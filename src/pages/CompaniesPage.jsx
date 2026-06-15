@@ -28,8 +28,8 @@ const CompaniesPage = () => {
     setGroups(fetchedGroups);
     setAllCompanies(fetchedCompanies);
     
-    // Auto-expand all groups on initial load
-    setExpandedGroups(new Set(fetchedGroups.map(g => g.id)));
+    // Começa com todos os grupos colapsados (fechados)
+    setExpandedGroups(new Set());
     setLoading(false);
   };
 
