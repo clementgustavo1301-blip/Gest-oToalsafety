@@ -1,0 +1,297 @@
+import { supabase } from '../lib/supabase';
+
+// --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
+
+function mapCompany(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    groupId: row.group_id,
+    name: row.name,
+    cnpj: row.cnpj,
+    contact: row.contact,
+    phone: row.phone,
+  };
+}
+
+function mapContract(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    contractNumber: row.contract_number,
+    description: row.description,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    status: row.status,
+    value: row.value,
+    filePath: row.file_path,
+  };
+}
+
+function mapDeliverable(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    contractId: row.contract_id,
+    title: row.title,
+    type: row.type,
+    status: row.status,
+    dueDate: row.due_date,
+    validityDate: row.validity_date,
+    deliveredDate: row.delivered_date,
+    fileName: row.file_name,
+    reason: row.reason,
+  };
+}
+
+function mapTraining(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    deliverableId: row.deliverable_id,
+    title: row.title,
+    date: row.date,
+    time: row.time,
+    status: row.status,
+    instructor: row.instructor,
+    participants: row.participants,
+  };
+}
+
+// --- Groups ---
+export async function getGroups() {
+  const { data, error } = await supabase.from('groups').select('*').order('created_at', { ascending: true });
+  if (error) { console.error('Error fetching groups:', error); return []; }
+  return data;
+}
+
+export async function addGroup(group) {
+  const { data, error } = await supabase.from('groups').insert([{ name: group.name }]).select().single();
+  if (error) { console.error('Error adding group:', error); return null; }
+  return data;
+}
+
+export async function deleteGroup(groupId) {
+  const { error } = await supabase.from('groups').delete().eq('id', groupId);
+  if (error) console.error('Error deleting group:', error);
+}
+
+// --- Companies ---
+export async function getCompanies() {
+  const { data, error } = await supabase.from('companies').select('*').order('name', { ascending: true });
+  if (error) { console.error('Error fetching companies:', error); return []; }
+  return data.map(mapCompany);
+}
+
+export async function getCompaniesByGroup(groupId) {
+  const { data, error } = await supabase.from('companies').select('*').eq('group_id', groupId);
+  if (error) { console.error('Error fetching companies by group:', error); return []; }
+  return data.map(mapCompany);
+}
+
+export async function getCompanyById(companyId) {
+  const { data, error } = await supabase.from('companies').select('*').eq('id', companyId).single();
+  if (error) { console.error('Error fetching company:', error); return null; }
+  return mapCompany(data);
+}
+
+export async function addCompany(company) {
+  const { data, error } = await supabase.from('companies').insert([{
+    group_id: company.groupId,
+    name: company.name,
+    cnpj: company.cnpj,
+    contact: company.contact,
+    phone: company.phone
+  }]).select().single();
+  if (error) { console.error('Error adding company:', error); return null; }
+  return mapCompany(data);
+}
+
+export async function deleteCompany(companyId) {
+  const { error } = await supabase.from('companies').delete().eq('id', companyId);
+  if (error) console.error('Error deleting company:', error);
+}
+
+// --- Trainings ---
+export async function getTrainings() {
+  const { data, error } = await supabase.from('trainings').select('*').order('date', { ascending: true });
+  if (error) { console.error('Error fetching trainings:', error); return []; }
+  return data.map(mapTraining);
+}
+
+export async function getTrainingsByCompany(companyId) {
+  const { data, error } = await supabase.from('trainings').select('*').eq('company_id', companyId);
+  if (error) { console.error('Error fetching trainings by company:', error); return []; }
+  return data.map(mapTraining);
+}
+
+export async function addTraining(training) {
+  const { data, error } = await supabase.from('trainings').insert([{
+    company_id: training.companyId,
+    deliverable_id: training.deliverableId,
+    title: training.title,
+    date: training.date,
+    time: training.time,
+    status: training.status,
+    instructor: training.instructor,
+    participants: training.participants
+  }]).select().single();
+  if (error) { console.error('Error adding training:', error); return null; }
+  return mapTraining(data);
+}
+
+export async function updateTraining(trainingId, updates) {
+  const snakeUpdates = {};
+  if (updates.status !== undefined) snakeUpdates.status = updates.status;
+  if (updates.instructor !== undefined) snakeUpdates.instructor = updates.instructor;
+  if (updates.participants !== undefined) snakeUpdates.participants = updates.participants;
+  if (updates.date !== undefined) snakeUpdates.date = updates.date;
+  if (updates.time !== undefined) snakeUpdates.time = updates.time;
+
+  const { data, error } = await supabase.from('trainings').update(snakeUpdates).eq('id', trainingId).select().single();
+  if (error) { console.error('Error updating training:', error); return null; }
+  return mapTraining(data);
+}
+
+export async function deleteTraining(trainingId) {
+  const { error } = await supabase.from('trainings').delete().eq('id', trainingId);
+  if (error) console.error('Error deleting training:', error);
+}
+
+// --- Contracts ---
+export async function getContracts() {
+  const { data, error } = await supabase.from('contracts').select('*');
+  if (error) { console.error('Error fetching contracts:', error); return []; }
+  return data.map(mapContract);
+}
+
+export async function getContractsByCompany(companyId) {
+  const { data, error } = await supabase.from('contracts').select('*').eq('company_id', companyId);
+  if (error) { console.error('Error fetching contracts by company:', error); return []; }
+  return data.map(mapContract);
+}
+
+export async function addContract(contract) {
+  // Garantir que o valor seja numérico ou nulo
+  let parsedValue = null;
+  if (contract.value) {
+    const numericString = contract.value.replace(/[^0-9,-]+/g, '').replace(',', '.');
+    if (!isNaN(parseFloat(numericString))) {
+      parsedValue = parseFloat(numericString);
+    }
+  }
+
+  const { data, error } = await supabase.from('contracts').insert([{
+    company_id: contract.companyId,
+    contract_number: contract.contractNumber,
+    description: contract.description,
+    start_date: contract.startDate,
+    end_date: contract.endDate,
+    status: contract.status || 'ativo',
+    value: parsedValue,
+    file_path: contract.filePath
+  }]).select().single();
+  if (error) {
+    console.error('Error adding contract:', error);
+    alert(`Erro ao adicionar contrato: ${error.message}`);
+    return null;
+  }
+  return mapContract(data);
+}
+
+export async function updateContract(contractId, updates) {
+  const snakeUpdates = {};
+  if (updates.status !== undefined) snakeUpdates.status = updates.status;
+  if (updates.filePath !== undefined) snakeUpdates.file_path = updates.filePath;
+
+  const { data, error } = await supabase.from('contracts').update(snakeUpdates).eq('id', contractId).select().single();
+  if (error) { console.error('Error updating contract:', error); return null; }
+  return mapContract(data);
+}
+
+// --- Deliverables ---
+export async function getDeliverables() {
+  const { data, error } = await supabase.from('deliverables').select('*').order('due_date', { ascending: true });
+  if (error) { console.error('Error fetching deliverables:', error); return []; }
+  return data.map(mapDeliverable);
+}
+
+export async function getDeliverablesByCompany(companyId) {
+  const { data, error } = await supabase.from('deliverables').select('*').eq('company_id', companyId);
+  if (error) { console.error('Error fetching deliverables by company:', error); return []; }
+  return data.map(mapDeliverable);
+}
+
+export async function getDeliverablesByContract(contractId) {
+  const { data, error } = await supabase.from('deliverables').select('*').eq('contract_id', contractId);
+  if (error) { console.error('Error fetching deliverables by contract:', error); return []; }
+  return data.map(mapDeliverable);
+}
+
+export async function addDeliverable(deliverable) {
+  const { data, error } = await supabase.from('deliverables').insert([{
+    company_id: deliverable.companyId,
+    contract_id: deliverable.contractId,
+    title: deliverable.title,
+    type: deliverable.type,
+    status: deliverable.status,
+    due_date: deliverable.dueDate,
+    validity_date: deliverable.validityDate,
+    delivered_date: deliverable.deliveredDate,
+    file_name: deliverable.fileName,
+    reason: deliverable.reason
+  }]).select().single();
+  if (error) { console.error('Error adding deliverable:', error); return null; }
+  return mapDeliverable(data);
+}
+
+export async function updateDeliverable(deliverableId, updates) {
+  const snakeUpdates = {};
+  if (updates.status !== undefined) snakeUpdates.status = updates.status;
+  if (updates.deliveredDate !== undefined) snakeUpdates.delivered_date = updates.deliveredDate;
+  if (updates.fileName !== undefined) snakeUpdates.file_name = updates.fileName;
+  if (updates.reason !== undefined) snakeUpdates.reason = updates.reason;
+
+  const { data, error } = await supabase.from('deliverables').update(snakeUpdates).eq('id', deliverableId).select().single();
+  if (error) { console.error('Error updating deliverable:', error); return null; }
+  return mapDeliverable(data);
+}
+
+export async function getAllDeliverablesSummary() {
+  // To avoid multiple queries, we can fetch all and map
+  const deliverables = await getDeliverables();
+  const companies = await getCompanies();
+  const contracts = await getContracts();
+
+  return deliverables.map(d => ({
+    ...d,
+    companyName: companies.find(c => c.id === d.companyId)?.name || 'N/A',
+    contractNumber: contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A',
+  }));
+}
+
+// --- Storage (Arquivos) ---
+export async function uploadDocument(file, folderPath) {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+  const filePath = `${folderPath}/${fileName}`;
+
+  const { error } = await supabase.storage
+    .from('documents')
+    .upload(filePath, file);
+
+  if (error) {
+    console.error('Error uploading file:', error);
+    return null;
+  }
+  return filePath;
+}
+
+export function getDocumentUrl(filePath) {
+  if (!filePath) return null;
+  const { data } = supabase.storage.from('documents').getPublicUrl(filePath);
+  return data.publicUrl;
+}

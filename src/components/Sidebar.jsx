@@ -1,15 +1,19 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles } from 'lucide-react';
 import React from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
   const location = useLocation();
+  const { signOut } = useAuth();
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
+    { name: 'Empresas', path: '/companies', icon: <Building2 size={20} /> },
     { name: 'Calendário', path: '/calendar', icon: <Calendar size={20} /> },
-    { name: 'Contratos', path: '#', icon: <ClipboardList size={20} /> },
-    { name: 'Configurações', path: '#', icon: <Settings size={20} /> },
+    { name: 'Entregáveis', path: '/deliverables', icon: <FileText size={20} /> },
+    { name: 'Assistente IA', path: '/ai-assistant', icon: <Sparkles size={20} /> },
+    { name: 'Configurações', path: '/settings', icon: <Settings size={20} /> },
   ];
 
   return (
@@ -43,7 +47,9 @@ const Sidebar = () => {
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = item.path !== '#' && (
+            item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+          );
           return (
             <Link
               key={item.name}
@@ -88,16 +94,33 @@ const Sidebar = () => {
         alignItems: 'center',
         gap: '0.75rem'
       }}>
-        <div style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: 'var(--secondary)',
-          boxShadow: '0 0 0 2px var(--surface), 0 0 0 4px var(--secondary-light)'
-        }} />
-        <span style={{ fontSize: '0.875rem', color: 'var(--secondary-hover)', fontWeight: '500' }}>
-          Sistema Online
-        </span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--secondary)',
+              boxShadow: '0 0 0 2px var(--surface), 0 0 0 4px var(--secondary-light)'
+            }} />
+            <span style={{ fontSize: '0.875rem', color: 'var(--secondary-hover)', fontWeight: '500' }}>
+              Sistema Online
+            </span>
+          </div>
+          <button 
+            onClick={signOut}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%',
+              padding: '0.5rem', background: 'transparent', border: 'none',
+              color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8125rem',
+              fontWeight: '500', transition: 'var(--transition)', borderRadius: 'var(--radius-sm)'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; e.currentTarget.style.color = 'var(--danger)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          >
+            <LogOut size={16} /> Sair do Sistema
+          </button>
+        </div>
       </div>
     </aside>
   );
