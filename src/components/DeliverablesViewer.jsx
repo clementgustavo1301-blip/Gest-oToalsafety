@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   getDeliverablesByCompany, getContractsByCompany, addDeliverable, updateDeliverable,
-  uploadDocument, getDocumentUrl
+  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts
 } from '../services/storageService';
 import AddDeliverableModal from './AddDeliverableModal';
 
@@ -21,6 +21,7 @@ const STATUS_CONFIG = {
   entregue: { label: 'Entregue', icon: <CheckCircle size={14} />, color: 'var(--secondary-hover)', bg: 'var(--secondary-light)' },
   feito: { label: 'Feito', icon: <CheckCircle size={14} />, color: 'var(--secondary-hover)', bg: 'var(--secondary-light)' },
   pendente: { label: 'Pendente', icon: <Clock size={14} />, color: '#b45309', bg: '#fef3c7' },
+  agendado: { label: 'Agendado', icon: <Clock size={14} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
   em_elaboracao: { label: 'Em Elaboração', icon: <AlertTriangle size={14} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
   adiado: { label: 'Adiado', icon: <AlertTriangle size={14} />, color: '#b45309', bg: '#fef3c7' },
   cancelado: { label: 'Cancelado', icon: <AlertTriangle size={14} />, color: 'var(--danger)', bg: '#fee2e2' },
@@ -39,17 +40,26 @@ const DeliverablesViewer = ({ companyId }) => {
 
   const loadData = async () => {
     setLoading(true);
-    const [delivs, ctrs] = await Promise.all([
-      getDeliverablesByCompany(companyId),
-      getContractsByCompany(companyId)
-    ]);
-    setDeliverables(delivs);
-    setContracts(ctrs);
+    if (companyId) {
+      const [delivs, ctrs] = await Promise.all([
+        getDeliverablesByCompany(companyId),
+        getContractsByCompany(companyId)
+      ]);
+      setDeliverables(delivs);
+      setContracts(ctrs);
+    } else {
+      const [delivs, ctrs] = await Promise.all([
+        getAllDeliverablesSummary(),
+        getContracts()
+      ]);
+      setDeliverables(delivs);
+      setContracts(ctrs);
+    }
     setLoading(false);
   };
 
   useEffect(() => {
-    if (companyId) loadData();
+    loadData();
   }, [companyId]);
 
   const handleAddDeliverable = async (data) => {
@@ -72,11 +82,11 @@ const DeliverablesViewer = ({ companyId }) => {
     await loadData();
   };
 
-  const handleFileUpload = async (deliverableId, file) => {
+  const handleFileUpload = async (deliverableId, file, destCompanyId) => {
     if (!file) return;
     setUploadingId(deliverableId);
     
-    const filePath = await uploadDocument(file, `deliverables/${companyId}`);
+    const filePath = await uploadDocument(file, `deliverables/${destCompanyId || companyId}`);
     if (filePath) {
       await updateDeliverable(deliverableId, { fileName: filePath, status: 'feito', deliveredDate: new Date().toISOString() });
       await loadData();
@@ -93,7 +103,9 @@ const DeliverablesViewer = ({ companyId }) => {
   const filtered = deliverables.filter(d => {
     const matchType = filterType === 'all' || d.type === filterType;
     const matchContract = filterContract === 'all' || d.contractId === filterContract;
-    const matchSearch = !searchTerm || d.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchSearch = !searchTerm || 
+      d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (d.companyName && d.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchType && matchContract && matchSearch;
   });
 
@@ -218,10 +230,17 @@ const DeliverablesViewer = ({ companyId }) => {
                 </div>
               </div>
 
-              {/* Title */}
-              <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem', lineHeight: 1.4 }}>
-                {d.title}
-              </h4>
+              {/* Title & Company */}
+              <div>
+                <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem', lineHeight: 1.4 }}>
+                  {d.title}
+                </h4>
+                {!companyId && d.companyName && (
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <FileText size={12} /> {d.companyName}
+                  </p>
+                )}
+              </div>
 
               {/* Meta */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
@@ -261,7 +280,7 @@ const DeliverablesViewer = ({ companyId }) => {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', flexWrap: 'wrap' }}>
-                {d.status !== 'feito' && d.status !== 'entregue' && d.type !== 'treinamento' && (
+                {d.status !== 'feito' && d.status !== 'entregue' && (
                   <button
                     className="btn"
                     onClick={() => handleChangeStatus(d.id, 'feito')}
@@ -275,7 +294,7 @@ const DeliverablesViewer = ({ companyId }) => {
                     Marcar Feito
                   </button>
                 )}
-                {d.status !== 'adiado' && d.type !== 'treinamento' && (
+                {d.status !== 'adiado' && (
                   <button
                     className="btn"
                     onClick={() => handleChangeStatus(d.id, 'adiado')}
@@ -289,7 +308,7 @@ const DeliverablesViewer = ({ companyId }) => {
                     Adiar
                   </button>
                 )}
-                {d.status !== 'cancelado' && d.type !== 'treinamento' && (
+                {d.status !== 'cancelado' && (
                   <button
                     className="btn"
                     onClick={() => handleChangeStatus(d.id, 'cancelado')}
@@ -336,7 +355,7 @@ const DeliverablesViewer = ({ companyId }) => {
                       accept=".pdf,.doc,.docx" 
                       style={{ display: 'none' }} 
                       disabled={uploadingId === d.id}
-                      onChange={(e) => handleFileUpload(d.id, e.target.files[0])}
+                      onChange={(e) => handleFileUpload(d.id, e.target.files[0], d.company_id || companyId)}
                     />
                   </label>
                 )}

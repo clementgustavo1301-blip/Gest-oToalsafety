@@ -43,6 +43,7 @@ function mapDeliverable(row) {
     deliveredDate: row.delivered_date,
     fileName: row.file_name,
     reason: row.reason,
+    description: row.description,
   };
 }
 
@@ -58,6 +59,7 @@ function mapTraining(row) {
     status: row.status,
     instructor: row.instructor,
     participants: row.participants,
+    description: row.description
   };
 }
 
@@ -106,7 +108,39 @@ export async function addCompany(company) {
     contact: company.contact,
     phone: company.phone
   }]).select().single();
-  if (error) { console.error('Error adding company:', error); return null; }
+  if (error) { 
+    console.error('Error adding company:', error); 
+    if (error.code === '23505') {
+      alert('Erro: Já existe uma empresa cadastrada com este CNPJ!');
+    } else {
+      alert(`Erro ao adicionar empresa: ${error.message}`);
+    }
+    return null; 
+  }
+
+  const standardDeliverables = [
+    { company_id: data.id, title: 'Visita Técnica In Loco', type: 'visita_tecnica', status: 'pendente', description: 'Mensal (4h/Visita)' },
+    { company_id: data.id, title: 'PGR & Mapa de Riscos', type: 'programa', status: 'pendente', description: 'Anual / Alteração' },
+    { company_id: data.id, title: 'Avaliações Psicossociais', type: 'laudo', status: 'pendente', description: 'Estruturação Inicial' },
+    { company_id: data.id, title: 'LTCAT & LTIP', type: 'laudo', status: 'pendente', description: 'Conforme Legislação' },
+    { company_id: data.id, title: 'PCA (Conservação Auditiva)', type: 'programa', status: 'pendente', description: 'Anual' },
+    { company_id: data.id, title: 'Apoio Técnico e Perícias', type: 'programa', status: 'pendente', description: 'Sob Demanda' },
+    { company_id: data.id, title: 'Treinamentos Digitais (EaD)', type: 'treinamento', status: 'pendente', description: 'Contínuo' },
+    { company_id: data.id, title: 'Palestras Preventivas', type: 'treinamento', status: 'pendente', description: 'Conforme PGR' },
+    { company_id: data.id, title: 'Gestão de Certificados', type: 'programa', status: 'pendente', description: 'Contínuo' },
+    { company_id: data.id, title: 'PCMSO Base & Relatório', type: 'programa', status: 'pendente', description: 'Anual' },
+    { company_id: data.id, title: 'Controle de Vencimentos', type: 'programa', status: 'pendente', description: 'Contínuo' },
+    { company_id: data.id, title: 'Atendimento Premium', type: 'visita_tecnica', status: 'pendente', description: 'Sob Agendamento' },
+    { company_id: data.id, title: 'Eventos eSocial (S-2240)', type: 'programa', status: 'pendente', description: 'Contínuo' },
+    { company_id: data.id, title: 'PPP Digital', type: 'programa', status: 'pendente', description: 'Contínuo' },
+    { company_id: data.id, title: 'Plataforma e Documentos', type: 'programa', status: 'pendente', description: 'Contínuo' }
+  ];
+
+  const { error: delivError } = await supabase.from('deliverables').insert(standardDeliverables);
+  if (delivError) {
+    console.error('Error adding standard deliverables:', delivError);
+  }
+
   return mapCompany(data);
 }
 
@@ -149,9 +183,15 @@ export async function addTraining(training) {
     time: training.time,
     status: training.status,
     instructor: training.instructor,
-    participants: training.participants
+    participants: training.participants,
+    description: training.description
   }]).select().single();
   if (error) { console.error('Error adding training:', error); return null; }
+
+  if (training.deliverableId) {
+    await supabase.from('deliverables').update({ status: 'agendado' }).eq('id', training.deliverableId);
+  }
+
   return mapTraining(data);
 }
 
@@ -160,11 +200,23 @@ export async function updateTraining(trainingId, updates) {
   if (updates.status !== undefined) snakeUpdates.status = updates.status;
   if (updates.instructor !== undefined) snakeUpdates.instructor = updates.instructor;
   if (updates.participants !== undefined) snakeUpdates.participants = updates.participants;
+  if (updates.description !== undefined) snakeUpdates.description = updates.description;
   if (updates.date !== undefined) snakeUpdates.date = updates.date;
   if (updates.time !== undefined) snakeUpdates.time = updates.time;
 
   const { data, error } = await supabase.from('trainings').update(snakeUpdates).eq('id', trainingId).select().single();
   if (error) { console.error('Error updating training:', error); return null; }
+
+  // Sincronizar com deliverables
+  if (data.deliverable_id && updates.status) {
+    let delivStatus = 'agendado';
+    if (updates.status === 'concluido') delivStatus = 'feito';
+    if (updates.status === 'adiado') delivStatus = 'adiado';
+    if (updates.status === 'nao_feito') delivStatus = 'pendente';
+    
+    await supabase.from('deliverables').update({ status: delivStatus }).eq('id', data.deliverable_id);
+  }
+
   return mapTraining(data);
 }
 
@@ -254,7 +306,8 @@ export async function addDeliverable(deliverable) {
     validity_date: deliverable.validityDate,
     delivered_date: deliverable.deliveredDate,
     file_name: deliverable.fileName,
-    reason: deliverable.reason
+    reason: deliverable.reason,
+    description: deliverable.description
   }]).select().single();
   if (error) { console.error('Error adding deliverable:', error); return null; }
   return mapDeliverable(data);
@@ -263,12 +316,27 @@ export async function addDeliverable(deliverable) {
 export async function updateDeliverable(deliverableId, updates) {
   const snakeUpdates = {};
   if (updates.status !== undefined) snakeUpdates.status = updates.status;
-  if (updates.deliveredDate !== undefined) snakeUpdates.delivered_date = updates.deliveredDate;
-  if (updates.fileName !== undefined) snakeUpdates.file_name = updates.fileName;
   if (updates.reason !== undefined) snakeUpdates.reason = updates.reason;
+  if (updates.fileName !== undefined) snakeUpdates.file_name = updates.fileName;
+  if (updates.deliveredDate !== undefined) snakeUpdates.delivered_date = updates.deliveredDate;
 
   const { data, error } = await supabase.from('deliverables').update(snakeUpdates).eq('id', deliverableId).select().single();
   if (error) { console.error('Error updating deliverable:', error); return null; }
+
+  // Sincronizar com treinamentos (se for um treinamento)
+  if (updates.status) {
+    let trainingStatus = null;
+    if (updates.status === 'feito' || updates.status === 'entregue') trainingStatus = 'concluido';
+    if (updates.status === 'adiado') trainingStatus = 'adiado';
+    if (updates.status === 'cancelado') trainingStatus = 'nao_feito';
+    if (updates.status === 'agendado') trainingStatus = 'agendado';
+    if (updates.status === 'pendente') trainingStatus = 'agendado';
+
+    if (trainingStatus) {
+      await supabase.from('trainings').update({ status: trainingStatus }).eq('deliverable_id', deliverableId);
+    }
+  }
+
   return mapDeliverable(data);
 }
 

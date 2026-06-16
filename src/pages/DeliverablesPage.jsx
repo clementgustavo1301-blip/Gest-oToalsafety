@@ -5,6 +5,7 @@ import {
   Building2, ClipboardList
 } from 'lucide-react';
 import { getAllDeliverablesSummary, getContracts } from '../services/storageService';
+import DeliverablesViewer from '../components/DeliverablesViewer';
 
 const TYPE_CONFIG = {
   programa: { label: 'Programa', icon: <FileSpreadsheet size={14} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
@@ -14,7 +15,9 @@ const TYPE_CONFIG = {
 
 const STATUS_CONFIG = {
   entregue: { label: 'Entregue', icon: <CheckCircle size={12} />, color: 'var(--secondary-hover)', bg: 'var(--secondary-light)' },
+  feito: { label: 'Feito', icon: <CheckCircle size={12} />, color: 'var(--secondary-hover)', bg: 'var(--secondary-light)' },
   pendente: { label: 'Pendente', icon: <Clock size={12} />, color: '#b45309', bg: '#fef3c7' },
+  agendado: { label: 'Agendado', icon: <Clock size={12} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
   em_elaboracao: { label: 'Em Elaboração', icon: <AlertTriangle size={12} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
 };
 
@@ -104,170 +107,7 @@ const DeliverablesPage = () => {
       </div>
 
       {activeView === 'deliverables' && (
-        <>
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-            {[
-              { label: 'Total', value: stats.total, color: 'var(--text-primary)', bg: 'var(--background)' },
-              { label: 'Entregues', value: stats.entregue, color: 'var(--secondary)', bg: 'var(--secondary-light)' },
-              { label: 'Pendentes', value: stats.pendente, color: '#b45309', bg: '#fef3c7' },
-              { label: 'Em Elaboração', value: stats.em_elaboracao, color: 'var(--primary)', bg: 'var(--primary-light)' },
-            ].map((s, i) => (
-              <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem' }}>
-                <div style={{
-                  width: '44px', height: '44px', borderRadius: '50%',
-                  backgroundColor: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: '700', color: s.color }}>{s.value}</span>
-                </div>
-                <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{s.label}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Filters */}
-          <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '220px' }}>
-              <Search size={18} color="var(--text-secondary)" />
-              <input
-                id="search-all-deliverables"
-                type="text"
-                placeholder="Buscar por título ou empresa..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  flex: 1, border: 'none', outline: 'none', fontSize: '0.875rem',
-                  backgroundColor: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Filter size={16} color="var(--text-secondary)" />
-              <select
-                id="filter-all-type"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                style={{
-                  padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border)', fontSize: '0.8125rem',
-                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                  fontFamily: 'inherit', cursor: 'pointer'
-                }}
-              >
-                <option value="all">Todos os tipos</option>
-                <option value="programa">Programas</option>
-                <option value="laudo">Laudos</option>
-                <option value="contrato">Contratos</option>
-              </select>
-              <select
-                id="filter-all-status"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                style={{
-                  padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border)', fontSize: '0.8125rem',
-                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                  fontFamily: 'inherit', cursor: 'pointer'
-                }}
-              >
-                <option value="all">Todos os status</option>
-                <option value="entregue">Entregues</option>
-                <option value="pendente">Pendentes</option>
-                <option value="em_elaboracao">Em Elaboração</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--background)' }}>
-                  {['Entregável', 'Empresa', 'Tipo', 'Vencimento', 'Status', 'Arquivo'].map(col => (
-                    <th key={col} style={{
-                      padding: '0.875rem 1.25rem', textAlign: 'left',
-                      fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)',
-                      textTransform: 'uppercase', letterSpacing: '0.05em',
-                      borderBottom: '1px solid var(--border)'
-                    }}>
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((d) => {
-                  const typeConf = TYPE_CONFIG[d.type] || TYPE_CONFIG.contrato;
-                  const statusConf = STATUS_CONFIG[d.status] || STATUS_CONFIG.pendente;
-
-                  return (
-                    <tr key={d.id} style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--background)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                    >
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <span style={{ fontWeight: '500', fontSize: '0.875rem', color: 'var(--text-primary)' }}>{d.title}</span>
-                        <br />
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{d.contractNumber}</span>
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
-                          <Building2 size={14} color="var(--text-secondary)" /> {d.companyName}
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                          padding: '0.25rem 0.625rem', borderRadius: '1rem',
-                          backgroundColor: typeConf.bg, color: typeConf.color,
-                          fontSize: '0.75rem', fontWeight: '600'
-                        }}>
-                          {typeConf.icon} {typeConf.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem', fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
-                        {d.dueDate ? new Date(d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''}
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                          padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                          backgroundColor: statusConf.bg, color: statusConf.color,
-                          fontSize: '0.6875rem', fontWeight: '500'
-                        }}>
-                          {statusConf.icon} {statusConf.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem 1.25rem' }}>
-                        {d.fileName ? (
-                          <button
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: '0.375rem',
-                              fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '500',
-                              padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)',
-                              backgroundColor: 'var(--primary-light)', cursor: 'pointer',
-                              transition: 'var(--transition)', border: 'none'
-                            }}
-                          >
-                            <Download size={12} /> PDF
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {filtered.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                <FileText size={40} style={{ marginBottom: '0.75rem', opacity: 0.4 }} />
-                <p>Nenhum entregável encontrado.</p>
-              </div>
-            )}
-          </div>
-        </>
+        <DeliverablesViewer />
       )}
 
       {activeView === 'contracts' && (

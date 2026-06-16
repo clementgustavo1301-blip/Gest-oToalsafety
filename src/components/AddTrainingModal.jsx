@@ -11,6 +11,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [time, setTime] = useState('08:00 - 12:00');
   const [instructor, setInstructor] = useState('');
   const [participants, setParticipants] = useState('');
+  const [description, setDescription] = useState('');
 
   const [customTitle, setCustomTitle] = useState('');
   const [isStandalone, setIsStandalone] = useState(false);
@@ -63,6 +64,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       time,
       instructor: instructor.trim(),
       participants: parseInt(participants) || 0,
+      description: description.trim(),
       status: 'agendado',
       deliverableId,
       companyId: selectedCompanyId
@@ -224,9 +226,23 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                     placeholder="0"
                     className="modal-input"
                     min="0"
-                    disabled={saving}
                   />
                 </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="modal-label" htmlFor="training-description">Descrição / Observações</label>
+                <textarea
+                  id="training-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Detalhes adicionais sobre o treinamento..."
+                  className="modal-input"
+                  rows={3}
+                  disabled={saving}
+                  style={{ resize: 'vertical' }}
+                />
               </div>
 
             </div>

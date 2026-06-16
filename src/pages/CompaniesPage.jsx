@@ -4,7 +4,7 @@ import {
   Building2, Plus, ChevronDown, ChevronRight, Search,
   Trash2, Users, FileText, MapPin
 } from 'lucide-react';
-import { getGroups, getCompanies, addGroup, addCompany, deleteGroup } from '../services/storageService';
+import { getGroups, getCompanies, addGroup, addCompany, deleteGroup, deleteCompany } from '../services/storageService';
 import AddGroupModal from '../components/AddGroupModal';
 import AddCompanyModal from '../components/AddCompanyModal';
 
@@ -52,9 +52,11 @@ const CompaniesPage = () => {
   };
 
   const handleAddCompany = async (companyData) => {
-    await addCompany({ ...companyData, groupId: selectedGroupId });
-    await loadData();
-    setShowCompanyModal(false);
+    const success = await addCompany({ ...companyData, groupId: selectedGroupId });
+    if (success) {
+      await loadData();
+      setShowCompanyModal(false);
+    }
   };
 
   const handleDeleteGroup = async (groupId) => {
@@ -223,7 +225,28 @@ const CompaniesPage = () => {
                             </div>
                           </div>
                         </div>
-                        <ChevronRight size={18} color="var(--text-secondary)" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (window.confirm(`Tem certeza que deseja excluir a empresa ${company.name}? Isso apagará também os laudos e treinamentos dela.`)) {
+                                await deleteCompany(company.id);
+                                await loadData();
+                              }
+                            }}
+                            style={{ 
+                              padding: '0.375rem', borderRadius: 'var(--radius-md)', 
+                              color: 'var(--danger)', opacity: 0.7, background: 'transparent', border: 'none', cursor: 'pointer', transition: 'var(--transition)' 
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            title="Excluir Empresa"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                          <ChevronRight size={18} color="var(--text-secondary)" />
+                        </div>
                       </Link>
                     ))
                   )}

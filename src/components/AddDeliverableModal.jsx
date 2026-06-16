@@ -4,6 +4,7 @@ import { getContractsByCompany } from '../services/storageService';
 
 const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [type, setType] = useState('programa');
   const [contractId, setContractId] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -34,6 +35,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
     setSaving(true);
     await onSave({
       title: title.trim(),
+      description: description.trim() || null,
       type,
       contractId: contractId || (contracts.length > 0 ? contracts[0].id : null),
       dueDate: dueDate || null,
@@ -84,6 +86,21 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                   autoFocus
                   required
                   disabled={saving}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="modal-label" htmlFor="dlv-desc">Descrição / Detalhes (Opcional)</label>
+                <textarea
+                  id="dlv-desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Detalhes ou anotações sobre este entregável..."
+                  className="modal-input"
+                  rows="3"
+                  disabled={saving}
+                  style={{ resize: 'vertical' }}
                 />
               </div>
 

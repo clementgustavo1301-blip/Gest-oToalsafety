@@ -56,7 +56,7 @@ const dbToolDeclaration = {
         properties: {
           table: { type: "STRING", description: "Nome exato da tabela no banco. Use SOMENTE estas opções: 'groups' (grupos de empresas), 'companies' (empresas), 'trainings' (treinamentos), 'contracts' (contratos) ou 'deliverables' (laudos, programas, entregáveis)" },
           action: { type: "STRING", description: "A ação a ser executada: select, insert, update ou delete" },
-          data: { type: "OBJECT", description: "Colunas exatas permitidas por tabela: groups (name), companies (group_id, name, cnpj, contact, phone), trainings (company_id, deliverable_id, title, date, time, status, instructor, participants), contracts (company_id, contract_number, description, start_date, end_date, status, value, file_path), deliverables (company_id, contract_id, title, type, status, due_date, validity_date, delivered_date, file_name, reason). NÃO INVENTE COLUNAS COMO 'address'. Deixe vazio para select/delete." },
+          data: { type: "OBJECT", description: "Colunas exatas permitidas por tabela: groups (name), companies (group_id, name, cnpj, contact, phone), trainings (company_id, deliverable_id, title, date, time, status, instructor, participants), contracts (company_id, contract_number, description, start_date, end_date, status, value, file_path), deliverables (company_id, contract_id, title, description, type, status, due_date, validity_date, delivered_date, file_name, reason). NÃO INVENTE COLUNAS COMO 'address'. Deixe vazio para select/delete." },
           filters: { type: "OBJECT", description: "Objeto com filtros essenciais para select, update ou delete (ex: { id: 1 }). Deixe vazio para insert." }
         },
         required: ["table", "action"]

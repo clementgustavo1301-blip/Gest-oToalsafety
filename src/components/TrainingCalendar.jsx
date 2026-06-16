@@ -255,6 +255,16 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                   </div>
                 </div>
 
+                {event.description && (
+                  <div style={{
+                    fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1rem',
+                    padding: '0.5rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-sm)',
+                    borderLeft: '2px solid var(--border)'
+                  }}>
+                    {event.description}
+                  </div>
+                )}
+
                 {/* Status Actions */}
                 <div style={{
                   display: 'flex', gap: '0.5rem', paddingTop: '0.75rem',
