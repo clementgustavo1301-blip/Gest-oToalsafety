@@ -2,10 +2,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles } from 'lucide-react';
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useAI } from '../context/AIContext';
 
 const Sidebar = () => {
   const location = useLocation();
   const { signOut } = useAuth();
+  const { unreadCount } = useAI();
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
@@ -78,8 +80,26 @@ const Sidebar = () => {
                 }
               }}
             >
-              {item.icon}
-              {item.name}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                {item.icon}
+                {item.name}
+              </div>
+              {item.path === '/ai-assistant' && unreadCount > 0 && (
+                <div style={{
+                  backgroundColor: 'var(--danger)',
+                  color: 'white',
+                  fontSize: '0.6875rem',
+                  fontWeight: 'bold',
+                  padding: '0.125rem 0.375rem',
+                  borderRadius: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '20px'
+                }}>
+                  {unreadCount}
+                </div>
+              )}
             </Link>
           );
         })}

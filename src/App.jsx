@@ -10,6 +10,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import { AIProvider } from './context/AIContext';
 
 function App() {
   return (
@@ -22,20 +23,22 @@ function App() {
           {/* Rotas Protegidas */}
           <Route path="/*" element={
             <ProtectedRoute>
-              <div className="app-layout">
-                <Sidebar />
-                <main className="main-content">
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/calendar" element={<CalendarView />} />
-                    <Route path="/companies" element={<CompaniesPage />} />
-                    <Route path="/company/:companyId" element={<CompanyDetailsPage />} />
-                    <Route path="/deliverables" element={<DeliverablesPage />} />
-                    <Route path="/ai-assistant" element={<AIAssistant />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                  </Routes>
-                </main>
-              </div>
+              <AIProvider>
+                <div className="app-layout">
+                  <Sidebar />
+                  <main className="main-content">
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/calendar" element={<CalendarView />} />
+                      <Route path="/companies" element={<CompaniesPage />} />
+                      <Route path="/company/:companyId" element={<CompanyDetailsPage />} />
+                      <Route path="/deliverables" element={<DeliverablesPage />} />
+                      <Route path="/ai-assistant" element={<AIAssistant />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                    </Routes>
+                  </main>
+                </div>
+              </AIProvider>
             </ProtectedRoute>
           } />
         </Routes>

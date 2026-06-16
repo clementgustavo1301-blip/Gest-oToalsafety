@@ -1,34 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Send, Sparkles, Bot, User, ShieldCheck, Paperclip, X, FileText } from 'lucide-react';
-import { sendMessageToAI } from '../services/aiService';
-import { extractTextFromPDF } from '../utils/pdfParser';
+import { useAI } from '../context/AIContext';
 
 const AIAssistant = () => {
-  const [messages, setMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ecoia_chat_messages');
-      const savedTime = localStorage.getItem('ecoia_chat_timestamp');
-      if (saved && savedTime) {
-        // Exclui com 24h (24 * 60 * 60 * 1000 = 86400000 ms)
-        if (Date.now() - parseInt(savedTime, 10) < 86400000) {
-          return JSON.parse(saved);
-        }
-      }
-    } catch (e) {
-      console.error('Erro ao ler chat salvo:', e);
-    }
-    return [
-      {
-        id: 1,
-        role: 'assistant',
-        text: 'Olá! Sou a EcoIA, sua especialista em Segurança do Trabalho. Como posso te ajudar hoje com a gestão da sua clínica ou empresas?'
-      }
-    ];
-  });
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const { 
+    messages, 
+    input, setInput, 
+    isTyping, isExtracting, 
+    handleSend, 
+    markAsRead, 
+    setIsActivePage 
+  } = useAI();
+  
   const [attachedFile, setAttachedFile] = useState(null);
-  const [isExtracting, setIsExtracting] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -38,92 +22,18 @@ const AIAssistant = () => {
 
   useEffect(() => {
     scrollToBottom();
-    try {
-      localStorage.setItem('ecoia_chat_messages', JSON.stringify(messages));
-      localStorage.setItem('ecoia_chat_timestamp', Date.now().toString());
-    } catch (e) {
-      console.error('Erro ao salvar chat:', e);
-    }
-  }, [messages]);
+  }, [messages, isTyping]);
 
-  const handleSend = async (e) => {
+  useEffect(() => {
+    setIsActivePage(true);
+    markAsRead();
+    return () => setIsActivePage(false);
+  }, [setIsActivePage, markAsRead]);
+
+  const onSubmit = (e) => {
     e.preventDefault();
-    if (!input.trim() && !attachedFile) return;
-
-    setIsExtracting(true);
-    let extractedText = '';
-    
-    if (attachedFile) {
-      try {
-        extractedText = await extractTextFromPDF(attachedFile);
-      } catch (err) {
-        alert(err.message);
-        setIsExtracting(false);
-        return;
-      }
-    }
-
-    const userMessageText = input.trim();
-    const finalMessageText = attachedFile 
-      ? `(Arquivo anexado: ${attachedFile.name})\n\n${userMessageText}\n\n[CONTEÚDO DO DOCUMENTO]:\n${extractedText}`
-      : userMessageText;
-
-    const userMessage = {
-      id: Date.now(),
-      role: 'user',
-      text: userMessageText || `Analise o documento anexado: ${attachedFile.name}`,
-      internalText: finalMessageText // Texto real enviado pra IA
-    };
-
-    let newMessages = [...messages, userMessage];
-    
-    // Limite de 20 mensagens (mantém a primeira de boas vindas + 19 últimas)
-    if (newMessages.length > 20) {
-      newMessages = [newMessages[0], ...newMessages.slice(-19)];
-    }
-    
-    setMessages(newMessages);
-    setInput('');
+    handleSend(input, attachedFile);
     setAttachedFile(null);
-    setIsExtracting(false);
-    setIsTyping(true);
-
-    try {
-      // Mandamos o "internalText" (que tem o PDF embutido) pra IA, mas mostramos só o "text" pro usuário
-      const messagesToSend = newMessages.map(m => ({
-        role: m.role,
-        text: m.internalText || m.text
-      }));
-
-      const responseText = await sendMessageToAI(messagesToSend);
-      const aiResponse = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        text: responseText
-      };
-      setMessages(prev => {
-        let updated = [...prev, aiResponse];
-        if (updated.length > 20) {
-          updated = [updated[0], ...updated.slice(-19)];
-        }
-        return updated;
-      });
-    } catch (error) {
-      const errorResponse = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        text: `⚠️ **Erro:** ${error.message}`
-      };
-      setMessages(prev => {
-        let updated = [...prev, errorResponse];
-        if (updated.length > 20) {
-          updated = [updated[0], ...updated.slice(-19)];
-        }
-        return updated;
-      });
-    } finally {
-      setIsTyping(false);
-    }
   };
 
   return (
@@ -264,7 +174,7 @@ const AIAssistant = () => {
         )}
 
         <form 
-          onSubmit={handleSend}
+          onSubmit={onSubmit}
           style={{
             display: 'flex',
             gap: '0.5rem',
@@ -285,7 +195,7 @@ const AIAssistant = () => {
             style={{ display: 'none' }}
             onChange={(e) => {
               if (e.target.files[0]) setAttachedFile(e.target.files[0]);
-              e.target.value = null; // reseta para permitir selecionar o mesmo depois
+              e.target.value = null; 
             }}
           />
           <button
@@ -332,8 +242,13 @@ const AIAssistant = () => {
           </button>
         </form>
         <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          <ShieldCheck size={12} style={{ display: 'inline', marginRight: '0.25rem', verticalAlign: 'middle' }} />
-          Assistente de Inteligência Artificial Especializado. Pode cometer erros. Considere verificar informações críticas.
+          <div style={{ marginBottom: '0.25rem' }}>
+            <ShieldCheck size={12} style={{ display: 'inline', marginRight: '0.25rem', verticalAlign: 'middle' }} />
+            Assistente de Inteligência Artificial Especializado. Pode cometer erros. Considere verificar informações críticas.
+          </div>
+          <div style={{ opacity: 0.8 }}>
+            🕒 O histórico desta conversa é apagado automaticamente todos os dias às 00:00.
+          </div>
         </div>
       </div>
       <style>{`

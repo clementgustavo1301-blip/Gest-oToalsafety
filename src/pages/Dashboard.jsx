@@ -2,7 +2,7 @@ import { ArrowRight, CheckCircle, Clock, AlertTriangle, FileText, Users, Buildin
 import { Link } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import {
-  getContracts, getDeliverables, getTrainings, getCompanies
+  getContracts, getDeliverables, getTrainings, getCompanies, getGroups
 } from '../services/storageService';
 
 const Dashboard = () => {
@@ -10,20 +10,23 @@ const Dashboard = () => {
   const [deliverables, setDeliverables] = useState([]);
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
-      const [c, d, t, comp] = await Promise.all([
+      const [c, d, t, comp, g] = await Promise.all([
         getContracts(),
         getDeliverables(),
         getTrainings(),
-        getCompanies()
+        getCompanies(),
+        getGroups()
       ]);
       setContracts(c);
       setDeliverables(d);
       setTrainings(t);
       setCompanies(comp);
+      setGroups(g);
       setLoading(false);
     }
     loadData();
@@ -39,6 +42,8 @@ const Dashboard = () => {
   const attentionItems = trainings.filter(t => t.status === 'nao_feito' || t.status === 'adiado').length;
 
   const stats = [
+    { title: 'Grupos Cadastrados', value: String(groups.length), icon: <Building2 size={24} color="var(--info)" />, trend: 'Total de grupos' },
+    { title: 'Empresas Ativas', value: String(companies.length), icon: <Building2 size={24} color="var(--primary)" />, trend: 'Matrizes e filiais' },
     { title: 'Contratos Ativos', value: String(activeContracts), icon: <FileText size={24} color="var(--primary)" />, trend: `${contracts.length} total` },
     { title: 'Entregáveis Pendentes', value: String(pendingDeliverables), icon: <Clock size={24} color="var(--warning)" />, trend: 'Aguardando ação' },
     { title: 'Treinamentos Concluídos', value: String(completedTrainings), icon: <Users size={24} color="var(--secondary)" />, trend: `de ${trainings.length} agendados` },

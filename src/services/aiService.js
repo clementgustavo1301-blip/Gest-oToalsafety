@@ -72,7 +72,16 @@ const callGemini = async (apiKey, messagesHistory) => {
     parts: [{ text: m.text }]
   }));
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  // Heurística para decidir o modelo: se tem PDF anexado ou texto longo, é complexo.
+  const lastMessage = messagesHistory[messagesHistory.length - 1]?.text || '';
+  const isComplex = lastMessage.includes('[CONTEÚDO DO DOCUMENTO]') || lastMessage.length > 300;
+  
+  // Selecionando modelos com base na tabela de cotas:
+  // - Simples: Gemini 3.1 Flash Lite (Cota excelente: 500 RPD / 15 RPM)
+  // - Complexo: Gemini 3.5 Flash (Cota restrita: 20 RPD / 5 RPM, porém mais robusto)
+  const modelToUse = isComplex ? 'gemini-3.5-flash' : 'gemini-3.1-flash-lite';
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`;
   
   let maxTurns = 15; // Limite alto para permitir que a IA crie vários registros em sequência
   
@@ -133,10 +142,10 @@ const callGemini = async (apiKey, messagesHistory) => {
     if (functionCallPart) {
       const { name, args } = functionCallPart.functionCall;
       
-      // Salva a decisão da IA no histórico temporário da conversa
+      // Salva a decisão da IA (e o raciocínio/thought_signature completo) no histórico temporário
       contents.push({
         role: "model",
-        parts: [{ functionCall: { name, args } }]
+        parts: parts
       });
 
       if (name === "database_operation") {
