@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText, ClipboardList,
-  Phone, User, Hash
+  Phone, User, Hash, Edit3
 } from 'lucide-react';
 import {
   getCompanyById, getGroups, getTrainingsByCompany,
   getContractsByCompany, getDeliverablesByCompany, addContract,
-  updateContract, uploadDocument, getDocumentUrl, addDeliverable
+  updateContract, uploadDocument, getDocumentUrl, addDeliverable,
+  updateCompany
 } from '../services/storageService';
 import TrainingCalendar from '../components/TrainingCalendar';
 import DeliverablesViewer from '../components/DeliverablesViewer';
 import AddContractModal from '../components/AddContractModal';
 import AddDeliverableModal from '../components/AddDeliverableModal';
+import EditCompanyModal from '../components/EditCompanyModal';
 
 const TABS = [
   { id: 'overview', label: 'Visão Geral', icon: <Building2 size={16} /> },
@@ -32,6 +34,7 @@ const CompanyDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showContractModal, setShowContractModal] = useState(false);
   const [showDeliverableModal, setShowDeliverableModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [uploadingContractId, setUploadingContractId] = useState(null);
 
   const loadData = async () => {
@@ -74,6 +77,12 @@ const CompanyDetailsPage = () => {
     await addDeliverable({ ...deliverableData, fileName, companyId });
     await loadData();
     setShowDeliverableModal(false);
+  };
+
+  const handleEditCompany = async (id, updates) => {
+    await updateCompany(id, updates);
+    await loadData();
+    setShowEditModal(false);
   };
 
   const handleContractFileUpload = async (contractId, file) => {
@@ -150,8 +159,17 @@ const CompanyDetailsPage = () => {
           <Building2 size={28} color="white" />
         </div>
         <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.375rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             {company.name}
+            <button 
+              onClick={() => setShowEditModal(true)} 
+              title="Editar Empresa"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', transition: 'color 0.2s' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+            >
+              <Edit3 size={18} />
+            </button>
           </h1>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -439,6 +457,14 @@ const CompanyDetailsPage = () => {
           companyId={companyId}
           onClose={() => setShowDeliverableModal(false)} 
           onSave={handleAddDeliverable} 
+        />
+      )}
+
+      {showEditModal && (
+        <EditCompanyModal 
+          company={company}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleEditCompany}
         />
       )}
     </div>

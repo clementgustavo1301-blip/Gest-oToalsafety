@@ -1,17 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Bot, User, ShieldCheck } from 'lucide-react';
+import { Send, Sparkles, Bot, User, ShieldCheck, Paperclip, X, FileText } from 'lucide-react';
+import { sendMessageToAI } from '../services/aiService';
+import { extractTextFromPDF } from '../utils/pdfParser';
 
 const AIAssistant = () => {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      role: 'assistant',
-      text: 'Olá! Sou seu Assistente de Inteligência Artificial Especialista em Segurança do Trabalho. Como posso te ajudar hoje com a gestão da sua clínica ou empresas?'
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ecoia_chat_messages');
+      const savedTime = localStorage.getItem('ecoia_chat_timestamp');
+      if (saved && savedTime) {
+        // Exclui com 24h (24 * 60 * 60 * 1000 = 86400000 ms)
+        if (Date.now() - parseInt(savedTime, 10) < 86400000) {
+          return JSON.parse(saved);
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao ler chat salvo:', e);
     }
-  ]);
+    return [
+      {
+        id: 1,
+        role: 'assistant',
+        text: 'Olá! Sou a EcoIA, sua especialista em Segurança do Trabalho. Como posso te ajudar hoje com a gestão da sua clínica ou empresas?'
+      }
+    ];
+  });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [isExtracting, setIsExtracting] = useState(false);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -19,32 +38,92 @@ const AIAssistant = () => {
 
   useEffect(() => {
     scrollToBottom();
+    try {
+      localStorage.setItem('ecoia_chat_messages', JSON.stringify(messages));
+      localStorage.setItem('ecoia_chat_timestamp', Date.now().toString());
+    } catch (e) {
+      console.error('Erro ao salvar chat:', e);
+    }
   }, [messages]);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && !attachedFile) return;
+
+    setIsExtracting(true);
+    let extractedText = '';
+    
+    if (attachedFile) {
+      try {
+        extractedText = await extractTextFromPDF(attachedFile);
+      } catch (err) {
+        alert(err.message);
+        setIsExtracting(false);
+        return;
+      }
+    }
+
+    const userMessageText = input.trim();
+    const finalMessageText = attachedFile 
+      ? `(Arquivo anexado: ${attachedFile.name})\n\n${userMessageText}\n\n[CONTEÚDO DO DOCUMENTO]:\n${extractedText}`
+      : userMessageText;
 
     const userMessage = {
       id: Date.now(),
       role: 'user',
-      text: input.trim()
+      text: userMessageText || `Analise o documento anexado: ${attachedFile.name}`,
+      internalText: finalMessageText // Texto real enviado pra IA
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    let newMessages = [...messages, userMessage];
+    
+    // Limite de 20 mensagens (mantém a primeira de boas vindas + 19 últimas)
+    if (newMessages.length > 20) {
+      newMessages = [newMessages[0], ...newMessages.slice(-19)];
+    }
+    
+    setMessages(newMessages);
     setInput('');
+    setAttachedFile(null);
+    setIsExtracting(false);
     setIsTyping(true);
 
-    // Simulated AI response
-    setTimeout(() => {
+    try {
+      // Mandamos o "internalText" (que tem o PDF embutido) pra IA, mas mostramos só o "text" pro usuário
+      const messagesToSend = newMessages.map(m => ({
+        role: m.role,
+        text: m.internalText || m.text
+      }));
+
+      const responseText = await sendMessageToAI(messagesToSend);
       const aiResponse = {
         id: Date.now() + 1,
         role: 'assistant',
-        text: 'Neste momento estou operando em modo de simulação, enquanto minhas chaves de API oficiais (como OpenAI ou Gemini) estão sendo preparadas. Mas logo poderei analisar seus laudos, gerenciar contratos, identificar pendências críticas e sugerir treinamentos automaticamente!'
+        text: responseText
       };
-      setMessages(prev => [...prev, aiResponse]);
+      setMessages(prev => {
+        let updated = [...prev, aiResponse];
+        if (updated.length > 20) {
+          updated = [updated[0], ...updated.slice(-19)];
+        }
+        return updated;
+      });
+    } catch (error) {
+      const errorResponse = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        text: `⚠️ **Erro:** ${error.message}`
+      };
+      setMessages(prev => {
+        let updated = [...prev, errorResponse];
+        if (updated.length > 20) {
+          updated = [updated[0], ...updated.slice(-19)];
+        }
+        return updated;
+      });
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -73,7 +152,7 @@ const AIAssistant = () => {
         </div>
         <div>
           <h1 className="text-h1" style={{ marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            Assistente Copilot <span style={{ fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 'bold', textTransform: 'uppercase' }}>BETA</span>
+            EcoIA <span style={{ fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 'bold', textTransform: 'uppercase' }}>BETA</span>
           </h1>
           <p className="text-body" style={{ color: 'var(--text-secondary)' }}>
             Inteligência Artificial aplicada a Gestão de SST
@@ -162,49 +241,90 @@ const AIAssistant = () => {
 
       {/* Input Area */}
       <div style={{ padding: '1.5rem', backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+        
+        {/* Preview do Anexo */}
+        {attachedFile && (
+          <div style={{
+            maxWidth: '1000px', margin: '0 auto 0.75rem auto',
+            display: 'flex', alignItems: 'center', gap: '0.75rem',
+            padding: '0.5rem 1rem', backgroundColor: 'var(--primary-light)',
+            borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)',
+            color: 'var(--primary)'
+          }}>
+            <FileText size={16} />
+            <span style={{ fontSize: '0.8125rem', fontWeight: '500', flex: 1 }}>{attachedFile.name}</span>
+            <button 
+              type="button" 
+              onClick={() => setAttachedFile(null)}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', display: 'flex' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         <form 
           onSubmit={handleSend}
           style={{
             display: 'flex',
-            gap: '0.75rem',
+            gap: '0.5rem',
             maxWidth: '1000px',
             margin: '0 auto',
             backgroundColor: 'var(--background)',
             padding: '0.5rem',
             borderRadius: '100px',
             border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-sm)'
+            boxShadow: 'var(--shadow-sm)',
+            alignItems: 'center'
           }}
         >
+          <input 
+            type="file" 
+            accept=".pdf" 
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              if (e.target.files[0]) setAttachedFile(e.target.files[0]);
+              e.target.value = null; // reseta para permitir selecionar o mesmo depois
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isTyping || isExtracting}
+            style={{
+              width: '40px', height: '40px', borderRadius: '50%',
+              backgroundColor: 'transparent', color: 'var(--text-secondary)',
+              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: (isTyping || isExtracting) ? 'not-allowed' : 'pointer', transition: 'var(--transition)'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+            title="Anexar PDF"
+          >
+            <Paperclip size={18} />
+          </button>
+          
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Pergunte à IA sobre normas, prazos, ou solicite análise de documentos..."
+            placeholder={isExtracting ? "Lendo PDF anexado, aguarde..." : "Pergunte à IA ou mande um documento (PDF) para análise..."}
+            disabled={isExtracting}
             style={{
-              flex: 1,
-              border: 'none',
-              outline: 'none',
-              backgroundColor: 'transparent',
-              padding: '0.75rem 1rem',
-              fontSize: '0.9375rem',
-              color: 'var(--text-primary)'
+              flex: 1, border: 'none', outline: 'none', backgroundColor: 'transparent',
+              padding: '0.5rem 0.5rem', fontSize: '0.9375rem', color: 'var(--text-primary)'
             }}
           />
+          
           <button
             type="submit"
-            disabled={!input.trim() || isTyping}
+            disabled={(!input.trim() && !attachedFile) || isTyping || isExtracting}
             style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              backgroundColor: input.trim() && !isTyping ? 'var(--primary)' : 'var(--text-secondary)',
-              color: 'white',
-              border: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: input.trim() && !isTyping ? 'pointer' : 'not-allowed',
+              width: '44px', height: '44px', borderRadius: '50%',
+              backgroundColor: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? 'var(--primary)' : 'var(--text-secondary)',
+              color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? 'pointer' : 'not-allowed',
               transition: 'var(--transition)'
             }}
           >

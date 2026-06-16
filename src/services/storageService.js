@@ -110,6 +110,18 @@ export async function addCompany(company) {
   return mapCompany(data);
 }
 
+export async function updateCompany(companyId, updates) {
+  const snakeUpdates = {};
+  if (updates.name !== undefined) snakeUpdates.name = updates.name;
+  if (updates.cnpj !== undefined) snakeUpdates.cnpj = updates.cnpj;
+  if (updates.contact !== undefined) snakeUpdates.contact = updates.contact;
+  if (updates.phone !== undefined) snakeUpdates.phone = updates.phone;
+
+  const { data, error } = await supabase.from('companies').update(snakeUpdates).eq('id', companyId).select().single();
+  if (error) { console.error('Error updating company:', error); return null; }
+  return mapCompany(data);
+}
+
 export async function deleteCompany(companyId) {
   const { error } = await supabase.from('companies').delete().eq('id', companyId);
   if (error) console.error('Error deleting company:', error);
