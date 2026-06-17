@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Send, Sparkles, Bot, User, ShieldCheck, Paperclip, X, FileText } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useAI } from '../context/AIContext';
 
 const AIAssistant = () => {
@@ -109,7 +110,13 @@ const AIAssistant = () => {
               borderTopRightRadius: msg.role === 'user' ? '0.25rem' : '1rem',
               borderTopLeftRadius: msg.role === 'assistant' ? '0.25rem' : '1rem',
             }}>
-              {msg.text}
+              {msg.role === 'assistant' ? (
+                <div className="markdown-content">
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+              )}
             </div>
 
             {msg.role === 'user' && (
@@ -262,6 +269,15 @@ const AIAssistant = () => {
           0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
           40% { opacity: 1; transform: scale(1.2); }
         }
+        .markdown-content p { margin-top: 0; margin-bottom: 0.75rem; }
+        .markdown-content p:last-child { margin-bottom: 0; }
+        .markdown-content ul, .markdown-content ol { margin-top: 0; margin-bottom: 0.75rem; padding-left: 1.5rem; }
+        .markdown-content li { margin-bottom: 0.25rem; }
+        .markdown-content strong { font-weight: 700; color: inherit; }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 { margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .markdown-content table { border-collapse: collapse; width: 100%; margin-bottom: 0.75rem; font-size: 0.875rem; }
+        .markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: 0.5rem; text-align: left; }
+        .markdown-content th { background-color: rgba(0,0,0,0.05); }
       `}</style>
     </div>
   );

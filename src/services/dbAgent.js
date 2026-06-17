@@ -58,6 +58,7 @@ export const executeDBAction = async (table, action, data = null, filters = null
     return {
       success: true,
       message: `Operação ${action} executada com sucesso na tabela ${table}.`,
+      count: Array.isArray(response.data) ? response.data.length : undefined,
       data: response.data
     };
   } catch (error) {
