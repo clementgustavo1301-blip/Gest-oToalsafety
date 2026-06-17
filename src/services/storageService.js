@@ -221,8 +221,19 @@ export async function updateTraining(trainingId, updates) {
 }
 
 export async function deleteTraining(trainingId) {
+  // Fetch training to get deliverable_id before deleting
+  const { data: training } = await supabase.from('trainings').select('deliverable_id').eq('id', trainingId).single();
+
   const { error } = await supabase.from('trainings').delete().eq('id', trainingId);
-  if (error) console.error('Error deleting training:', error);
+  if (error) {
+    console.error('Error deleting training:', error);
+    return;
+  }
+
+  // Revert deliverable to pendente
+  if (training && training.deliverable_id) {
+    await supabase.from('deliverables').update({ status: 'pendente' }).eq('id', training.deliverable_id);
+  }
 }
 
 // --- Contracts ---

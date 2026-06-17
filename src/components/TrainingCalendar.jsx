@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, Clock, User, Users,
-  CheckCircle, PauseCircle, XCircle, Calendar as CalendarIcon
+  CheckCircle, PauseCircle, XCircle, Calendar as CalendarIcon,
+  Trash2
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getTrainingsByCompany, addTraining, updateTraining } from '../services/storageService';
+import { getTrainingsByCompany, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from './AddTrainingModal';
 
 const STATUS_CONFIG = {
@@ -52,6 +53,14 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
     await updateTraining(trainingId, { status: newStatus });
     await loadData();
     if (onUpdate) onUpdate();
+  };
+
+  const handleDeleteTraining = async (trainingId) => {
+    if (window.confirm('Deseja realmente cancelar este agendamento? Ele voltará para a lista de pendentes.')) {
+      await deleteTraining(trainingId);
+      await loadData();
+      if (onUpdate) onUpdate();
+    }
   };
 
   const handleDayClick = (day) => {
@@ -268,10 +277,10 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                 {/* Status Actions */}
                 <div style={{
                   display: 'flex', gap: '0.5rem', paddingTop: '0.75rem',
-                  borderTop: '1px solid var(--border)'
+                  borderTop: '1px solid var(--border)', flexWrap: 'wrap'
                 }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', alignSelf: 'center', marginRight: '0.25rem' }}>
-                    Alterar status:
+                    Ações:
                   </span>
                   {event.status !== 'concluido' && (
                     <button
@@ -329,6 +338,19 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                       <CalendarIcon size={12} /> Reagendar
                     </button>
                   )}
+                  <button
+                    className="btn"
+                    onClick={() => handleDeleteTraining(event.id)}
+                    style={{
+                      padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                      backgroundColor: 'transparent', color: 'var(--danger)',
+                      border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
+                      fontWeight: '600', gap: '0.375rem', marginLeft: 'auto'
+                    }}
+                    title="Remover do calendário e voltar para pendentes"
+                  >
+                    <Trash2 size={12} /> Cancelar Agendamento
+                  </button>
                 </div>
               </div>
             );
