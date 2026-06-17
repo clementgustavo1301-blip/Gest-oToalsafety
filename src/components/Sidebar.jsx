@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell } from 'lucide-react';
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
@@ -84,20 +84,28 @@ const Sidebar = () => {
                 {item.icon}
                 {item.name}
               </div>
-              {item.path === '/ai-assistant' && unreadCount > 0 && (
+              {item.path === '/ai-assistant' && (
                 <div style={{
-                  backgroundColor: 'var(--danger)',
-                  color: 'white',
+                  backgroundColor: unreadCount > 0 ? 'var(--danger)' : 'transparent',
+                  color: unreadCount > 0 ? 'white' : 'var(--text-secondary)',
                   fontSize: '0.6875rem',
                   fontWeight: 'bold',
-                  padding: '0.125rem 0.375rem',
+                  padding: unreadCount > 0 ? '0.125rem 0.5rem' : '0',
                   borderRadius: '1rem',
                   display: 'flex',
                   alignItems: 'center',
+                  gap: '0.25rem',
                   justifyContent: 'center',
-                  minWidth: '20px'
+                  minWidth: '20px',
+                  transition: 'var(--transition)'
                 }}>
-                  {unreadCount}
+                  {unreadCount > 0 ? (
+                    <>
+                      <Bell size={14} fill="currentColor" /> {unreadCount}
+                    </>
+                  ) : (
+                    <Bell size={16} />
+                  )}
                 </div>
               )}
             </Link>

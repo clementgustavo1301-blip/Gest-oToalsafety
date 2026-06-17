@@ -12,7 +12,11 @@ export const executeDBAction = async (table, action, data = null, filters = null
 
     switch (action) {
       case 'select':
-        query = query.select('*');
+        if (['deliverables', 'contracts', 'trainings'].includes(table)) {
+          query = query.select('*, companies(name, cnpj)');
+        } else {
+          query = query.select('*');
+        }
         if (filters) {
           Object.entries(filters).forEach(([key, value]) => {
             query = query.eq(key, value);

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Send, Sparkles, Bot, User, ShieldCheck, Paperclip, X, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAI } from '../context/AIContext';
 
 const AIAssistant = () => {
@@ -42,111 +43,93 @@ const AIAssistant = () => {
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      backgroundColor: 'var(--background)'
+      backgroundColor: 'var(--background)',
+      position: 'relative'
     }}>
-      {/* Header */}
-      <div style={{
-        padding: '1.5rem',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-        backgroundColor: 'var(--surface)'
-      }}>
-        <div style={{
-          width: '48px', height: '48px', borderRadius: '1rem',
-          background: 'linear-gradient(135deg, var(--primary), var(--info))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', boxShadow: '0 4px 12px rgba(14, 165, 233, 0.2)'
-        }}>
-          <Sparkles size={24} />
-        </div>
-        <div>
-          <h1 className="text-h1" style={{ marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            EcoIA <span style={{ fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 'bold', textTransform: 'uppercase' }}>BETA</span>
-          </h1>
-          <p className="text-body" style={{ color: 'var(--text-secondary)' }}>
-            Inteligência Artificial aplicada a Gestão de SST
-          </p>
-        </div>
-      </div>
-
       {/* Chat Area */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '2rem',
+        padding: '2rem 1rem 10rem 1rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem'
+        alignItems: 'center',
+        gap: '2rem'
       }}>
-        {messages.map((msg) => (
+        {messages.length === 1 && (
+          <div style={{ textAlign: 'center', marginTop: '10vh', marginBottom: '2rem' }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '1.5rem', margin: '0 auto 1.5rem auto',
+              background: 'linear-gradient(135deg, var(--primary), var(--info))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', boxShadow: '0 8px 24px rgba(37, 99, 235, 0.25)'
+            }}>
+              <Sparkles size={32} />
+            </div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+              Olá! Como posso ajudar?
+            </h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem' }}>
+              Sua Inteligência Artificial especialista em Gestão de SST.
+            </p>
+          </div>
+        )}
+
+        {messages.filter((_, i) => !(messages.length === 1 && i === 0)).map((msg) => (
           <div key={msg.id} style={{
+            width: '100%',
+            maxWidth: '850px',
             display: 'flex',
-            gap: '1rem',
-            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-            maxWidth: '80%'
+            gap: '1.25rem',
+            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+            alignItems: 'flex-start'
           }}>
             {msg.role === 'assistant' && (
               <div style={{
                 width: '36px', height: '36px', borderRadius: '50%',
-                backgroundColor: 'var(--surface)', border: '1px solid var(--border)',
+                background: 'linear-gradient(135deg, var(--primary), var(--info))',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--primary)', flexShrink: 0
+                color: 'white', flexShrink: 0, marginTop: '0.25rem',
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.2)'
               }}>
-                <Bot size={20} />
+                <Sparkles size={18} />
               </div>
             )}
             
             <div style={{
-              padding: '1rem 1.25rem',
-              borderRadius: '1rem',
-              backgroundColor: msg.role === 'user' ? 'var(--primary)' : 'var(--surface)',
-              color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
-              border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
-              boxShadow: 'var(--shadow-sm)',
-              fontSize: '0.9375rem',
-              lineHeight: 1.5,
-              borderTopRightRadius: msg.role === 'user' ? '0.25rem' : '1rem',
-              borderTopLeftRadius: msg.role === 'assistant' ? '0.25rem' : '1rem',
+              maxWidth: msg.role === 'user' ? '70%' : '100%',
+              backgroundColor: msg.role === 'user' ? 'var(--surface)' : 'transparent',
+              color: 'var(--text-primary)',
+              border: msg.role === 'user' ? '1px solid var(--border)' : 'none',
+              borderRadius: msg.role === 'user' ? '1.5rem' : '0',
+              padding: msg.role === 'user' ? '0.875rem 1.25rem' : '0.25rem 0',
+              fontSize: '1rem',
+              lineHeight: 1.6,
+              boxShadow: msg.role === 'user' ? 'var(--shadow-sm)' : 'none'
             }}>
               {msg.role === 'assistant' ? (
                 <div className="markdown-content">
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
                 </div>
               ) : (
                 <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
               )}
             </div>
-
-            {msg.role === 'user' && (
-              <div style={{
-                width: '36px', height: '36px', borderRadius: '50%',
-                backgroundColor: 'var(--secondary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'white', flexShrink: 0
-              }}>
-                <User size={20} />
-              </div>
-            )}
           </div>
         ))}
+
         {isTyping && (
-          <div style={{ display: 'flex', gap: '1rem', alignSelf: 'flex-start', maxWidth: '80%' }}>
+          <div style={{ width: '100%', maxWidth: '850px', display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
             <div style={{
               width: '36px', height: '36px', borderRadius: '50%',
-              backgroundColor: 'var(--surface)', border: '1px solid var(--border)',
+              background: 'linear-gradient(135deg, var(--primary), var(--info))',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--primary)', flexShrink: 0
+              color: 'white', flexShrink: 0,
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.2)'
             }}>
-              <Bot size={20} />
+              <Sparkles size={18} />
             </div>
-            <div style={{
-              padding: '1rem 1.25rem',
-              borderRadius: '1rem', borderTopLeftRadius: '0.25rem',
-              backgroundColor: 'var(--surface)', border: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', gap: '0.375rem'
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--text-secondary)' }}>
               <span className="typing-dot" style={{ animationDelay: '0s' }}>•</span>
               <span className="typing-dot" style={{ animationDelay: '0.2s' }}>•</span>
               <span className="typing-dot" style={{ animationDelay: '0.4s' }}>•</span>
@@ -156,105 +139,107 @@ const AIAssistant = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div style={{ padding: '1.5rem', backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+      {/* Floating Input Area */}
+      <div style={{ 
+        position: 'absolute',
+        bottom: 0, left: 0, width: '100%',
+        padding: '0 1rem 1.5rem 1rem',
+        background: 'linear-gradient(to top, var(--background) 70%, transparent)'
+      }}>
         
-        {/* Preview do Anexo */}
-        {attachedFile && (
-          <div style={{
-            maxWidth: '1000px', margin: '0 auto 0.75rem auto',
-            display: 'flex', alignItems: 'center', gap: '0.75rem',
-            padding: '0.5rem 1rem', backgroundColor: 'var(--primary-light)',
-            borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)',
-            color: 'var(--primary)'
-          }}>
-            <FileText size={16} />
-            <span style={{ fontSize: '0.8125rem', fontWeight: '500', flex: 1 }}>{attachedFile.name}</span>
-            <button 
-              type="button" 
-              onClick={() => setAttachedFile(null)}
-              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', display: 'flex' }}
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
+        <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+          {/* Preview do Anexo */}
+          {attachedFile && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.75rem',
+              padding: '0.5rem 1rem', backgroundColor: 'var(--surface)',
+              borderRadius: '1rem', border: '1px solid var(--border)',
+              color: 'var(--text-primary)', marginBottom: '0.75rem',
+              width: 'fit-content', boxShadow: 'var(--shadow-sm)'
+            }}>
+              <FileText size={16} color="var(--primary)" />
+              <span style={{ fontSize: '0.8125rem', fontWeight: '500' }}>{attachedFile.name}</span>
+              <button 
+                type="button" 
+                onClick={() => setAttachedFile(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
 
-        <form 
-          onSubmit={onSubmit}
-          style={{
-            display: 'flex',
-            gap: '0.5rem',
-            maxWidth: '1000px',
-            margin: '0 auto',
-            backgroundColor: 'var(--background)',
-            padding: '0.5rem',
-            borderRadius: '100px',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-sm)',
-            alignItems: 'center'
-          }}
-        >
-          <input 
-            type="file" 
-            accept=".pdf" 
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              if (e.target.files[0]) setAttachedFile(e.target.files[0]);
-              e.target.value = null; 
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isTyping || isExtracting}
+          <form 
+            onSubmit={onSubmit}
             style={{
-              width: '40px', height: '40px', borderRadius: '50%',
-              backgroundColor: 'transparent', color: 'var(--text-secondary)',
-              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: (isTyping || isExtracting) ? 'not-allowed' : 'pointer', transition: 'var(--transition)'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-            title="Anexar PDF"
-          >
-            <Paperclip size={18} />
-          </button>
-          
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={isExtracting ? "Lendo PDF anexado, aguarde..." : "Pergunte à IA ou mande um documento (PDF) para análise..."}
-            disabled={isExtracting}
-            style={{
-              flex: 1, border: 'none', outline: 'none', backgroundColor: 'transparent',
-              padding: '0.5rem 0.5rem', fontSize: '0.9375rem', color: 'var(--text-primary)'
-            }}
-          />
-          
-          <button
-            type="submit"
-            disabled={(!input.trim() && !attachedFile) || isTyping || isExtracting}
-            style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              backgroundColor: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? 'var(--primary)' : 'var(--text-secondary)',
-              color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              gap: '0.5rem',
+              backgroundColor: 'var(--surface)',
+              padding: '0.5rem 0.5rem 0.5rem 1rem',
+              borderRadius: '2rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.05)',
+              alignItems: 'center',
               transition: 'var(--transition)'
             }}
           >
-            <Send size={18} style={{ marginLeft: '2px' }} />
-          </button>
-        </form>
-        <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          <div style={{ marginBottom: '0.25rem' }}>
-            <ShieldCheck size={12} style={{ display: 'inline', marginRight: '0.25rem', verticalAlign: 'middle' }} />
-            Assistente de Inteligência Artificial Especializado. Pode cometer erros. Considere verificar informações críticas.
-          </div>
-          <div style={{ opacity: 0.8 }}>
-            🕒 O histórico desta conversa é apagado automaticamente todos os dias às 00:00.
+            <input 
+              type="file" 
+              accept=".pdf" 
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.files[0]) setAttachedFile(e.target.files[0]);
+                e.target.value = null; 
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isTyping || isExtracting}
+              style={{
+                width: '36px', height: '36px', borderRadius: '50%',
+                backgroundColor: 'var(--background)', color: 'var(--text-secondary)',
+                border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: (isTyping || isExtracting) ? 'not-allowed' : 'pointer', transition: 'var(--transition)'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+              title="Anexar PDF"
+            >
+              <Paperclip size={16} />
+            </button>
+            
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={isExtracting ? "Lendo PDF anexado, aguarde..." : "Escreva sua mensagem ou anexe um documento..."}
+              disabled={isExtracting}
+              style={{
+                flex: 1, border: 'none', outline: 'none', backgroundColor: 'transparent',
+                padding: '0.5rem', fontSize: '1rem', color: 'var(--text-primary)'
+              }}
+            />
+            
+            <button
+              type="submit"
+              disabled={(!input.trim() && !attachedFile) || isTyping || isExtracting}
+              style={{
+                width: '40px', height: '40px', borderRadius: '50%',
+                backgroundColor: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? 'var(--text-primary)' : 'var(--background)',
+                color: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? 'var(--surface)' : 'var(--text-secondary)',
+                border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? 'pointer' : 'not-allowed',
+                transition: 'var(--transition)'
+              }}
+            >
+              <Send size={18} style={{ marginLeft: ((input.trim() || attachedFile) && !isTyping && !isExtracting) ? '2px' : '0' }} />
+            </button>
+          </form>
+          
+          <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            A EcoIA pode cometer erros. Verifique as informações geradas.
           </div>
         </div>
       </div>
@@ -277,7 +262,7 @@ const AIAssistant = () => {
         .markdown-content h1, .markdown-content h2, .markdown-content h3 { margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 700; }
         .markdown-content table { border-collapse: collapse; width: 100%; margin-bottom: 0.75rem; font-size: 0.875rem; }
         .markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: 0.5rem; text-align: left; }
-        .markdown-content th { background-color: rgba(0,0,0,0.05); }
+        .markdown-content th { background-color: rgba(0,0,0,0.05); position: static; }
       `}</style>
     </div>
   );

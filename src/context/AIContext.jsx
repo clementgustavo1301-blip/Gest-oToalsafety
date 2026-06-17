@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { sendMessageToAI } from '../services/aiService';
 import { extractTextFromPDF } from '../utils/pdfParser';
 
@@ -45,7 +45,13 @@ export const AIProvider = ({ children }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isActivePage, setIsActivePage] = useState(false); // Pra saber se o usuario está na aba do chat
+  const [isActivePage, setIsActivePageState] = useState(false);
+  const isActivePageRef = useRef(false);
+
+  const setIsActivePage = (value) => {
+    setIsActivePageState(value);
+    isActivePageRef.current = value;
+  };
 
   useEffect(() => {
     try {
@@ -128,7 +134,7 @@ export const AIProvider = ({ children }) => {
       });
 
       // Se a resposta chegou e o usuário não está na aba da IA, incremente as não lidas
-      if (!isActivePage) {
+      if (!isActivePageRef.current) {
         setUnreadCount(prev => prev + 1);
       }
       
@@ -145,7 +151,7 @@ export const AIProvider = ({ children }) => {
         }
         return updated;
       });
-      if (!isActivePage) setUnreadCount(prev => prev + 1);
+      if (!isActivePageRef.current) setUnreadCount(prev => prev + 1);
     } finally {
       setIsTyping(false);
     }
