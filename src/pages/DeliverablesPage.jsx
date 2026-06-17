@@ -11,6 +11,7 @@ const TYPE_CONFIG = {
   programa: { label: 'Programa', icon: <FileSpreadsheet size={14} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
   laudo: { label: 'Laudo', icon: <FileText size={14} />, color: '#d97706', bg: '#fef3c7' },
   contrato: { label: 'Contrato', icon: <File size={14} />, color: 'var(--secondary)', bg: 'var(--secondary-light)' },
+  documento: { label: 'Documento', icon: <FileText size={14} />, color: '#6366f1', bg: '#e0e7ff' },
 };
 
 const STATUS_CONFIG = {

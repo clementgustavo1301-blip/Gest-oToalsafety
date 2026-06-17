@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   FileText, Download, Filter, Search,
-  CheckCircle, Clock, AlertTriangle, FileSpreadsheet, File
+  CheckCircle, Clock, AlertTriangle, FileSpreadsheet, File,
+  LayoutGrid, List as ListIcon
 } from 'lucide-react';
 import {
   getDeliverablesByCompany, getContractsByCompany, addDeliverable, updateDeliverable,
-  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts
+  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies
 } from '../services/storageService';
 import AddDeliverableModal from './AddDeliverableModal';
 
@@ -13,6 +14,7 @@ const TYPE_CONFIG = {
   programa: { label: 'Programa', icon: <FileSpreadsheet size={16} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
   laudo: { label: 'Laudo', icon: <FileText size={16} />, color: '#d97706', bg: '#fef3c7' },
   contrato: { label: 'Contrato', icon: <File size={16} />, color: 'var(--secondary)', bg: 'var(--secondary-light)' },
+  documento: { label: 'Documento', icon: <FileText size={16} />, color: '#6366f1', bg: '#e0e7ff' },
   treinamento: { label: 'Treinamento', icon: <FileText size={16} />, color: 'var(--info)', bg: '#e0f2fe' },
   visita_tecnica: { label: 'Visita Técnica', icon: <FileText size={16} />, color: '#059669', bg: '#d1fae5' },
 };
@@ -30,11 +32,14 @@ const STATUS_CONFIG = {
 const DeliverablesViewer = ({ companyId }) => {
   const [filterType, setFilterType] = useState('all');
   const [filterContract, setFilterContract] = useState('all');
+  const [filterCompany, setFilterCompany] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
   
   const [deliverables, setDeliverables] = useState([]);
   const [contracts, setContracts] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState(null);
 
@@ -48,12 +53,14 @@ const DeliverablesViewer = ({ companyId }) => {
       setDeliverables(delivs);
       setContracts(ctrs);
     } else {
-      const [delivs, ctrs] = await Promise.all([
+      const [delivs, ctrs, comps] = await Promise.all([
         getAllDeliverablesSummary(),
-        getContracts()
+        getContracts(),
+        getCompanies()
       ]);
       setDeliverables(delivs);
       setContracts(ctrs);
+      setCompanies(comps);
     }
     setLoading(false);
   };
@@ -88,7 +95,7 @@ const DeliverablesViewer = ({ companyId }) => {
     
     const filePath = await uploadDocument(file, `deliverables/${destCompanyId || companyId}`);
     if (filePath) {
-      await updateDeliverable(deliverableId, { fileName: filePath, status: 'feito', deliveredDate: new Date().toISOString() });
+      await updateDeliverable(deliverableId, { fileName: filePath, status: 'entregue', deliveredDate: new Date().toISOString() });
       await loadData();
     } else {
       alert('Erro ao fazer upload do arquivo.');
@@ -103,15 +110,16 @@ const DeliverablesViewer = ({ companyId }) => {
   const filtered = deliverables.filter(d => {
     const matchType = filterType === 'all' || d.type === filterType;
     const matchContract = filterContract === 'all' || d.contractId === filterContract;
+    const matchCompany = filterCompany === 'all' || d.companyId === filterCompany;
     const matchSearch = !searchTerm || 
       d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
       (d.companyName && d.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchType && matchContract && matchSearch;
+    return matchType && matchContract && matchSearch && matchCompany;
   });
 
   const stats = {
     total: deliverables.length,
-    entregue: deliverables.filter(d => d.status === 'entregue' || d.status === 'feito').length,
+    entregue: deliverables.filter(d => d.status === 'entregue').length,
     pendente: deliverables.filter(d => d.status === 'pendente').length,
     em_elaboracao: deliverables.filter(d => d.status === 'em_elaboracao').length,
   };
@@ -154,8 +162,50 @@ const DeliverablesViewer = ({ companyId }) => {
             }}
           />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginRight: '0.5rem' }}>
+            <button
+              onClick={() => setViewMode('grid')}
+              style={{
+                padding: '0.375rem 0.5rem',
+                backgroundColor: viewMode === 'grid' ? 'var(--primary-light)' : 'transparent',
+                color: viewMode === 'grid' ? 'var(--primary)' : 'var(--text-secondary)',
+                border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              style={{
+                padding: '0.375rem 0.5rem',
+                backgroundColor: viewMode === 'list' ? 'var(--primary-light)' : 'transparent',
+                color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-secondary)',
+                border: 'none', cursor: 'pointer', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+            >
+              <ListIcon size={16} />
+            </button>
+          </div>
           <Filter size={16} color="var(--text-secondary)" />
+          {!companyId && (
+            <select
+              id="filter-company"
+              value={filterCompany}
+              onChange={(e) => setFilterCompany(e.target.value)}
+              style={{
+                padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)', fontSize: '0.8125rem',
+                backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                fontFamily: 'inherit', cursor: 'pointer'
+              }}
+            >
+              <option value="all">Todas as empresas</option>
+              {companies.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
           <select
             id="filter-type"
             value={filterType}
@@ -171,6 +221,7 @@ const DeliverablesViewer = ({ companyId }) => {
             <option value="programa">Programas</option>
             <option value="laudo">Laudos</option>
             <option value="contrato">Contratos</option>
+            <option value="documento">Documentos</option>
             <option value="treinamento">Treinamentos</option>
             <option value="visita_tecnica">Visitas Técnicas</option>
           </select>
@@ -202,16 +253,31 @@ const DeliverablesViewer = ({ companyId }) => {
         </div>
       </div>
 
-      {/* Deliverables Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
+      {/* Deliverables Grid/List */}
+      <div style={
+        viewMode === 'grid' 
+          ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }
+          : { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
+      }>
         {filtered.map(d => {
           const typeConf = TYPE_CONFIG[d.type] || TYPE_CONFIG.contrato;
           const statusConf = STATUS_CONFIG[d.status] || STATUS_CONFIG.pendente;
 
           return (
-            <div key={d.id} className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div key={d.id} className="card" style={{ 
+              padding: '1.25rem', display: 'flex', 
+              flexDirection: viewMode === 'grid' ? 'column' : 'row', 
+              gap: viewMode === 'grid' ? '0.75rem' : '1.5rem',
+              alignItems: viewMode === 'grid' ? 'stretch' : 'center'
+            }}>
+              {/* Header (Type & Status for Grid, Just Type for List) */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start',
+                width: viewMode === 'grid' ? 'auto' : '150px',
+                flexShrink: 0
+              }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem',
                   padding: '0.25rem 0.625rem', borderRadius: '1rem',
@@ -220,18 +286,20 @@ const DeliverablesViewer = ({ companyId }) => {
                 }}>
                   {typeConf.icon} {typeConf.label}
                 </div>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '0.375rem',
-                  padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                  backgroundColor: statusConf.bg, color: statusConf.color,
-                  fontSize: '0.6875rem', fontWeight: '500'
-                }}>
-                  {statusConf.icon} {statusConf.label}
-                </div>
+                {viewMode === 'grid' && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.375rem',
+                    padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                    backgroundColor: statusConf.bg, color: statusConf.color,
+                    fontSize: '0.6875rem', fontWeight: '500'
+                  }}>
+                    {statusConf.icon} {statusConf.label}
+                  </div>
+                )}
               </div>
 
               {/* Title & Company */}
-              <div>
+              <div style={{ flex: viewMode === 'list' ? 1 : 'none' }}>
                 <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem', lineHeight: 1.4 }}>
                   {d.title}
                 </h4>
@@ -240,35 +308,59 @@ const DeliverablesViewer = ({ companyId }) => {
                     <FileText size={12} /> {d.companyName}
                   </p>
                 )}
+                {/* Meta details if in list mode to save space */}
+                {viewMode === 'list' && (
+                  <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                    {d.dueDate && <span>Vencimento: {new Date(d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
+                    {d.validityDate && <span>Validade: {new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
+                    <span>Contrato: {contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A'}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Meta */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Data Limite:</span>
-                  <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{d.dueDate ? new Date(d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''}</span>
+              {/* Status for List mode */}
+              {viewMode === 'list' && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.375rem',
+                  padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                  backgroundColor: statusConf.bg, color: statusConf.color,
+                  fontSize: '0.75rem', fontWeight: '500', flexShrink: 0,
+                  width: '120px', justifyContent: 'center'
+                }}>
+                  {statusConf.icon} {statusConf.label}
                 </div>
-                {d.validityDate && (
+              )}
+
+              {/* Meta (Grid only) */}
+              {viewMode === 'grid' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Validade:</span>
-                    <span style={{ fontWeight: '500', color: 'var(--primary)' }}>{new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                    <span>Data Limite:</span>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{d.dueDate ? new Date(d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''}</span>
                   </div>
-                )}
-                {d.deliveredDate && (
+                  {d.validityDate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Validade:</span>
+                      <span style={{ fontWeight: '500', color: 'var(--primary)' }}>{new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                    </div>
+                  )}
+                  {d.deliveredDate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Entregue em:</span>
+                      <span style={{ fontWeight: '500', color: 'var(--secondary)' }}>{new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Entregue em:</span>
-                    <span style={{ fontWeight: '500', color: 'var(--secondary)' }}>{new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                    <span>Contrato:</span>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
+                      {contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A'}
+                    </span>
                   </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Contrato:</span>
-                  <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-                    {contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A'}
-                  </span>
                 </div>
-              </div>
+              )}
+
               {/* Reason */}
-              {d.reason && (
+              {d.reason && viewMode === 'grid' && (
                 <div style={{ 
                   marginTop: '0.25rem', padding: '0.5rem', backgroundColor: '#fef2f2', 
                   border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)',
@@ -278,87 +370,95 @@ const DeliverablesViewer = ({ companyId }) => {
                 </div>
               )}
 
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', flexWrap: 'wrap' }}>
-                {d.status !== 'feito' && d.status !== 'entregue' && (
-                  <button
-                    className="btn"
-                    onClick={() => handleChangeStatus(d.id, 'feito')}
-                    style={{
-                      flex: 1, padding: '0.5rem', fontSize: '0.75rem',
-                      backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
-                      border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Marcar Feito
-                  </button>
-                )}
-                {d.status !== 'adiado' && (
-                  <button
-                    className="btn"
-                    onClick={() => handleChangeStatus(d.id, 'adiado')}
-                    style={{
-                      flex: 1, padding: '0.5rem', fontSize: '0.75rem',
-                      backgroundColor: '#fef3c7', color: '#b45309',
-                      border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Adiar
-                  </button>
-                )}
-                {d.status !== 'cancelado' && (
-                  <button
-                    className="btn"
-                    onClick={() => handleChangeStatus(d.id, 'cancelado')}
-                    style={{
-                      flex: 1, padding: '0.5rem', fontSize: '0.75rem',
-                      backgroundColor: '#fee2e2', color: 'var(--danger)',
-                      border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </div>
+              {/* Actions & File Group (List Mode Layout vs Grid) */}
+              <div style={{ 
+                display: 'flex', gap: '0.5rem', 
+                flexDirection: viewMode === 'grid' ? 'column' : 'row',
+                marginTop: viewMode === 'grid' ? 'auto' : '0',
+                alignItems: viewMode === 'grid' ? 'stretch' : 'center',
+                flexShrink: 0
+              }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: viewMode === 'grid' ? 'wrap' : 'nowrap' }}>
+                  {d.status !== 'entregue' && (
+                    <button
+                      className="btn"
+                      onClick={() => handleChangeStatus(d.id, 'entregue')}
+                      style={{
+                        flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                        backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
+                        border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
+                        fontWeight: '600', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Marcar Entregue
+                    </button>
+                  )}
+                  {d.status !== 'adiado' && (
+                    <button
+                      className="btn"
+                      onClick={() => handleChangeStatus(d.id, 'adiado')}
+                      style={{
+                        flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                        backgroundColor: '#fef3c7', color: '#b45309',
+                        border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
+                        fontWeight: '600', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Adiar
+                    </button>
+                  )}
+                  {d.status !== 'cancelado' && (
+                    <button
+                      className="btn"
+                      onClick={() => handleChangeStatus(d.id, 'cancelado')}
+                      style={{
+                        flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                        backgroundColor: '#fee2e2', color: 'var(--danger)',
+                        border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
+                        fontWeight: '600', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
 
-              {/* File / Download */}
-              <div style={{ marginTop: 'auto', display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
-                {d.fileName ? (
-                  <button
-                    onClick={() => window.open(getDocumentUrl(d.fileName), '_blank')}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center',
-                      padding: '0.625rem', borderRadius: 'var(--radius-md)',
-                      backgroundColor: 'var(--background)', border: '1px solid var(--border)',
-                      fontSize: '0.8125rem', color: 'var(--primary)', fontWeight: '500',
-                      transition: 'var(--transition)', cursor: 'pointer', width: '100%'
-                    }}
-                  >
-                    <Download size={14} /> Baixar / Visualizar Anexo
-                  </button>
-                ) : (
-                  <label
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center',
-                      padding: '0.625rem', borderRadius: 'var(--radius-md)',
-                      backgroundColor: 'var(--background)', border: '1px dashed var(--border)',
-                      fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: '500',
-                      cursor: uploadingId === d.id ? 'not-allowed' : 'pointer', width: '100%'
-                    }}
-                  >
-                    <FileText size={14} /> {uploadingId === d.id ? 'Enviando...' : 'Anexar Documento (PDF)'}
-                    <input 
-                      type="file" 
-                      accept=".pdf,.doc,.docx" 
-                      style={{ display: 'none' }} 
-                      disabled={uploadingId === d.id}
-                      onChange={(e) => handleFileUpload(d.id, e.target.files[0], d.company_id || companyId)}
-                    />
-                  </label>
-                )}
+                {/* File / Download */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column', width: viewMode === 'list' ? '200px' : 'auto' }}>
+                  {d.fileName ? (
+                    <button
+                      onClick={() => window.open(getDocumentUrl(d.fileName), '_blank')}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center',
+                        padding: '0.625rem', borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--background)', border: '1px solid var(--border)',
+                        fontSize: '0.8125rem', color: 'var(--primary)', fontWeight: '500',
+                        transition: 'var(--transition)', cursor: 'pointer', width: '100%', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <Download size={14} /> Baixar
+                    </button>
+                  ) : (
+                    <label
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center',
+                        padding: '0.625rem', borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--background)', border: '1px dashed var(--border)',
+                        fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: '500',
+                        cursor: uploadingId === d.id ? 'not-allowed' : 'pointer', width: '100%', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <FileText size={14} /> {uploadingId === d.id ? '...' : 'Anexar PDF'}
+                      <input 
+                        type="file" 
+                        accept=".pdf,.doc,.docx" 
+                        style={{ display: 'none' }} 
+                        disabled={uploadingId === d.id}
+                        onChange={(e) => handleFileUpload(d.id, e.target.files[0], d.company_id || companyId)}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
             </div>
           );

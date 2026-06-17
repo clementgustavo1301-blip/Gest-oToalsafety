@@ -37,7 +37,7 @@ function mapDeliverable(row) {
     contractId: row.contract_id,
     title: row.title,
     type: row.type,
-    status: row.status,
+    status: row.status || 'pendente',
     dueDate: row.due_date,
     validityDate: row.validity_date,
     deliveredDate: row.delivered_date,
@@ -210,7 +210,7 @@ export async function updateTraining(trainingId, updates) {
   // Sincronizar com deliverables
   if (data.deliverable_id && updates.status) {
     let delivStatus = 'agendado';
-    if (updates.status === 'concluido') delivStatus = 'feito';
+    if (updates.status === 'concluido') delivStatus = 'entregue';
     if (updates.status === 'adiado') delivStatus = 'adiado';
     if (updates.status === 'nao_feito') delivStatus = 'pendente';
     
@@ -296,6 +296,71 @@ export async function getDeliverablesByContract(contractId) {
 }
 
 export async function addDeliverable(deliverable) {
+  // 1. Get the company's group_id
+  const { data: company } = await supabase.from('companies').select('group_id').eq('id', deliverable.companyId).single();
+  
+  if (company && company.group_id) {
+    // 2. Get all companies in the same group
+    const { data: groupCompanies } = await supabase.from('companies').select('id').eq('group_id', company.group_id);
+    
+    if (groupCompanies && groupCompanies.length > 0) {
+      let createdDeliverable = null;
+      for (const gc of groupCompanies) {
+        // Check if exists
+        const { data: existing } = await supabase.from('deliverables')
+          .select('id')
+          .eq('company_id', gc.id)
+          .eq('title', deliverable.title)
+          .eq('type', deliverable.type)
+          .maybeSingle();
+          
+        if (!existing) {
+          const { data, error } = await supabase.from('deliverables').insert([{
+            company_id: gc.id,
+            contract_id: gc.id === deliverable.companyId ? deliverable.contractId : null,
+            title: deliverable.title,
+            type: deliverable.type,
+            status: deliverable.status,
+            due_date: deliverable.dueDate,
+            validity_date: deliverable.validityDate,
+            delivered_date: deliverable.deliveredDate,
+            file_name: deliverable.fileName,
+            reason: deliverable.reason,
+            description: deliverable.description
+          }]).select().single();
+          
+          if (error) console.error('Error adding deliverable to group company:', error);
+          
+          if (gc.id === deliverable.companyId && data) {
+            createdDeliverable = data;
+          }
+        } else if (gc.id === deliverable.companyId) {
+           const { data } = await supabase.from('deliverables').select('*').eq('id', existing.id).single();
+           createdDeliverable = data;
+        }
+      }
+      
+      if (!createdDeliverable) {
+         const { data } = await supabase.from('deliverables').insert([{
+            company_id: deliverable.companyId,
+            contract_id: deliverable.contractId,
+            title: deliverable.title,
+            type: deliverable.type,
+            status: deliverable.status,
+            due_date: deliverable.dueDate,
+            validity_date: deliverable.validityDate,
+            delivered_date: deliverable.deliveredDate,
+            file_name: deliverable.fileName,
+            reason: deliverable.reason,
+            description: deliverable.description
+         }]).select().single();
+         createdDeliverable = data;
+      }
+      return mapDeliverable(createdDeliverable);
+    }
+  }
+
+  // Fallback
   const { data, error } = await supabase.from('deliverables').insert([{
     company_id: deliverable.companyId,
     contract_id: deliverable.contractId,
@@ -314,6 +379,12 @@ export async function addDeliverable(deliverable) {
 }
 
 export async function updateDeliverable(deliverableId, updates) {
+  // Fetch current deliverable to know title, type, and company_id
+  const { data: currentDeliv } = await supabase.from('deliverables')
+    .select('company_id, title, type')
+    .eq('id', deliverableId)
+    .single();
+
   const snakeUpdates = {};
   if (updates.status !== undefined) snakeUpdates.status = updates.status;
   if (updates.reason !== undefined) snakeUpdates.reason = updates.reason;
@@ -322,6 +393,29 @@ export async function updateDeliverable(deliverableId, updates) {
 
   const { data, error } = await supabase.from('deliverables').update(snakeUpdates).eq('id', deliverableId).select().single();
   if (error) { console.error('Error updating deliverable:', error); return null; }
+
+  // Sincronizar com outras empresas do grupo se o status for 'entregue'
+  if (currentDeliv && updates.status === 'entregue') {
+     const { data: company } = await supabase.from('companies').select('group_id').eq('id', currentDeliv.company_id).single();
+     if (company && company.group_id) {
+       const { data: groupCompanies } = await supabase.from('companies').select('id').eq('group_id', company.group_id);
+       if (groupCompanies && groupCompanies.length > 0) {
+         const companyIds = groupCompanies.map(c => c.id).filter(id => id !== currentDeliv.company_id);
+         
+         if (companyIds.length > 0) {
+           const syncUpdates = { status: 'entregue' };
+           if (updates.fileName !== undefined) syncUpdates.file_name = updates.fileName;
+           if (updates.deliveredDate !== undefined) syncUpdates.delivered_date = updates.deliveredDate;
+
+           await supabase.from('deliverables')
+             .update(syncUpdates)
+             .in('company_id', companyIds)
+             .eq('title', currentDeliv.title)
+             .eq('type', currentDeliv.type);
+         }
+       }
+     }
+  }
 
   // Sincronizar com treinamentos (se for um treinamento)
   if (updates.status) {

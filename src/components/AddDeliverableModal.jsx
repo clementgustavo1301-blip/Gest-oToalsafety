@@ -118,6 +118,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                     <option value="programa">Programa</option>
                     <option value="laudo">Laudo</option>
                     <option value="contrato">Contrato</option>
+                    <option value="documento">Documento</option>
                     <option value="treinamento">Treinamento</option>
                     <option value="visita_tecnica">Visita Técnica</option>
                   </select>
