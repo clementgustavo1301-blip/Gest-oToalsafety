@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   FileText, Download, Filter, Search,
   CheckCircle, Clock, AlertTriangle, FileSpreadsheet, File,
-  LayoutGrid, List as ListIcon
+  LayoutGrid, List as ListIcon, Edit3, Trash2
 } from 'lucide-react';
 import {
   getDeliverablesByCompany, getContractsByCompany, addDeliverable, updateDeliverable,
-  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies
+  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable
 } from '../services/storageService';
 import AddDeliverableModal from './AddDeliverableModal';
+import EditDeliverableModal from './EditDeliverableModal';
 
 const TYPE_CONFIG = {
   programa: { label: 'Programa', icon: <FileSpreadsheet size={16} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
@@ -42,9 +43,10 @@ const DeliverablesViewer = ({ companyId }) => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState(null);
+  const [editingDeliverable, setEditingDeliverable] = useState(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     if (companyId) {
       const [delivs, ctrs] = await Promise.all([
         getDeliverablesByCompany(companyId),
@@ -62,11 +64,11 @@ const DeliverablesViewer = ({ companyId }) => {
       setContracts(ctrs);
       setCompanies(comps);
     }
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
   }, [companyId]);
 
   const handleAddDeliverable = async (data) => {
@@ -76,7 +78,7 @@ const DeliverablesViewer = ({ companyId }) => {
     }
     await addDeliverable({ ...data, fileName, companyId });
     setShowModal(false);
-    await loadData();
+    await loadData(false);
   };
 
   const handleChangeStatus = async (deliverableId, newStatus) => {
@@ -86,7 +88,7 @@ const DeliverablesViewer = ({ companyId }) => {
       if (reason === null) return; // User cancelled prompt
     }
     await updateDeliverable(deliverableId, { status: newStatus, reason });
-    await loadData();
+    await loadData(false);
   };
 
   const handleFileUpload = async (deliverableId, file, destCompanyId) => {
@@ -96,11 +98,24 @@ const DeliverablesViewer = ({ companyId }) => {
     const filePath = await uploadDocument(file, `deliverables/${destCompanyId || companyId}`);
     if (filePath) {
       await updateDeliverable(deliverableId, { fileName: filePath, status: 'entregue', deliveredDate: new Date().toISOString() });
-      await loadData();
+      await loadData(false);
     } else {
       alert('Erro ao fazer upload do arquivo.');
     }
     setUploadingId(null);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Tem certeza que deseja excluir este entregável?')) {
+      await deleteDeliverable(id);
+      await loadData(false);
+    }
+  };
+
+  const handleEditSave = async (id, updates) => {
+    await updateDeliverable(id, updates);
+    setEditingDeliverable(null);
+    await loadData(false);
   };
 
   if (loading) {
@@ -165,6 +180,7 @@ const DeliverablesViewer = ({ companyId }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginRight: '0.5rem' }}>
             <button
+              type="button"
               onClick={() => setViewMode('grid')}
               style={{
                 padding: '0.375rem 0.5rem',
@@ -176,6 +192,7 @@ const DeliverablesViewer = ({ companyId }) => {
               <LayoutGrid size={16} />
             </button>
             <button
+              type="button"
               onClick={() => setViewMode('list')}
               style={{
                 padding: '0.375rem 0.5rem',
@@ -243,6 +260,7 @@ const DeliverablesViewer = ({ companyId }) => {
           </select>
           {companyId && (
             <button 
+              type="button"
               className="btn btn-primary" 
               onClick={() => setShowModal(true)}
               style={{ marginLeft: 'auto' }}
@@ -378,56 +396,82 @@ const DeliverablesViewer = ({ companyId }) => {
                 alignItems: viewMode === 'grid' ? 'stretch' : 'center',
                 flexShrink: 0
               }}>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: viewMode === 'grid' ? 'wrap' : 'nowrap' }}>
-                  {d.status !== 'entregue' && (
-                    <button
-                      className="btn"
-                      onClick={() => handleChangeStatus(d.id, 'entregue')}
-                      style={{
-                        flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
-                        backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
-                        border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
-                        fontWeight: '600', whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Marcar Entregue
-                    </button>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: viewMode === 'grid' ? 'wrap' : 'nowrap', alignItems: 'center' }}>
+                  {['pendente', 'agendado', 'em_elaboracao'].includes(d.status) && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'entregue'); }}
+                        style={{
+                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
+                          border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
+                          fontWeight: '600', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Marcar Entregue
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'adiado'); }}
+                        style={{
+                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          backgroundColor: '#fef3c7', color: '#b45309',
+                          border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
+                          fontWeight: '600', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Adiar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'cancelado'); }}
+                        style={{
+                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          backgroundColor: '#fee2e2', color: 'var(--danger)',
+                          border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
+                          fontWeight: '600', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </>
                   )}
-                  {d.status !== 'adiado' && (
-                    <button
-                      className="btn"
-                      onClick={() => handleChangeStatus(d.id, 'adiado')}
-                      style={{
-                        flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
-                        backgroundColor: '#fef3c7', color: '#b45309',
-                        border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
-                        fontWeight: '600', whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Adiar
-                    </button>
-                  )}
-                  {d.status !== 'cancelado' && (
-                    <button
-                      className="btn"
-                      onClick={() => handleChangeStatus(d.id, 'cancelado')}
-                      style={{
-                        flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
-                        backgroundColor: '#fee2e2', color: 'var(--danger)',
-                        border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
-                        fontWeight: '600', whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setEditingDeliverable(d)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
+                      display: 'flex', transition: 'color 0.2s', padding: '0.375rem', marginLeft: ['pendente', 'agendado', 'em_elaboracao'].includes(d.status) ? 'auto' : '0'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    title="Editar"
+                  >
+                    <Edit3 size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(d.id)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
+                      display: 'flex', transition: 'color 0.2s', padding: '0.375rem'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    title="Excluir"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
                 {/* File / Download */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column', width: viewMode === 'list' ? '200px' : 'auto' }}>
                   {d.fileName ? (
                     <button
-                      onClick={() => window.open(getDocumentUrl(d.fileName), '_blank')}
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); window.open(getDocumentUrl(d.fileName), '_blank'); }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center',
                         padding: '0.625rem', borderRadius: 'var(--radius-md)',
@@ -477,6 +521,15 @@ const DeliverablesViewer = ({ companyId }) => {
           companyId={companyId} 
           onClose={() => setShowModal(false)}
           onSave={handleAddDeliverable}
+        />
+      )}
+
+      {editingDeliverable && (
+        <EditDeliverableModal
+          deliverable={editingDeliverable}
+          companyId={companyId}
+          onClose={() => setEditingDeliverable(null)}
+          onSave={handleEditSave}
         />
       )}
     </div>

@@ -127,13 +127,9 @@ export async function addCompany(company) {
     { company_id: data.id, title: 'Apoio Técnico e Perícias', type: 'programa', status: 'pendente', description: 'Sob Demanda' },
     { company_id: data.id, title: 'Treinamentos Digitais (EaD)', type: 'treinamento', status: 'pendente', description: 'Contínuo' },
     { company_id: data.id, title: 'Palestras Preventivas', type: 'treinamento', status: 'pendente', description: 'Conforme PGR' },
-    { company_id: data.id, title: 'Gestão de Certificados', type: 'programa', status: 'pendente', description: 'Contínuo' },
     { company_id: data.id, title: 'PCMSO Base & Relatório', type: 'programa', status: 'pendente', description: 'Anual' },
-    { company_id: data.id, title: 'Controle de Vencimentos', type: 'programa', status: 'pendente', description: 'Contínuo' },
-    { company_id: data.id, title: 'Atendimento Premium', type: 'visita_tecnica', status: 'pendente', description: 'Sob Agendamento' },
     { company_id: data.id, title: 'Eventos eSocial (S-2240)', type: 'programa', status: 'pendente', description: 'Contínuo' },
-    { company_id: data.id, title: 'PPP Digital', type: 'programa', status: 'pendente', description: 'Contínuo' },
-    { company_id: data.id, title: 'Plataforma e Documentos', type: 'programa', status: 'pendente', description: 'Contínuo' }
+    { company_id: data.id, title: 'PPP Digital', type: 'programa', status: 'pendente', description: 'Contínuo' }
   ];
 
   const { error: delivError } = await supabase.from('deliverables').insert(standardDeliverables);
@@ -443,6 +439,19 @@ export async function updateDeliverable(deliverableId, updates) {
   }
 
   return mapDeliverable(data);
+}
+
+export async function deleteDeliverable(deliverableId) {
+  const { error } = await supabase
+    .from('deliverables')
+    .delete()
+    .eq('id', deliverableId);
+
+  if (error) {
+    console.error('Error deleting deliverable:', error);
+    throw error;
+  }
+  return true;
 }
 
 export async function getAllDeliverablesSummary() {

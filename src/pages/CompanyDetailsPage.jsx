@@ -37,8 +37,8 @@ const CompanyDetailsPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [uploadingContractId, setUploadingContractId] = useState(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const [comp, allGroups, trn, ctr, deliv] = await Promise.all([
       getCompanyById(companyId),
       getGroups(),
@@ -52,11 +52,11 @@ const CompanyDetailsPage = () => {
     setTrainings(trn);
     setContracts(ctr);
     setDeliverables(deliv);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
   }, [companyId]);
 
   const handleAddContract = async (contractData) => {
@@ -65,7 +65,7 @@ const CompanyDetailsPage = () => {
       filePath = await uploadDocument(contractData.file, `contracts/${companyId}`);
     }
     await addContract({ ...contractData, filePath, companyId });
-    await loadData();
+    await loadData(false);
     setShowContractModal(false);
   };
 
@@ -75,13 +75,13 @@ const CompanyDetailsPage = () => {
       fileName = await uploadDocument(deliverableData.file, `deliverables/${companyId}`);
     }
     await addDeliverable({ ...deliverableData, fileName, companyId });
-    await loadData();
+    await loadData(false);
     setShowDeliverableModal(false);
   };
 
   const handleEditCompany = async (id, updates) => {
     await updateCompany(id, updates);
-    await loadData();
+    await loadData(false);
     setShowEditModal(false);
   };
 
@@ -92,7 +92,7 @@ const CompanyDetailsPage = () => {
     const filePath = await uploadDocument(file, `contracts/${companyId}`);
     if (filePath) {
       await updateContract(contractId, { filePath });
-      await loadData();
+      await loadData(false);
     } else {
       alert('Erro ao fazer upload do contrato.');
     }
@@ -438,7 +438,7 @@ const CompanyDetailsPage = () => {
       )}
 
       {activeTab === 'calendar' && (
-        <TrainingCalendar companyId={companyId} onUpdate={loadData} />
+        <TrainingCalendar companyId={companyId} onUpdate={() => loadData(false)} />
       )}
 
       {activeTab === 'deliverables' && (

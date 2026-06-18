@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getTrainings, getCompanies, addTraining } from '../services/storageService';
@@ -16,14 +16,15 @@ const CalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
 
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [pendingTrainings, setPendingTrainings] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const [trn, comp, { getDeliverables }] = await Promise.all([
       getTrainings(),
       getCompanies(),
@@ -34,17 +35,17 @@ const CalendarView = () => {
     setTrainings(trn);
     setCompanies(comp);
     setPendingTrainings(deliverables.filter(d => d.type === 'treinamento' && d.status === 'pendente'));
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
   }, []);
 
   const handleAddTraining = async (trainingData) => {
     await addTraining(trainingData);
     setShowModal(false);
-    await loadData();
+    await loadData(false);
   };
 
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
@@ -65,6 +66,8 @@ const CalendarView = () => {
   const startDate = startOfWeek(monthStart);
   const endDate = endOfWeek(monthEnd);
 
+  const filteredTrainings = trainings.filter(t => filterStatus === 'all' || t.status === filterStatus);
+
   const rows = [];
   let days = [];
   let day = startDate;
@@ -73,7 +76,7 @@ const CalendarView = () => {
     for (let i = 0; i < 7; i++) {
       const cloneDay = day;
       const dateStr = format(day, 'yyyy-MM-dd');
-      const dayEvents = trainings.filter(t => t.date === dateStr);
+      const dayEvents = filteredTrainings.filter(t => t.date === dateStr);
       const isCurrentMonth = isSameMonth(day, monthStart);
       const isToday = isSameDay(day, new Date());
       const isSelected = selectedDate === dateStr;
@@ -145,7 +148,7 @@ const CalendarView = () => {
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   const selectedDayEvents = selectedDate
-    ? trainings.filter(t => t.date === selectedDate).map(t => ({ ...t, companyName: getCompanyName(t.companyId) }))
+    ? filteredTrainings.filter(t => t.date === selectedDate).map(t => ({ ...t, companyName: getCompanyName(t.companyId) }))
     : [];
 
   const statusIcons = {
@@ -174,14 +177,35 @@ const CalendarView = () => {
         )}
       </header>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        {Object.entries(STATUS_CONFIG).map(([key, val]) => (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: val.color }} />
-            {val.label}
-          </div>
-        ))}
+      {/* Legend and Filter */}
+      <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+          {Object.entries(STATUS_CONFIG).map(([key, val]) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: val.color }} />
+              {val.label}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Filter size={16} color="var(--text-secondary)" />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{
+              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)', fontSize: '0.8125rem',
+              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+              fontFamily: 'inherit', cursor: 'pointer'
+            }}
+          >
+            <option value="all">Todos os Status</option>
+            <option value="agendado">Agendados</option>
+            <option value="concluido">Concluídos</option>
+            <option value="adiado">Adiados</option>
+            <option value="nao_feito">Não Feitos</option>
+          </select>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: selectedDate ? '1fr 320px' : '1fr', gap: '1.5rem', flex: 1 }}>
