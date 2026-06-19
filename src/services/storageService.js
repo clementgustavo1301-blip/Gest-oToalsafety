@@ -393,6 +393,12 @@ export async function updateDeliverable(deliverableId, updates) {
     .single();
 
   const snakeUpdates = {};
+  if (updates.title !== undefined) snakeUpdates.title = updates.title;
+  if (updates.description !== undefined) snakeUpdates.description = updates.description;
+  if (updates.type !== undefined) snakeUpdates.type = updates.type;
+  if (updates.contractId !== undefined) snakeUpdates.contract_id = updates.contractId;
+  if (updates.dueDate !== undefined) snakeUpdates.due_date = updates.dueDate;
+  if (updates.validityDate !== undefined) snakeUpdates.validity_date = updates.validityDate;
   if (updates.status !== undefined) snakeUpdates.status = updates.status;
   if (updates.reason !== undefined) snakeUpdates.reason = updates.reason;
   if (updates.fileName !== undefined) snakeUpdates.file_name = updates.fileName;
