@@ -9,6 +9,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
   const [contractId, setContractId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [validityDate, setValidityDate] = useState('');
+  const [deliveredDate, setDeliveredDate] = useState('');
   const [file, setFile] = useState(null);
 
   const [contracts, setContracts] = useState([]);
@@ -41,7 +42,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
       dueDate: dueDate || null,
       validityDate: validityDate || null,
       status: file ? 'entregue' : 'pendente', // Se anexar o arquivo na hora, já marca como entregue
-      deliveredDate: file ? new Date().toISOString() : null,
+      deliveredDate: deliveredDate || (file ? new Date().toISOString() : null),
       fileName: null,
       file: file
     });
@@ -168,6 +169,20 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                     />
                   </div>
                 )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                <div>
+                  <label className="modal-label" htmlFor="dlv-delivered">Data de Entrega (Opcional)</label>
+                  <input
+                    id="dlv-delivered"
+                    type="date"
+                    value={deliveredDate}
+                    onChange={(e) => setDeliveredDate(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  />
+                </div>
               </div>
 
               <div>

@@ -331,6 +331,7 @@ const DeliverablesViewer = ({ companyId }) => {
                   <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                     {d.dueDate && <span>Vencimento: {new Date(d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
                     {d.validityDate && <span>Validade: {new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
+                    {d.deliveredDate && <span>Entregue em: {new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
                     <span>Contrato: {contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A'}</span>
                   </div>
                 )}

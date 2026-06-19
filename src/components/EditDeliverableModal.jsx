@@ -9,6 +9,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const [contractId, setContractId] = useState(deliverable?.contractId || '');
   const [dueDate, setDueDate] = useState(deliverable?.dueDate || '');
   const [validityDate, setValidityDate] = useState(deliverable?.validityDate || '');
+  const [deliveredDate, setDeliveredDate] = useState(deliverable?.deliveredDate || '');
   const [status, setStatus] = useState(deliverable?.status || 'pendente');
 
   const [contracts, setContracts] = useState([]);
@@ -44,6 +45,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
       contractId: contractId || null,
       dueDate: dueDate || null,
       validityDate: validityDate || null,
+      deliveredDate: deliveredDate || null,
       status
     });
     setSaving(false);
@@ -173,7 +175,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
               </div>
               
               {type !== 'treinamento' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label className="modal-label" htmlFor="dlv-validity">Validade do Documento</label>
                     <input
@@ -181,6 +183,17 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                       type="date"
                       value={validityDate}
                       onChange={(e) => setValidityDate(e.target.value)}
+                      className="modal-input"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div>
+                    <label className="modal-label" htmlFor="dlv-delivered">Data de Entrega</label>
+                    <input
+                      id="dlv-delivered"
+                      type="date"
+                      value={deliveredDate}
+                      onChange={(e) => setDeliveredDate(e.target.value)}
                       className="modal-input"
                       disabled={saving}
                     />
