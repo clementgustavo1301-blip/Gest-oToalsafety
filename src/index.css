@@ -61,18 +61,9 @@ button {
   font-size: inherit;
 }
 
-/* Layout */
-.app-layout {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
+/* Managed dynamically below */
 
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 2rem;
-}
+/* Managed dynamically below */
 
 /* Utilities */
 .card {
@@ -219,6 +210,55 @@ button {
   box-shadow: 0 0 0 3px var(--primary-light);
 }
 
+/* Forms (Shared) */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.form-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon > svg {
+  position: absolute;
+  left: 0.875rem;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  background-color: var(--background);
+  transition: var(--transition);
+  outline: none;
+}
+
+.input-with-icon > .form-input {
+  padding-left: 2.5rem;
+}
+
+.form-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  background-color: var(--surface);
+}
+
 /* Table */
 table {
   font-size: 0.875rem;
@@ -252,4 +292,155 @@ table th {
 select.modal-input {
   cursor: pointer;
   appearance: auto;
+}
+
+/* ========================================= */
+/* MOBILE FIRST & RESPONSIVE LAYOUT          */
+/* ========================================= */
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  flex-direction: column; /* Mobile by default */
+}
+
+/* On Desktop, flex row */
+@media (min-width: 1024px) {
+  .app-layout {
+    flex-direction: row;
+  }
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem; /* Smaller padding on mobile */
+}
+
+@media (min-width: 1024px) {
+  .main-content {
+    padding: 2rem;
+  }
+}
+
+/* --- Mobile TopBar --- */
+.mobile-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+@media (min-width: 1024px) {
+  .mobile-topbar {
+    display: none;
+  }
+}
+
+/* --- Sidebar (Drawer on mobile, Fixed on Desktop) --- */
+.sidebar {
+  width: 280px;
+  background-color: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  transform: translateX(-100%); /* Hidden by default on mobile */
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.sidebar-open {
+  transform: translateX(0);
+}
+
+@media (min-width: 1024px) {
+  .sidebar {
+    position: static;
+    transform: translateX(0);
+    width: 260px;
+  }
+}
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-overlay {
+    display: none;
+  }
+}
+
+/* --- Utilities --- */
+.hide-on-mobile {
+  display: none !important;
+}
+
+.hide-on-desktop {
+  display: block !important;
+}
+
+@media (min-width: 1024px) {
+  .hide-on-mobile {
+    display: block !important;
+  }
+  .hide-on-desktop {
+    display: none !important;
+  }
+}
+
+/* Responsive Tables */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive table {
+  min-width: 600px; /* Force minimum width to enable scrolling */
+}
+
+/* Flex wrap helper for headers */
+.header-responsive {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  align-items: flex-start;
+}
+
+@media (min-width: 768px) {
+  .header-responsive {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+/* Make inputs look better on mobile */
+input, select, textarea {
+  font-size: 16px !important; /* Prevents iOS Safari zoom */
 }

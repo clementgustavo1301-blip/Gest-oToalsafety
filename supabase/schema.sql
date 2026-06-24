@@ -140,3 +140,26 @@ CREATE POLICY "Enable read access for authenticated users" ON public.trainings F
 CREATE POLICY "Enable insert for authenticated users" ON public.trainings FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Enable update for authenticated users" ON public.trainings FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Enable delete for authenticated users" ON public.trainings FOR DELETE TO authenticated USING (true);
+
+-- ==========================================
+-- 6. Inventory Table
+-- ==========================================
+CREATE TABLE public.inventory (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    category TEXT,
+    quantity INTEGER DEFAULT 0,
+    unit TEXT,
+    min_quantity INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TRIGGER handle_updated_at_inventory BEFORE UPDATE ON public.inventory
+  FOR EACH ROW EXECUTE PROCEDURE moddatetime (updated_at);
+
+ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for authenticated users" ON public.inventory FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Enable insert for authenticated users" ON public.inventory FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Enable update for authenticated users" ON public.inventory FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Enable delete for authenticated users" ON public.inventory FOR DELETE TO authenticated USING (true);

@@ -1,10 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X } from 'lucide-react';
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
   const { signOut } = useAuth();
   const { unreadCount } = useAI();
@@ -14,20 +14,13 @@ const Sidebar = () => {
     { name: 'Empresas', path: '/companies', icon: <Building2 size={20} /> },
     { name: 'Calendário', path: '/calendar', icon: <Calendar size={20} /> },
     { name: 'Entregáveis', path: '/deliverables', icon: <FileText size={20} /> },
+    { name: 'Estoque', path: '/inventory', icon: <Package size={20} /> },
     { name: 'Assistente IA', path: '/ai-assistant', icon: <Sparkles size={20} /> },
     { name: 'Configurações', path: '/settings', icon: <Settings size={20} /> },
   ];
 
   return (
-    <aside style={{
-      width: '260px',
-      backgroundColor: 'var(--surface)',
-      borderRight: '1px solid var(--border)',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '1.5rem',
-      height: '100%'
-    }}>
+    <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem' }}>
         <div style={{
           width: '40px',
@@ -45,6 +38,13 @@ const Sidebar = () => {
           <h2 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: 0 }}>TotalSafety</h2>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Gestão SST</span>
         </div>
+        <button 
+          className="hide-on-desktop" 
+          onClick={onClose}
+          style={{ marginLeft: 'auto', color: 'var(--text-secondary)', padding: '0.25rem' }}
+        >
+          <X size={20} />
+        </button>
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>

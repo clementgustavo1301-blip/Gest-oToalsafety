@@ -110,7 +110,7 @@ const Dashboard = () => {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="header-responsive">
         <div>
           <h1 className="text-h1">Dashboard Geral</h1>
           <p className="text-subtitle">Acompanhamento integrado de entregáveis, treinamentos e contratos.</p>

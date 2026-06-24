@@ -160,7 +160,7 @@ const CalendarView = () => {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <header className="header-responsive" style={{ marginBottom: '1.5rem', alignItems: 'flex-start' }}>
         <div>
           <h1 className="text-h1">Agenda de Treinamentos</h1>
           <p className="text-subtitle">Visão geral de todas as empresas. Acesse a empresa para agendar.</p>

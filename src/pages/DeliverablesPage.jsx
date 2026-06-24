@@ -73,7 +73,7 @@ const DeliverablesPage = () => {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="header-responsive">
         <div>
           <h1 className="text-h1">Entregáveis & Contratos</h1>
           <p className="text-subtitle">Visualize todos os programas, laudos e entregáveis de cada contrato.</p>
