@@ -21,9 +21,6 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
       setLoadingData(true);
       const ctrs = await getContractsByCompany(companyId);
       setContracts(ctrs);
-      if (ctrs.length > 0) {
-        setContractId(ctrs[0].id);
-      }
       setLoadingData(false);
     }
     load();
@@ -38,7 +35,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
       title: title.trim(),
       description: description.trim() || null,
       type,
-      contractId: contractId || (contracts.length > 0 ? contracts[0].id : null),
+      contractId: contractId || null,
       dueDate: dueDate || null,
       validityDate: validityDate || null,
       status: file ? 'entregue' : 'pendente', // Se anexar o arquivo na hora, já marca como entregue
@@ -131,10 +128,9 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                     value={contractId}
                     onChange={(e) => setContractId(e.target.value)}
                     className="modal-input"
-                    required
                     disabled={saving}
                   >
-                    {contracts.length === 0 && <option value="">Sem contratos...</option>}
+                    <option value="">Sem vínculo (Opcional)</option>
                     {contracts.map(c => (
                       <option key={c.id} value={c.id}>{c.contractNumber}</option>
                     ))}

@@ -24,14 +24,11 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
       if (compId) {
         const ctrs = await getContractsByCompany(compId);
         setContracts(ctrs);
-        if (!contractId && ctrs.length > 0) {
-          setContractId(ctrs[0].id);
-        }
       }
       setLoadingData(false);
     }
     load();
-  }, [companyId, deliverable, contractId]);
+  }, [companyId, deliverable]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
