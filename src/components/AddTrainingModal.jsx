@@ -13,6 +13,10 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [participants, setParticipants] = useState('');
   const [description, setDescription] = useState('');
 
+  const [recurrence, setRecurrence] = useState('none');
+  const [customDays, setCustomDays] = useState(7);
+  const [repeatCount, setRepeatCount] = useState(4);
+
   const [customTitle, setCustomTitle] = useState('');
   const [isStandalone, setIsStandalone] = useState(false);
 
@@ -58,9 +62,8 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       deliverableId = selectedDeliverableId;
     }
     
-    await onSave({
+    const baseItem = {
       title,
-      date,
       time,
       instructor: instructor.trim(),
       participants: parseInt(participants) || 0,
@@ -68,7 +71,50 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       status: 'agendado',
       deliverableId,
       companyId: selectedCompanyId
-    });
+    };
+
+    const itemsToSave = [];
+    
+    if (recurrence !== 'none') {
+       let currentDate = new Date(date);
+       for (let i = 0; i <= repeatCount; i++) {
+           let dateStr = currentDate.toISOString().split('T')[0];
+           
+           itemsToSave.push({
+               ...baseItem,
+               date: dateStr,
+           });
+
+           if (recurrence === 'weekly' || recurrence === 'weekly_same_day') {
+               currentDate.setDate(currentDate.getDate() + 7);
+           } else if (recurrence === 'monthly') {
+               const originalDate = new Date(dateStr);
+               const weekday = originalDate.getDay();
+               const nth = Math.ceil(originalDate.getDate() / 7);
+               
+               currentDate.setMonth(currentDate.getMonth() + 1);
+               currentDate.setDate(1);
+               while (currentDate.getDay() !== weekday) {
+                   currentDate.setDate(currentDate.getDate() + 1);
+               }
+               currentDate.setDate(currentDate.getDate() + (nth - 1) * 7);
+               
+               // If it spilled over to the next month, pull back by 1 week
+               if (currentDate.getMonth() !== (originalDate.getMonth() + 1) % 12) {
+                   currentDate.setDate(currentDate.getDate() - 7);
+               }
+           } else if (recurrence === 'custom_same_day') {
+               const weeksToAdd = Math.round(customDays / 7) || 1;
+               currentDate.setDate(currentDate.getDate() + (weeksToAdd * 7));
+           } else if (recurrence === 'custom') {
+               currentDate.setDate(currentDate.getDate() + customDays);
+           }
+       }
+    } else {
+       itemsToSave.push({ ...baseItem, date });
+    }
+
+    await onSave(itemsToSave);
     setSaving(false);
   };
 
@@ -173,6 +219,54 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                   />
                 </div>
               )}
+
+              {/* Repetição */}
+              <div style={{ padding: '1rem', backgroundColor: 'var(--surface-light)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+                <label className="modal-label">Repetição (Opcional)</label>
+                <select
+                  className="modal-input"
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="none">Não repetir (padrão)</option>
+                  <option value="weekly">Semanalmente (a cada 7 dias)</option>
+                  <option value="weekly_same_day">Semanalmente (no mesmo dia da semana)</option>
+                  <option value="monthly">Mensalmente (no mesmo dia da semana)</option>
+                  <option value="custom">Personalizado (a cada X dias)</option>
+                  <option value="custom_same_day">Personalizado (a cada X dias no mesmo dia da semana)</option>
+                </select>
+
+                {recurrence !== 'none' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: (recurrence === 'custom' || recurrence === 'custom_same_day') ? '1fr 1fr' : '1fr', gap: '1rem', marginTop: '1rem' }}>
+                    {(recurrence === 'custom' || recurrence === 'custom_same_day') && (
+                      <div>
+                        <label className="modal-label">A cada quantos dias?</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="modal-input"
+                          value={customDays}
+                          onChange={(e) => setCustomDays(parseInt(e.target.value) || 1)}
+                          disabled={saving}
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="modal-label">Nº de ocorrências futuras (além da 1ª)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="52"
+                        className="modal-input"
+                        value={repeatCount}
+                        onChange={(e) => setRepeatCount(parseInt(e.target.value) || 1)}
+                        disabled={saving}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Date and Time */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

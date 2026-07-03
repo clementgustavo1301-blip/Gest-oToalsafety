@@ -12,6 +12,10 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
   const [deliveredDate, setDeliveredDate] = useState('');
   const [file, setFile] = useState(null);
 
+  const [recurrence, setRecurrence] = useState('none');
+  const [customDays, setCustomDays] = useState(7);
+  const [repeatCount, setRepeatCount] = useState(4);
+
   const [contracts, setContracts] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,18 +35,61 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
     if (!title.trim() || !dueDate) return;
     
     setSaving(true);
-    await onSave({
+    
+    const baseItem = {
       title: title.trim(),
       description: description.trim() || null,
       type,
       contractId: contractId || null,
-      dueDate: dueDate || null,
       validityDate: validityDate || null,
-      status: file ? 'entregue' : 'pendente', // Se anexar o arquivo na hora, já marca como entregue
+      status: file ? 'entregue' : 'pendente',
       deliveredDate: deliveredDate || (file ? new Date().toISOString() : null),
       fileName: null,
       file: file
-    });
+    };
+
+    const itemsToSave = [];
+    
+    if ((type === 'treinamento' || type === 'visita_tecnica') && recurrence !== 'none') {
+       let currentDueDate = new Date(dueDate);
+       for (let i = 0; i <= repeatCount; i++) {
+           let dateStr = currentDueDate.toISOString().split('T')[0];
+           
+           itemsToSave.push({
+               ...baseItem,
+               dueDate: dateStr,
+           });
+
+           if (recurrence === 'weekly' || recurrence === 'weekly_same_day') {
+               currentDueDate.setDate(currentDueDate.getDate() + 7);
+           } else if (recurrence === 'monthly') {
+               const originalDate = new Date(dateStr);
+               const weekday = originalDate.getDay();
+               const nth = Math.ceil(originalDate.getDate() / 7);
+               
+               currentDueDate.setMonth(currentDueDate.getMonth() + 1);
+               currentDueDate.setDate(1);
+               while (currentDueDate.getDay() !== weekday) {
+                   currentDueDate.setDate(currentDueDate.getDate() + 1);
+               }
+               currentDueDate.setDate(currentDueDate.getDate() + (nth - 1) * 7);
+               
+               // If it spilled over to the next month, pull back by 1 week
+               if (currentDueDate.getMonth() !== (originalDate.getMonth() + 1) % 12) {
+                   currentDueDate.setDate(currentDueDate.getDate() - 7);
+               }
+           } else if (recurrence === 'custom_same_day') {
+               const weeksToAdd = Math.round(customDays / 7) || 1;
+               currentDueDate.setDate(currentDueDate.getDate() + (weeksToAdd * 7));
+           } else if (recurrence === 'custom') {
+               currentDueDate.setDate(currentDueDate.getDate() + customDays);
+           }
+       }
+    } else {
+       itemsToSave.push({ ...baseItem, dueDate });
+    }
+
+    await onSave(itemsToSave);
     setSaving(false);
   };
 
@@ -180,6 +227,55 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                   />
                 </div>
               </div>
+
+              {(type === 'treinamento' || type === 'visita_tecnica') && (
+                <div style={{ padding: '1rem', backgroundColor: 'var(--surface-light)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+                  <label className="modal-label">Repetição (Opcional)</label>
+                  <select
+                    className="modal-input"
+                    value={recurrence}
+                    onChange={(e) => setRecurrence(e.target.value)}
+                    disabled={saving}
+                  >
+                  <option value="none">Não repetir (padrão)</option>
+                  <option value="weekly">Semanalmente (a cada 7 dias)</option>
+                  <option value="weekly_same_day">Semanalmente (no mesmo dia da semana)</option>
+                  <option value="monthly">Mensalmente (no mesmo dia da semana)</option>
+                  <option value="custom">Personalizado (a cada X dias)</option>
+                  <option value="custom_same_day">Personalizado (a cada X dias no mesmo dia da semana)</option>
+                  </select>
+
+                  {recurrence !== 'none' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: (recurrence === 'custom' || recurrence === 'custom_same_day') ? '1fr 1fr' : '1fr', gap: '1rem', marginTop: '1rem' }}>
+                      {(recurrence === 'custom' || recurrence === 'custom_same_day') && (
+                        <div>
+                          <label className="modal-label">A cada quantos dias?</label>
+                          <input
+                            type="number"
+                            min="1"
+                            className="modal-input"
+                            value={customDays}
+                            onChange={(e) => setCustomDays(parseInt(e.target.value) || 1)}
+                            disabled={saving}
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="modal-label">Nº de ocorrências futuras (além da 1ª)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="52"
+                          className="modal-input"
+                          value={repeatCount}
+                          onChange={(e) => setRepeatCount(parseInt(e.target.value) || 1)}
+                          disabled={saving}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="modal-label">Anexar PDF Inicial (Opcional)</label>

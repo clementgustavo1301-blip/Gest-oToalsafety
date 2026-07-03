@@ -28,6 +28,7 @@ const STATUS_CONFIG = {
   em_elaboracao: { label: 'Em Elaboração', icon: <AlertTriangle size={14} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
   adiado: { label: 'Adiado', icon: <AlertTriangle size={14} />, color: '#b45309', bg: '#fef3c7' },
   cancelado: { label: 'Cancelado', icon: <AlertTriangle size={14} />, color: 'var(--danger)', bg: '#fee2e2' },
+  nao_se_aplica: { label: 'Não Se Aplica', icon: <AlertTriangle size={14} />, color: '#4b5563', bg: '#f3f4f6' },
 };
 
 const DeliverablesViewer = ({ companyId }) => {
@@ -71,12 +72,18 @@ const DeliverablesViewer = ({ companyId }) => {
     loadData(true);
   }, [companyId]);
 
-  const handleAddDeliverable = async (data) => {
+  const handleAddDeliverable = async (dataOrArray) => {
+    const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
+    
     let fileName = null;
-    if (data.file) {
-      fileName = await uploadDocument(data.file, `deliverables/${companyId}`);
+    if (items[0].file) {
+      fileName = await uploadDocument(items[0].file, `deliverables/${companyId}`);
     }
-    await addDeliverable({ ...data, fileName, companyId });
+
+    for (const data of items) {
+      await addDeliverable({ ...data, fileName, companyId });
+    }
+
     setShowModal(false);
     await loadData(false);
   };
@@ -438,6 +445,19 @@ const DeliverablesViewer = ({ companyId }) => {
                         }}
                       >
                         Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'nao_se_aplica'); }}
+                        style={{
+                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          backgroundColor: '#f3f4f6', color: '#4b5563',
+                          border: '1px solid #9ca3af', borderRadius: 'var(--radius-md)',
+                          fontWeight: '600', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Não se aplica
                       </button>
                     </>
                   )}

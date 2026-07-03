@@ -42,8 +42,11 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
 
-  const handleAddTraining = async (trainingData) => {
-    await addTraining({ ...trainingData, companyId });
+  const handleAddTraining = async (dataOrArray) => {
+    const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
+    for (const data of items) {
+      await addTraining({ ...data, companyId });
+    }
     setShowModal(false);
     await loadData();
     if (onUpdate) onUpdate();

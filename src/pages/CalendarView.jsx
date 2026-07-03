@@ -42,8 +42,11 @@ const CalendarView = () => {
     loadData(true);
   }, []);
 
-  const handleAddTraining = async (trainingData) => {
-    await addTraining(trainingData);
+  const handleAddTraining = async (dataOrArray) => {
+    const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
+    for (const data of items) {
+      await addTraining(data);
+    }
     setShowModal(false);
     await loadData(false);
   };

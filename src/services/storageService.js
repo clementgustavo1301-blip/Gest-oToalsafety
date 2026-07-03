@@ -407,28 +407,7 @@ export async function updateDeliverable(deliverableId, updates) {
   const { data, error } = await supabase.from('deliverables').update(snakeUpdates).eq('id', deliverableId).select().single();
   if (error) { console.error('Error updating deliverable:', error); return null; }
 
-  // Sincronizar com outras empresas do grupo se o status for 'entregue'
-  if (currentDeliv && updates.status === 'entregue') {
-     const { data: company } = await supabase.from('companies').select('group_id').eq('id', currentDeliv.company_id).single();
-     if (company && company.group_id) {
-       const { data: groupCompanies } = await supabase.from('companies').select('id').eq('group_id', company.group_id);
-       if (groupCompanies && groupCompanies.length > 0) {
-         const companyIds = groupCompanies.map(c => c.id).filter(id => id !== currentDeliv.company_id);
-         
-         if (companyIds.length > 0) {
-           const syncUpdates = { status: 'entregue' };
-           if (updates.fileName !== undefined) syncUpdates.file_name = updates.fileName;
-           if (updates.deliveredDate !== undefined) syncUpdates.delivered_date = updates.deliveredDate;
 
-           await supabase.from('deliverables')
-             .update(syncUpdates)
-             .in('company_id', companyIds)
-             .eq('title', currentDeliv.title)
-             .eq('type', currentDeliv.type);
-         }
-       }
-     }
-  }
 
   // Sincronizar com treinamentos (se for um treinamento)
   if (updates.status) {
