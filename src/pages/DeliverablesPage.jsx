@@ -123,17 +123,12 @@ const DeliverablesPage = () => {
                 }}
               />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div className="filters-actions">
               <Filter size={16} color="var(--text-secondary)" />
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                style={{
-                  padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border)', fontSize: '0.8125rem',
-                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                  fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
-                }}
+                className="filter-select"
               >
                 <option value="all">Todos os status</option>
                 <option value="pendente">Pendentes</option>
@@ -147,12 +142,7 @@ const DeliverablesPage = () => {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                style={{
-                  padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border)', fontSize: '0.8125rem',
-                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                  fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
-                }}
+                className="filter-select"
               >
                 <option value="all">Todos os tipos</option>
                 <option value="programa">Programas</option>

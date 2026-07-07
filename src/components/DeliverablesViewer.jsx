@@ -186,7 +186,7 @@ const DeliverablesViewer = ({ companyId }) => {
             }}
           />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="filters-actions">
           <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginRight: '0.5rem' }}>
             <button
               type="button"
@@ -219,12 +219,7 @@ const DeliverablesViewer = ({ companyId }) => {
               id="filter-company"
               value={filterCompany}
               onChange={(e) => setFilterCompany(e.target.value)}
-              style={{
-                padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)', fontSize: '0.8125rem',
-                backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                fontFamily: 'inherit', cursor: 'pointer'
-              }}
+              className="filter-select"
             >
               <option value="all">Todas as empresas</option>
               {companies.map(c => (
@@ -236,12 +231,7 @@ const DeliverablesViewer = ({ companyId }) => {
             id="filter-status"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            style={{
-              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)', fontSize: '0.8125rem',
-              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
-            }}
+            className="filter-select"
           >
             <option value="all">Todos os status</option>
             <option value="pendente">Pendentes</option>
@@ -256,12 +246,7 @@ const DeliverablesViewer = ({ companyId }) => {
             id="filter-type"
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            style={{
-              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)', fontSize: '0.8125rem',
-              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
-            }}
+            className="filter-select"
           >
             <option value="all">Todos os tipos</option>
             <option value="programa">Programas</option>
@@ -275,12 +260,7 @@ const DeliverablesViewer = ({ companyId }) => {
             id="filter-contract"
             value={filterContract}
             onChange={(e) => setFilterContract(e.target.value)}
-            style={{
-              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)', fontSize: '0.8125rem',
-              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '140px'
-            }}
+            className="filter-select"
           >
             <option value="all">Todos os contratos</option>
             {contracts.map(c => (
