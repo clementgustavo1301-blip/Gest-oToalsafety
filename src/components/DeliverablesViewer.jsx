@@ -151,7 +151,7 @@ const DeliverablesViewer = ({ companyId }) => {
   return (
     <div>
       {/* Stats Bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="grid-responsive-stats" style={{ marginBottom: '1.5rem' }}>
         {[
           { label: 'Total', value: stats.total, color: 'var(--text-primary)', bg: 'var(--surface)' },
           { label: 'Entregues', value: stats.entregue, color: 'var(--secondary)', bg: 'var(--secondary-light)' },
@@ -303,7 +303,7 @@ const DeliverablesViewer = ({ companyId }) => {
       {/* Deliverables Grid/List */}
       <div style={
         viewMode === 'grid' 
-          ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }
+          ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '1rem' }
           : { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
       }>
         {filtered.map(d => {

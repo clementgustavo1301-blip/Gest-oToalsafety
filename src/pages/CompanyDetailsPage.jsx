@@ -150,41 +150,43 @@ const CompanyDetailsPage = () => {
 
       {/* Company Header */}
       <div className="card flex-col-mobile" style={{ marginBottom: '1.5rem', gap: '1.5rem' }}>
-        <div style={{
-          width: '64px', height: '64px', borderRadius: 'var(--radius-lg)',
-          background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)', flexShrink: 0
-        }}>
-          <Building2 size={28} color="white" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {company.name}
-            <button 
-              onClick={() => setShowEditModal(true)} 
-              title="Editar Empresa"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', transition: 'color 0.2s' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-            >
-              <Edit3 size={18} />
-            </button>
-          </h1>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontFamily: "'JetBrains Mono', monospace" }}>
-              <Hash size={14} /> {company.cnpj}
-            </span>
-            {company.contact && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                <User size={14} /> {company.contact}
+        <div style={{ display: 'flex', gap: '1.5rem', flex: 1, alignItems: 'center' }}>
+          <div style={{
+            width: '64px', height: '64px', borderRadius: 'var(--radius-lg)',
+            background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)', flexShrink: 0
+          }}>
+            <Building2 size={28} color="white" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {company.name}
+              <button 
+                onClick={() => setShowEditModal(true)} 
+                title="Editar Empresa"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', transition: 'color 0.2s' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+              >
+                <Edit3 size={18} />
+              </button>
+            </h1>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontFamily: "'JetBrains Mono', monospace" }}>
+                <Hash size={14} /> {company.cnpj}
               </span>
-            )}
-            {company.phone && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                <Phone size={14} /> {company.phone}
-              </span>
-            )}
+              {company.contact && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                  <User size={14} /> {company.contact}
+                </span>
+              )}
+              {company.phone && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                  <Phone size={14} /> {company.phone}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '1rem', flexShrink: 0, flexWrap: 'wrap' }}>

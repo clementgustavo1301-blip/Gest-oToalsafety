@@ -162,8 +162,8 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
 
   return (
     <div>
-      {/* Status Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
+      {/* Stats */}
+      <div className="grid-responsive-stats" style={{ marginBottom: '1.5rem' }}>
         {[
           { label: 'Agendados', value: agendados, ...STATUS_CONFIG.agendado },
           { label: 'Concluídos', value: concluidos, ...STATUS_CONFIG.concluido },

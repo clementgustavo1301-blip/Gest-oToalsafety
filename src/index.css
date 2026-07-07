@@ -539,4 +539,25 @@ input, select, textarea {
   }
 }
 
+/* Tabs Container */
+.tabs-container {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  background-color: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabs-container::-webkit-scrollbar {
+  display: none;
+}
+.tabs-container {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 
