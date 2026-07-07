@@ -240,7 +240,7 @@ const DeliverablesViewer = ({ companyId }) => {
               padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border)', fontSize: '0.8125rem',
               backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer'
+              fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
             }}
           >
             <option value="all">Todos os status</option>
@@ -260,7 +260,7 @@ const DeliverablesViewer = ({ companyId }) => {
               padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border)', fontSize: '0.8125rem',
               backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer'
+              fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
             }}
           >
             <option value="all">Todos os tipos</option>
@@ -279,7 +279,7 @@ const DeliverablesViewer = ({ companyId }) => {
               padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border)', fontSize: '0.8125rem',
               backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer'
+              fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '140px'
             }}
           >
             <option value="all">Todos os contratos</option>
@@ -434,7 +434,7 @@ const DeliverablesViewer = ({ companyId }) => {
                         className="btn"
                         onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'entregue'); }}
                         style={{
-                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
                           backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
                           border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
                           fontWeight: '600', whiteSpace: 'nowrap'
@@ -447,7 +447,7 @@ const DeliverablesViewer = ({ companyId }) => {
                         className="btn"
                         onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'adiado'); }}
                         style={{
-                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
                           backgroundColor: '#fef3c7', color: '#b45309',
                           border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
                           fontWeight: '600', whiteSpace: 'nowrap'
@@ -460,7 +460,7 @@ const DeliverablesViewer = ({ companyId }) => {
                         className="btn"
                         onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'cancelado'); }}
                         style={{
-                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
                           backgroundColor: '#fee2e2', color: 'var(--danger)',
                           border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
                           fontWeight: '600', whiteSpace: 'nowrap'
@@ -473,7 +473,7 @@ const DeliverablesViewer = ({ companyId }) => {
                         className="btn"
                         onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'nao_se_aplica'); }}
                         style={{
-                          flex: 1, padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                          padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
                           backgroundColor: '#f3f4f6', color: '#4b5563',
                           border: '1px solid #9ca3af', borderRadius: 'var(--radius-md)',
                           fontWeight: '600', whiteSpace: 'nowrap'

@@ -132,7 +132,7 @@ const DeliverablesPage = () => {
                   padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--border)', fontSize: '0.8125rem',
                   backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                  fontFamily: 'inherit', cursor: 'pointer'
+                  fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
                 }}
               >
                 <option value="all">Todos os status</option>
@@ -151,7 +151,7 @@ const DeliverablesPage = () => {
                   padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--border)', fontSize: '0.8125rem',
                   backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                  fontFamily: 'inherit', cursor: 'pointer'
+                  fontFamily: 'inherit', cursor: 'pointer', flex: '1 1 auto', minWidth: '120px'
                 }}
               >
                 <option value="all">Todos os tipos</option>
