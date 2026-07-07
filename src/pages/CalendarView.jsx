@@ -211,7 +211,7 @@ const CalendarView = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedDate ? '1fr 320px' : '1fr', gap: '1.5rem', flex: 1 }}>
+      <div className={selectedDate ? "grid-responsive-calendar" : ""} style={{ display: 'grid', gridTemplateColumns: selectedDate ? undefined : '1fr', gap: '1.5rem', flex: 1 }}>
         <div className="card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
           {/* Calendar Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.5rem', borderBottom: '1px solid var(--border)' }}>

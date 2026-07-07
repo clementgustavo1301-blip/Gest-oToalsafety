@@ -74,7 +74,7 @@ const AddCompanyModal = ({ onClose, onSave }) => {
                 disabled={loading}
               />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="grid-responsive-2">
               <div>
                 <label className="modal-label" htmlFor="company-contact">Contato</label>
                 <input

@@ -149,7 +149,7 @@ const CompanyDetailsPage = () => {
       </div>
 
       {/* Company Header */}
-      <div className="card" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+      <div className="card flex-col-mobile" style={{ marginBottom: '1.5rem', gap: '1.5rem' }}>
         <div style={{
           width: '64px', height: '64px', borderRadius: 'var(--radius-lg)',
           background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
@@ -187,8 +187,8 @@ const CompanyDetailsPage = () => {
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
-          <div style={{ textAlign: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 auto', textAlign: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-md)' }}>
             <p style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)' }}>{totalTrainingsCount}</p>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Treinamentos</p>
           </div>
@@ -204,11 +204,7 @@ const CompanyDetailsPage = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{
-        display: 'flex', gap: '0.25rem', marginBottom: '1.5rem',
-        backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)',
-        padding: '0.25rem', border: '1px solid var(--border)'
-      }}>
+      <div className="tabs-container">
         {TABS.map(tab => (
           <button
             key={tab.id}
@@ -229,7 +225,7 @@ const CompanyDetailsPage = () => {
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div className="grid-responsive-overview">
           {/* Contracts */}
           <div className="card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>

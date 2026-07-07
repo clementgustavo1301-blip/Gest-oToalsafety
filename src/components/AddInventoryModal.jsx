@@ -130,7 +130,7 @@ const AddInventoryModal = ({ onClose, item }) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="grid-responsive-2">
             <div className="form-group">
               <label className="form-label" htmlFor="quantity">Quantidade Final</label>
               <div className="input-with-icon">
@@ -201,7 +201,7 @@ const AddInventoryModal = ({ onClose, item }) => {
               <h3 style={{ fontSize: '0.8125rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
                 Movimentação Rápida
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid-responsive-2">
                 <div className="form-group">
                   <label className="form-label" style={{ color: 'var(--secondary)' }}>Entrada (+)</label>
                   <div className="input-with-icon">

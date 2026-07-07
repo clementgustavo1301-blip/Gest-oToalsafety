@@ -127,8 +127,8 @@ const CompaniesPage = () => {
               {/* Group Header */}
               <div
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '1.25rem 1.5rem', cursor: 'pointer',
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
+                  padding: '1rem', cursor: 'pointer',
                   backgroundColor: isExpanded ? 'var(--primary-light)' : 'var(--surface)',
                   borderBottom: isExpanded ? '1px solid var(--border)' : 'none',
                   transition: 'var(--transition)',
@@ -191,8 +191,8 @@ const CompaniesPage = () => {
                         key={company.id}
                         to={`/company/${company.id}`}
                         style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '1rem 1.5rem',
+                          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
+                          padding: '1rem',
                           borderBottom: idx < companiesInGroup.length - 1 ? '1px solid var(--border)' : 'none',
                           transition: 'var(--transition)',
                           cursor: 'pointer',
@@ -210,7 +210,7 @@ const CompaniesPage = () => {
                           </div>
                           <div>
                             <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{company.name}</h4>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.125rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginTop: '0.125rem' }}>
                               <span style={{
                                 fontSize: '0.8125rem', color: 'var(--text-secondary)',
                                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace", letterSpacing: '0.5px'

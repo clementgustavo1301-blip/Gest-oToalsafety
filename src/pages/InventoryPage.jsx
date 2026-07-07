@@ -98,7 +98,7 @@ const InventoryPage = () => {
             <p>Nenhum insumo encontrado.</p>
           </div>
         ) : (
-          <div className="card table-responsive" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card table-responsive" style={{ padding: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ backgroundColor: 'var(--background)', borderBottom: '1px solid var(--border)' }}>

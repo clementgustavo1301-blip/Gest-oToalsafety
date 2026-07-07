@@ -81,11 +81,7 @@ const DeliverablesPage = () => {
       </header>
 
       {/* View Switcher */}
-      <div style={{
-        display: 'flex', gap: '0.25rem', marginBottom: '1.5rem',
-        backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)',
-        padding: '0.25rem', border: '1px solid var(--border)', width: 'fit-content'
-      }}>
+      <div className="tabs-container">
         {[
           { id: 'deliverables', label: 'Entregáveis', icon: <FileText size={16} /> },
           { id: 'contracts', label: 'Contratos TotalSafety', icon: <ClipboardList size={16} /> },
@@ -112,13 +108,72 @@ const DeliverablesPage = () => {
       )}
 
       {activeView === 'contracts' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {allContracts.map(contract => {
-            const contractDeliverables = allDeliverables.filter(d => d.contractId === contract.id);
+        <>
+          <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '200px' }}>
+              <Search size={18} color="var(--text-secondary)" />
+              <input
+                type="text"
+                placeholder="Buscar entregável..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  flex: 1, border: 'none', outline: 'none', fontSize: '0.875rem',
+                  backgroundColor: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Filter size={16} color="var(--text-secondary)" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                style={{
+                  padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)', fontSize: '0.8125rem',
+                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                  fontFamily: 'inherit', cursor: 'pointer'
+                }}
+              >
+                <option value="all">Todos os status</option>
+                <option value="pendente">Pendentes</option>
+                <option value="em_elaboracao">Em Elaboração</option>
+                <option value="agendado">Agendados</option>
+                <option value="entregue">Entregues</option>
+                <option value="adiado">Adiados</option>
+                <option value="cancelado">Cancelados</option>
+                <option value="nao_se_aplica">Não Se Aplica</option>
+              </select>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                style={{
+                  padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)', fontSize: '0.8125rem',
+                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                  fontFamily: 'inherit', cursor: 'pointer'
+                }}
+              >
+                <option value="all">Todos os tipos</option>
+                <option value="programa">Programas</option>
+                <option value="laudo">Laudos</option>
+                <option value="contrato">Contratos</option>
+                <option value="documento">Documentos</option>
+                <option value="treinamento">Treinamentos</option>
+                <option value="visita_tecnica">Visitas Técnicas</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {allContracts.map(contract => {
+              const contractDeliverables = filtered.filter(d => d.contractId === contract.id);
+              if (contractDeliverables.length === 0 && (filterStatus !== 'all' || filterType !== 'all' || searchTerm)) {
+                return null;
+              }
             const colors = statusColors[contract.status] || statusColors.ativo;
             return (
               <div key={contract.id} className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.375rem' }}>
                       <h3 style={{ fontWeight: '600', fontSize: '1.0625rem', color: 'var(--text-primary)' }}>
@@ -138,7 +193,7 @@ const DeliverablesPage = () => {
                 </div>
 
                 <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center',
                   padding: '0.75rem 1rem', backgroundColor: 'var(--background)',
                   borderRadius: 'var(--radius-md)', fontSize: '0.8125rem', color: 'var(--text-secondary)',
                   marginBottom: '1rem'
@@ -154,7 +209,7 @@ const DeliverablesPage = () => {
                       const statusConf = STATUS_CONFIG[d.status] || STATUS_CONFIG.pendente;
                       return (
                         <div key={d.id} style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between',
                           padding: '0.75rem 1rem', border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)'
                         }}>
@@ -192,7 +247,8 @@ const DeliverablesPage = () => {
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

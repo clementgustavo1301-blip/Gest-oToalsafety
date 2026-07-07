@@ -103,7 +103,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
               </div>
 
               {/* Type & Contract */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid-responsive-2">
                 <div>
                   <label className="modal-label" htmlFor="dlv-type">Tipo</label>
                   <select
@@ -139,7 +139,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
               </div>
 
               {/* Dates & Status */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid-responsive-2">
                 <div>
                   <label className="modal-label" htmlFor="dlv-due">Data Limite (Prazo)</label>
                   <input
@@ -172,7 +172,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
               </div>
               
               {type !== 'treinamento' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="grid-responsive-2">
                   <div>
                     <label className="modal-label" htmlFor="dlv-validity">Validade do Documento</label>
                     <input

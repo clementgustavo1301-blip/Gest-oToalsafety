@@ -75,7 +75,7 @@ const AddContractModal = ({ onClose, onSave }) => {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="grid-responsive-2">
               <div>
                 <label className="modal-label" htmlFor="contract-start">Data de Início</label>
                 <input

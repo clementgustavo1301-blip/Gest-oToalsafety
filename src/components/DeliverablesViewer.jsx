@@ -33,6 +33,7 @@ const STATUS_CONFIG = {
 
 const DeliverablesViewer = ({ companyId }) => {
   const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [filterContract, setFilterContract] = useState('all');
   const [filterCompany, setFilterCompany] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,12 +132,13 @@ const DeliverablesViewer = ({ companyId }) => {
 
   const filtered = deliverables.filter(d => {
     const matchType = filterType === 'all' || d.type === filterType;
+    const matchStatus = filterStatus === 'all' || d.status === filterStatus;
     const matchContract = filterContract === 'all' || d.contractId === filterContract;
     const matchCompany = filterCompany === 'all' || d.companyId === filterCompany;
     const matchSearch = !searchTerm || 
       d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
       (d.companyName && d.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchType && matchContract && matchSearch && matchCompany;
+    return matchType && matchStatus && matchContract && matchSearch && matchCompany;
   });
 
   const stats = {
@@ -230,6 +232,26 @@ const DeliverablesViewer = ({ companyId }) => {
               ))}
             </select>
           )}
+          <select
+            id="filter-status"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{
+              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)', fontSize: '0.8125rem',
+              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+              fontFamily: 'inherit', cursor: 'pointer'
+            }}
+          >
+            <option value="all">Todos os status</option>
+            <option value="pendente">Pendentes</option>
+            <option value="em_elaboracao">Em Elaboração</option>
+            <option value="agendado">Agendados</option>
+            <option value="entregue">Entregues</option>
+            <option value="adiado">Adiados</option>
+            <option value="cancelado">Cancelados</option>
+            <option value="nao_se_aplica">Não Se Aplica</option>
+          </select>
           <select
             id="filter-type"
             value={filterType}

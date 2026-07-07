@@ -238,7 +238,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                 </select>
 
                 {recurrence !== 'none' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: (recurrence === 'custom' || recurrence === 'custom_same_day') ? '1fr 1fr' : '1fr', gap: '1rem', marginTop: '1rem' }}>
+                  <div className={recurrence === 'custom' || recurrence === 'custom_same_day' ? 'grid-responsive-2' : ''} style={{ display: 'grid', gridTemplateColumns: (recurrence === 'custom' || recurrence === 'custom_same_day') ? undefined : '1fr', gap: '1rem', marginTop: '1rem' }}>
                     {(recurrence === 'custom' || recurrence === 'custom_same_day') && (
                       <div>
                         <label className="modal-label">A cada quantos dias?</label>
@@ -269,7 +269,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
               </div>
 
               {/* Date and Time */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid-responsive-2">
                 <div>
                   <label className="modal-label" htmlFor="training-date">Data</label>
                   <input
@@ -297,7 +297,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
               </div>
 
               {/* Instructor and Participants */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid-responsive-2">
                 <div>
                   <label className="modal-label" htmlFor="training-instructor">Instrutor</label>
                   <input

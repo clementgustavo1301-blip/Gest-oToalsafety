@@ -31,10 +31,10 @@ const SettingsPage = () => {
         <p className="text-body" style={{ color: 'var(--text-secondary)' }}>Gerencie suas preferências, segurança e integrações.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '2rem', alignItems: 'start' }}>
+      <div className="grid-responsive-sidebar">
         
         {/* Sidebar Menu Interno */}
-        <div className="card" style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div className="card flex-col-desktop" style={{ padding: '0.5rem', gap: '0.25rem' }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -46,7 +46,8 @@ const SettingsPage = () => {
                 color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
                 fontWeight: activeTab === tab.id ? '600' : '500',
                 border: 'none', cursor: 'pointer', textAlign: 'left',
-                transition: 'var(--transition)'
+                transition: 'var(--transition)',
+                whiteSpace: 'nowrap'
               }}
               onMouseEnter={(e) => { if (activeTab !== tab.id) e.currentTarget.style.backgroundColor = 'var(--background)'; }}
               onMouseLeave={(e) => { if (activeTab !== tab.id) e.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -61,7 +62,8 @@ const SettingsPage = () => {
               display: 'flex', alignItems: 'center', gap: '0.75rem',
               padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)',
               backgroundColor: 'transparent', color: 'var(--danger)',
-              fontWeight: '500', border: 'none', cursor: 'pointer', textAlign: 'left'
+              fontWeight: '500', border: 'none', cursor: 'pointer', textAlign: 'left',
+              whiteSpace: 'nowrap'
             }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -93,7 +95,7 @@ const SettingsPage = () => {
                   <button type="button" className="btn btn-secondary">Alterar Foto</button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <div className="grid-responsive-2">
                   <div>
                     <label className="modal-label">Nome Completo</label>
                     <input 
