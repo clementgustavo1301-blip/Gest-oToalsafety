@@ -215,6 +215,10 @@ button {
   color: var(--text-primary);
   font-family: inherit;
   cursor: pointer;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 @media (max-width: 767px) {
@@ -223,6 +227,7 @@ button {
   }
   .filter-select {
     flex: 1 1 calc(50% - 0.5rem);
+    min-width: 0;
   }
   .filters-actions > .btn {
     width: 100%;
