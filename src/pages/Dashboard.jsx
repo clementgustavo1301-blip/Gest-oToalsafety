@@ -53,8 +53,8 @@ const Dashboard = () => {
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
 
   const upcomingDeliverables = deliverables
-    .filter(d => d.status === 'pendente' && d.dueDate)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .filter(d => d.status === 'pendente')
+    .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))
     .slice(0, 5)
     .map(d => ({
       ...d,
