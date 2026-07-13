@@ -132,7 +132,13 @@ const DeliverablesViewer = ({ companyId }) => {
 
   const filtered = deliverables.filter(d => {
     const matchType = filterType === 'all' || d.type === filterType;
-    const matchStatus = filterStatus === 'all' || d.status === filterStatus;
+    const isExpired = d.validityDate ? new Date(d.validityDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+    
+    let matchStatus = false;
+    if (filterStatus === 'all') matchStatus = true;
+    else if (filterStatus === 'vencido') matchStatus = isExpired;
+    else matchStatus = d.status === filterStatus;
+
     const matchContract = filterContract === 'all' || d.contractId === filterContract;
     const matchCompany = filterCompany === 'all' || d.companyId === filterCompany;
     const matchSearch = !searchTerm || 
@@ -146,6 +152,7 @@ const DeliverablesViewer = ({ companyId }) => {
     entregue: deliverables.filter(d => d.status === 'entregue').length,
     pendente: deliverables.filter(d => d.status === 'pendente').length,
     em_elaboracao: deliverables.filter(d => d.status === 'em_elaboracao').length,
+    vencidos: deliverables.filter(d => d.validityDate ? new Date(d.validityDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false).length,
   };
 
   return (
@@ -157,6 +164,7 @@ const DeliverablesViewer = ({ companyId }) => {
           { label: 'Entregues', value: stats.entregue, color: 'var(--secondary)', bg: 'var(--secondary-light)' },
           { label: 'Pendentes', value: stats.pendente, color: '#b45309', bg: '#fef3c7' },
           { label: 'Em Elaboração', value: stats.em_elaboracao, color: 'var(--primary)', bg: 'var(--primary-light)' },
+          { label: 'Vencidos', value: stats.vencidos, color: '#dc2626', bg: '#fee2e2' },
         ].map((s, i) => (
           <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem' }}>
             <div style={{
@@ -236,6 +244,7 @@ const DeliverablesViewer = ({ companyId }) => {
             <option value="all">Todos os status</option>
             <option value="pendente">Pendentes</option>
             <option value="em_elaboracao">Em Elaboração</option>
+            <option value="vencido">Vencidos</option>
             <option value="agendado">Agendados</option>
             <option value="entregue">Entregues</option>
             <option value="adiado">Adiados</option>
