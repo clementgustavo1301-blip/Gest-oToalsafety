@@ -37,7 +37,7 @@ const Dashboard = () => {
   }
 
   const activeContracts = contracts.filter(c => c.status === 'ativo').length;
-  const pendingDeliverables = deliverables.filter(d => d.status === 'pendente' || d.status === 'em_elaboracao').length;
+  const pendingDeliverables = deliverables.filter(d => d.status === 'pendente').length;
   const completedTrainings = trainings.filter(t => t.status === 'concluido').length;
   const attentionItems = trainings.filter(t => t.status === 'nao_feito' || t.status === 'adiado').length;
 
@@ -53,7 +53,7 @@ const Dashboard = () => {
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
 
   const upcomingDeliverables = deliverables
-    .filter(d => d.status !== 'entregue' && d.dueDate)
+    .filter(d => d.status === 'pendente' && d.dueDate)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 5)
     .map(d => ({

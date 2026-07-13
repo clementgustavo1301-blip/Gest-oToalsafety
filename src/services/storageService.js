@@ -118,24 +118,6 @@ export async function addCompany(company) {
     return null; 
   }
 
-  const standardDeliverables = [
-    { company_id: data.id, title: 'Visita Técnica In Loco', type: 'visita_tecnica', status: 'pendente', description: 'Mensal (4h/Visita)' },
-    { company_id: data.id, title: 'PGR & Mapa de Riscos', type: 'programa', status: 'pendente', description: 'Anual / Alteração' },
-    { company_id: data.id, title: 'Avaliações Psicossociais', type: 'laudo', status: 'pendente', description: 'Estruturação Inicial' },
-    { company_id: data.id, title: 'LTCAT & LTIP', type: 'laudo', status: 'pendente', description: 'Conforme Legislação' },
-    { company_id: data.id, title: 'PCA (Conservação Auditiva)', type: 'programa', status: 'pendente', description: 'Anual' },
-    { company_id: data.id, title: 'Apoio Técnico e Perícias', type: 'programa', status: 'pendente', description: 'Sob Demanda' },
-    { company_id: data.id, title: 'Treinamentos Digitais (EaD)', type: 'treinamento', status: 'pendente', description: 'Contínuo' },
-    { company_id: data.id, title: 'Palestras Preventivas', type: 'treinamento', status: 'pendente', description: 'Conforme PGR' },
-    { company_id: data.id, title: 'PCMSO Base & Relatório', type: 'programa', status: 'pendente', description: 'Anual' },
-    { company_id: data.id, title: 'Eventos eSocial (S-2240)', type: 'programa', status: 'pendente', description: 'Contínuo' },
-    { company_id: data.id, title: 'PPP Digital', type: 'programa', status: 'pendente', description: 'Contínuo' }
-  ];
-
-  const { error: delivError } = await supabase.from('deliverables').insert(standardDeliverables);
-  if (delivError) {
-    console.error('Error adding standard deliverables:', delivError);
-  }
 
   return mapCompany(data);
 }
