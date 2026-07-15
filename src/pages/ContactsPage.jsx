@@ -254,7 +254,11 @@ const ContactsPage = () => {
                               <Phone size={14} /> {contact.phone}
                             </div>
                             <a 
-                              href={`https://web.whatsapp.com/send?phone=55${contact.phone.replace(/\D/g, '')}`} 
+                              href={
+                                /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+                                  ? `https://wa.me/55${contact.phone.replace(/\D/g, '')}`
+                                  : `https://web.whatsapp.com/send?phone=55${contact.phone.replace(/\D/g, '')}`
+                              }
                               target="_blank" 
                               rel="noopener noreferrer"
                               style={{ 
