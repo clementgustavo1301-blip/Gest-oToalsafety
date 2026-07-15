@@ -46,22 +46,17 @@ const LoginPage = () => {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', backgroundColor: 'var(--background)'
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', backgroundColor: 'var(--background)', padding: '2rem'
     }}>
       <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
-            width: '64px', height: '64px', borderRadius: 'var(--radius-lg)',
-            background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 1rem'
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 1.5rem'
           }}>
-            <Building2 size={32} color="white" />
+            <img src="/logo-totalsafety.png" alt="TotalSafety Logo" style={{ width: '240px', height: 'auto', objectFit: 'contain' }} />
           </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-            TotalSafety
-          </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
             {isSignUp ? 'Crie sua conta para acessar o sistema' : 'Faça login para acessar o sistema'}
           </p>
@@ -112,6 +107,11 @@ const LoginPage = () => {
             {isSignUp ? 'Já tem uma conta? Faça Login' : 'Não tem conta? Cadastre-se'}
           </button>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '2rem', gap: '0.5rem', opacity: 0.8 }}>
+        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: '500' }}>by</span>
+        <img src="/logo-ecosafety.png" alt="EcoSafety Logo" style={{ width: '130px', height: 'auto', objectFit: 'contain' }} />
       </div>
     </div>
   );

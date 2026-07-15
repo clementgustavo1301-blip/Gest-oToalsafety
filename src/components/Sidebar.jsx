@@ -23,23 +23,8 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem' }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: 'var(--primary)',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <ShieldCheck size={24} />
-        </div>
-        <div>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: 0 }}>TotalSafety</h2>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Gestão SST</span>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2.5rem', width: '100%' }}>
+        <img src="/logo-totalsafety.png" alt="TotalSafety" style={{ width: '100%', maxWidth: '240px', height: 'auto', maxHeight: '80px', objectFit: 'contain' }} />
         <button 
           className="hide-on-desktop" 
           onClick={onClose}
