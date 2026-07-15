@@ -142,7 +142,40 @@ CREATE POLICY "Enable update for authenticated users" ON public.trainings FOR UP
 CREATE POLICY "Enable delete for authenticated users" ON public.trainings FOR DELETE TO authenticated USING (true);
 
 -- ==========================================
--- 6. Inventory Table
+-- 6. Convocations Table
+-- ==========================================
+CREATE TABLE public.convocations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+    year INTEGER NOT NULL,
+    jan BOOLEAN DEFAULT false,
+    feb BOOLEAN DEFAULT false,
+    mar BOOLEAN DEFAULT false,
+    apr BOOLEAN DEFAULT false,
+    may BOOLEAN DEFAULT false,
+    jun BOOLEAN DEFAULT false,
+    jul BOOLEAN DEFAULT false,
+    aug BOOLEAN DEFAULT false,
+    sep BOOLEAN DEFAULT false,
+    oct BOOLEAN DEFAULT false,
+    nov BOOLEAN DEFAULT false,
+    dec BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(company_id, year)
+);
+
+CREATE TRIGGER handle_updated_at_convocations BEFORE UPDATE ON public.convocations
+  FOR EACH ROW EXECUTE PROCEDURE moddatetime (updated_at);
+
+ALTER TABLE public.convocations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for authenticated users" ON public.convocations FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Enable insert for authenticated users" ON public.convocations FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Enable update for authenticated users" ON public.convocations FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Enable delete for authenticated users" ON public.convocations FOR DELETE TO authenticated USING (true);
+
+-- ==========================================
+-- 7. Inventory Table
 -- ==========================================
 CREATE TABLE public.inventory (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

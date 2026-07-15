@@ -11,6 +11,7 @@ import InventoryPage from './pages/InventoryPage';
 import AIAssistant from './pages/AIAssistant';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
+import ConvocationsPage from './pages/ConvocationsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { AIProvider } from './context/AIContext';
@@ -45,6 +46,7 @@ function App() {
                       <Route path="/deliverables" element={<DeliverablesPage />} />
                       <Route path="/inventory" element={<InventoryPage />} />
                       <Route path="/ai-assistant" element={<AIAssistant />} />
+                      <Route path="/convocations" element={<ConvocationsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Routes>
                   </main>
