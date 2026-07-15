@@ -194,5 +194,27 @@ CREATE TRIGGER handle_updated_at_inventory BEFORE UPDATE ON public.inventory
 ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable read access for authenticated users" ON public.inventory FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Enable insert for authenticated users" ON public.inventory FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Enable update for authenticated users" ON public.inventory FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Enable delete for authenticated users" ON public.inventory FOR DELETE TO authenticated USING (true);
+
+-- ==========================================
+-- 8. Group Contacts Table
+-- ==========================================
+CREATE TABLE public.group_contacts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    role TEXT,
+    email TEXT,
+    phone TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TRIGGER handle_updated_at_group_contacts BEFORE UPDATE ON public.group_contacts
+  FOR EACH ROW EXECUTE PROCEDURE moddatetime (updated_at);
+
+ALTER TABLE public.group_contacts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for authenticated users" ON public.group_contacts FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Enable insert for authenticated users" ON public.group_contacts FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Enable update for authenticated users" ON public.group_contacts FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Enable delete for authenticated users" ON public.group_contacts FOR DELETE TO authenticated USING (true);
