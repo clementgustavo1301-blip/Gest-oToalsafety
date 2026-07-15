@@ -14,20 +14,8 @@ const MobileTopBar = ({ onOpenSidebar }) => {
         <Menu size={24} />
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <div style={{
-          width: '28px',
-          height: '28px',
-          borderRadius: 'var(--radius-sm)',
-          backgroundColor: 'var(--primary)',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <ShieldCheck size={18} />
-        </div>
-        <h2 style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: 0 }}>TotalSafety</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+        <img src="/logo-totalsafety.png" alt="TotalSafety" style={{ height: '32px', objectFit: 'contain' }} />
       </div>
 
       <div style={{ position: 'relative' }}>
