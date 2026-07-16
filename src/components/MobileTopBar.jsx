@@ -15,7 +15,7 @@ const MobileTopBar = ({ onOpenSidebar }) => {
       </button>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-        <img src="/logo-totalsafety.png" alt="TotalSafety" style={{ height: '32px', objectFit: 'contain' }} />
+        <img src="/logo-totalsafety.png" alt="TotalSafety" style={{ height: '48px', transform: 'scale(1.6)', objectFit: 'contain' }} />
       </div>
 
       <div style={{ position: 'relative' }}>

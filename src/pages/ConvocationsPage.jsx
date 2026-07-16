@@ -164,7 +164,7 @@ const ConvocationsPage = () => {
       )}
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="hide-on-mobile" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--secondary-light)', borderBottom: '2px solid var(--border)' }}>
@@ -240,6 +240,87 @@ const ConvocationsPage = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View */}
+        <div className="hide-on-desktop" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {companies.map(company => {
+            const record = convocations[company.id] || {};
+            
+            return (
+              <div key={company.id} style={{ 
+                border: '1px solid var(--border)', 
+                borderRadius: 'var(--radius-lg)', 
+                padding: '1.25rem', 
+                backgroundColor: 'var(--surface)',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <h3 style={{ 
+                  fontSize: '1.125rem', 
+                  fontWeight: '600', 
+                  color: 'var(--text-primary)', 
+                  borderBottom: '1px solid var(--border)', 
+                  paddingBottom: '0.75rem', 
+                  margin: '0 0 1rem 0'
+                }}>
+                  {company.name}
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem 0.5rem' }}>
+                  {MONTHS.map(month => {
+                    const isDone = !!record[month.key];
+                    
+                    return (
+                      <div key={month.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                          {month.label}
+                        </span>
+                        <button
+                          onClick={() => handleToggleMonth(company.id, month.key)}
+                          disabled={saving}
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            border: isDone ? 'none' : '1px solid var(--border)',
+                            backgroundColor: isDone ? 'var(--success)' : 'transparent',
+                            color: isDone ? 'white' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: saving ? 'wait' : 'pointer',
+                            transition: 'all 0.2s',
+                            opacity: saving ? 0.7 : 1,
+                            boxShadow: isDone ? 'var(--shadow-sm)' : 'none'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isDone && !saving) {
+                              e.currentTarget.style.backgroundColor = 'var(--secondary-light)';
+                              e.currentTarget.style.color = 'var(--text-muted)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isDone && !saving) {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = 'transparent';
+                            }
+                          }}
+                        >
+                          <Check size={20} strokeWidth={3} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          
+          {companies.length === 0 && (
+            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              Nenhuma empresa encontrada.
+            </div>
+          )}
         </div>
       </div>
     </div>

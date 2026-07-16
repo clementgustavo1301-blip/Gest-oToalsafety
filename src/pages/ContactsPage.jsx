@@ -204,96 +204,97 @@ const ContactsPage = () => {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            Carregando contatos...
-          </div>
-        ) : filteredContacts.length > 0 ? (
-          <div className="table-responsive">
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--secondary-light)', borderBottom: '2px solid var(--border)' }}>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Nome</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Grupo</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Cargo</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Contato</th>
-                  <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>Ações</th>
+      {/* Desktop List View */}
+      <div className="card hide-on-mobile" style={{ padding: 0, overflow: 'hidden', marginBottom: '1.5rem' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--secondary-light)', borderBottom: '2px solid var(--border)' }}>
+                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Nome</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Grupo Empresarial</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Contatos</th>
+                <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', width: '150px' }}>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    Carregando contatos...
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredContacts.map(contact => (
+              ) : filteredContacts.length > 0 ? (
+                filteredContacts.map(contact => (
                   <tr key={contact.id} style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)' }} className="table-row-hover">
-                    <td style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-primary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 'bold', flexShrink: 0 }}>
                           {contact.name.charAt(0).toUpperCase()}
                         </div>
-                        {contact.name}
+                        <div>
+                          <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{contact.name}</div>
+                          {contact.role && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.125rem' }}>
+                              {contact.role}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.5rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', border: '1px solid var(--border)' }}>
-                        <Building2 size={12} />
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: '500' }}>
+                        <Building2 size={16} className="text-secondary" />
                         {contact.group?.name || 'Desconhecido'}
                       </span>
                     </td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
-                      {contact.role || '-'}
-                    </td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
                         {contact.email && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                             <Mail size={14} /> {contact.email}
                           </div>
                         )}
                         {contact.phone && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                              <Phone size={14} /> {contact.phone}
-                            </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                            <Phone size={14} /> {contact.phone}
                             <a 
-                              href={
-                                /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-                                  ? `https://wa.me/55${contact.phone.replace(/\D/g, '')}`
-                                  : `https://web.whatsapp.com/send?phone=55${contact.phone.replace(/\D/g, '')}`
-                              }
+                              href={`https://web.whatsapp.com/send?phone=55${contact.phone.replace(/\D/g, '')}`}
                               target="_blank" 
                               rel="noopener noreferrer"
                               style={{ 
                                 display: 'inline-flex', 
                                 alignItems: 'center', 
                                 justifyContent: 'center',
-                                padding: '0.25rem',
+                                padding: '0.125rem 0.375rem',
                                 backgroundColor: '#25D366', 
                                 color: 'white', 
-                                borderRadius: 'var(--radius-md)',
-                                transition: 'var(--transition)'
+                                borderRadius: '4px',
+                                textDecoration: 'none',
+                                fontWeight: '500',
+                                fontSize: '0.65rem',
+                                marginLeft: '0.5rem',
+                                gap: '0.25rem'
                               }}
                               title="Chamar no WhatsApp"
-                              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                             >
-                              <MessageCircle size={14} />
+                              <MessageCircle size={12} /> WhatsApp
                             </a>
                           </div>
                         )}
-                        {!contact.email && !contact.phone && '-'}
                       </div>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                         <button 
                           onClick={() => handleOpenModal(contact)}
-                          style={{ padding: '0.375rem', color: 'var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--primary-light)', transition: 'var(--transition)' }}
+                          style={{ padding: '0.5rem', color: 'var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--primary-light)', transition: 'var(--transition)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           title="Editar"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button 
                           onClick={() => handleDeleteContact(contact.id)}
-                          style={{ padding: '0.375rem', color: 'var(--danger)', borderRadius: 'var(--radius-md)', backgroundColor: '#fee2e2', transition: 'var(--transition)' }}
+                          style={{ padding: '0.5rem', color: 'var(--danger)', borderRadius: 'var(--radius-md)', backgroundColor: '#fee2e2', transition: 'var(--transition)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           title="Excluir"
                         >
                           <Trash2 size={16} />
@@ -301,12 +302,109 @@ const ContactsPage = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    Nenhum contato encontrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Mobile Grid View */}
+      <div className="hide-on-desktop" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+        {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            Carregando contatos...
+          </div>
+        ) : filteredContacts.length > 0 ? (
+          filteredContacts.map(contact => (
+            <div key={contact.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem', position: 'relative' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', fontWeight: 'bold' }}>
+                    {contact.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '1rem', lineHeight: '1.2' }}>{contact.name}</h3>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                      <Building2 size={12} />
+                      {contact.group?.name || 'Desconhecido'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {contact.role && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.5rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem', color: 'var(--text-secondary)', alignSelf: 'flex-start', border: '1px solid var(--border)' }}>
+                  <Briefcase size={14} /> {contact.role}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                {contact.email && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    <Mail size={16} /> <span style={{ wordBreak: 'break-all' }}>{contact.email}</span>
+                  </div>
+                )}
+                {contact.phone && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    <Phone size={16} /> {contact.phone}
+                    
+                    <a 
+                      href={
+                        /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+                          ? `https://wa.me/55${contact.phone.replace(/\D/g, '')}`
+                          : `https://web.whatsapp.com/send?phone=55${contact.phone.replace(/\D/g, '')}`
+                      }
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        padding: '0.25rem 0.5rem',
+                        backgroundColor: '#25D366', 
+                        color: 'white', 
+                        borderRadius: 'var(--radius-md)',
+                        transition: 'var(--transition)',
+                        marginLeft: 'auto',
+                        textDecoration: 'none',
+                        fontWeight: '500',
+                        fontSize: '0.75rem',
+                        gap: '0.25rem'
+                      }}
+                      title="Chamar no WhatsApp"
+                    >
+                      <MessageCircle size={14} /> WhatsApp
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button 
+                  onClick={() => handleOpenModal(contact)}
+                  style={{ flex: 1, padding: '0.5rem', color: 'var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--primary-light)', transition: 'var(--transition)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', fontWeight: '500', fontSize: '0.875rem', border: 'none', cursor: 'pointer' }}
+                >
+                  <Edit2 size={16} /> Editar
+                </button>
+                <button 
+                  onClick={() => handleDeleteContact(contact.id)}
+                  style={{ flex: 1, padding: '0.5rem', color: 'var(--danger)', borderRadius: 'var(--radius-md)', backgroundColor: '#fee2e2', transition: 'var(--transition)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', fontWeight: '500', fontSize: '0.875rem', border: 'none', cursor: 'pointer' }}
+                >
+                  <Trash2 size={16} /> Excluir
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)' }}>
             Nenhum contato encontrado.
           </div>
         )}
