@@ -13,6 +13,8 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import ConvocationsPage from './pages/ConvocationsPage';
 import ContactsPage from './pages/ContactsPage';
+import ScheduleGeneratorPage from './pages/ScheduleGeneratorPage';
+import ReportsPage from './pages/ReportsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { AIProvider } from './context/AIContext';
@@ -49,6 +51,8 @@ function App() {
                       <Route path="/ai-assistant" element={<AIAssistant />} />
                       <Route path="/convocations" element={<ConvocationsPage />} />
                       <Route path="/contacts" element={<ContactsPage />} />
+                      <Route path="/schedule-generator" element={<ScheduleGeneratorPage />} />
+                      <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Routes>
                   </main>

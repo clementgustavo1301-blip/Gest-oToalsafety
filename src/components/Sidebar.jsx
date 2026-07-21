@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
@@ -9,15 +9,31 @@ const Sidebar = ({ isOpen, onClose }) => {
   const { signOut } = useAuth();
   const { unreadCount } = useAI();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState({});
+
+  const toggleMenu = (name) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [name]: !prev[name]
+    }));
+  };
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
     { name: 'Empresas', path: '/companies', icon: <Building2 size={20} /> },
     { name: 'Calendário', path: '/calendar', icon: <Calendar size={20} /> },
     { name: 'Entregáveis', path: '/deliverables', icon: <FileText size={20} /> },
-    { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={20} /> },
-    { name: 'Contatos', path: '/contacts', icon: <Users size={20} /> },
-    { name: 'Estoque', path: '/inventory', icon: <Package size={20} /> },
+    { 
+      name: 'Ferramentas', 
+      icon: <Wrench size={20} />, 
+      subItems: [
+        { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={18} /> },
+        { name: 'Contatos', path: '/contacts', icon: <Users size={18} /> },
+        { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> },
+        { name: 'Cronograma', path: '/schedule-generator', icon: <Wand2 size={18} /> },
+        { name: 'Relatórios', path: '/reports', icon: <BarChart3 size={18} /> },
+      ]
+    },
     { name: 'Assistente IA', path: '/ai-assistant', icon: <Sparkles size={20} /> },
     { name: 'Configurações', path: '/settings', icon: <Settings size={20} /> },
   ];
@@ -91,8 +107,111 @@ const Sidebar = ({ isOpen, onClose }) => {
 
       <nav style={{
         position: 'relative',
-        display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+        display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1,
+        overflowY: 'auto', overflowX: 'hidden'
+      }}>
         {navItems.map((item) => {
+          if (item.subItems) {
+            const isExpanded = expandedMenus[item.name];
+            const isAnySubActive = item.subItems.some(sub => 
+              sub.path !== '#' && location.pathname.startsWith(sub.path)
+            );
+            
+            return (
+              <div key={item.name} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <button 
+                  onClick={() => {
+                    if (isCollapsed) {
+                      setIsCollapsed(false);
+                      if (!isExpanded) toggleMenu(item.name);
+                    } else {
+                      toggleMenu(item.name);
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: isCollapsed ? '0.75rem' : '0.75rem 1rem',
+                    justifyContent: isCollapsed ? 'center' : 'space-between',
+                    borderRadius: 'var(--radius-md)',
+                    color: isAnySubActive ? 'var(--primary)' : 'var(--text-secondary)',
+                    backgroundColor: isAnySubActive && !isExpanded ? 'var(--primary-light)' : 'transparent',
+                    fontWeight: isAnySubActive ? '600' : '500',
+                    transition: 'var(--transition)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    width: '100%',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isAnySubActive || isExpanded) {
+                      e.currentTarget.style.backgroundColor = 'var(--background)';
+                      e.currentTarget.style.color = 'var(--text-primary)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isAnySubActive || isExpanded) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    }
+                  }}
+                  title={isCollapsed ? item.name : ''}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: isCollapsed ? 0 : 1 }}>
+                    <div>{item.icon}</div>
+                    {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>{item.name}</span>}
+                  </div>
+                  {!isCollapsed && (
+                    <div>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
+                  )}
+                </button>
+                
+                {isExpanded && !isCollapsed && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '1rem', marginTop: '0.25rem' }}>
+                    {item.subItems.map((subItem) => {
+                      const isSubActive = subItem.path !== '#' && location.pathname.startsWith(subItem.path);
+                      return (
+                        <Link 
+                          key={subItem.name}
+                          to={subItem.path}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            padding: '0.5rem 1rem',
+                            borderRadius: 'var(--radius-md)',
+                            color: isSubActive ? 'var(--primary)' : 'var(--text-secondary)',
+                            backgroundColor: isSubActive ? 'var(--primary-light)' : 'transparent',
+                            fontWeight: isSubActive ? '600' : '500',
+                            transition: 'var(--transition)',
+                            fontSize: '0.9em'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSubActive) {
+                              e.currentTarget.style.backgroundColor = 'var(--background)';
+                              e.currentTarget.style.color = 'var(--text-primary)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSubActive) {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-secondary)';
+                            }
+                          }}
+                        >
+                          <div>{subItem.icon}</div>
+                          <span style={{ whiteSpace: 'nowrap' }}>{subItem.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const isActive = item.path !== '#' && (
             item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
           );
