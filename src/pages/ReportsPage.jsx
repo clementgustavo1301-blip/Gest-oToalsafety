@@ -554,8 +554,18 @@ const ReportsPage = () => {
             {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select value={filterType} onChange={e => setFilterType(e.target.value)} className="filter-select">
-            <option value="all">Todos os tipos</option>
+            <option value="all">Todos os tipos (Ex: Programas, Laudos)</option>
             {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="filter-select">
+            <option value="all">Todos os status</option>
+            <option value="pendente">Pendentes</option>
+            <option value="vencido">Vencidos</option>
+            <option value="proximo_vencer">Próximos a Vencer</option>
+            <option value="entregue">Entregues / Feitos</option>
+            <option value="em_elaboracao">Em Elaboração</option>
+            <option value="agendado">Agendados</option>
+            <option value="cancelado">Cancelados</option>
           </select>
         </div>
       </div>
