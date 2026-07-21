@@ -146,13 +146,12 @@ const ReportsPage = () => {
   };
 
   const exportCSV = () => {
-    const headers = ['Empresa', 'Entregável', 'Tipo', 'Status', 'Prazo (Execução)', 'Validade (Vencimento)', 'Vencido', 'Dias p/ Vencer'];
+    const headers = ['Empresa', 'Entregável', 'Tipo', 'Status', 'Validade (Vencimento)', 'Vencido', 'Dias p/ Vencer'];
     const rows = filtered.map(d => [
       d.companyName,
       d.title,
       TYPE_CONFIG[d.type]?.label || d.type,
       STATUS_CONFIG[d.status]?.label || d.status,
-      d.dueDate ? new Date(d.dueDate + 'T00:00:00').toLocaleDateString('pt-BR') : '',
       d.validityDate ? new Date(d.validityDate + 'T00:00:00').toLocaleDateString('pt-BR') : '',
       d.isOverdue ? 'SIM' : '',
       d.daysUntilDue !== null ? d.daysUntilDue : ''
@@ -254,14 +253,13 @@ const ReportsPage = () => {
       d.title,
       TYPE_LABELS[d.type] || d.type || '',
       STATUS_LABELS[d.status] || d.status || '',
-      d.dueDate ? new Date(d.dueDate + 'T00:00:00').toLocaleDateString('pt-BR') : '—',
       d.validityDate ? new Date(d.validityDate + 'T00:00:00').toLocaleDateString('pt-BR') : '—',
       d.isOverdue ? `Vencido (${Math.abs(d.daysUntilDue)}d)` : d.isExpiringSoon ? `${d.daysUntilDue}d restantes` : (d.status === 'entregue' || d.status === 'feito') ? 'OK' : ''
     ]);
 
     autoTable(doc, {
       startY: 24,
-      head: [['Empresa', 'Entregável', 'Tipo', 'Status', 'Prazo', 'Validade', 'Situação']],
+      head: [['Empresa', 'Entregável', 'Tipo', 'Status', 'Validade', 'Situação']],
       body: tableData,
       theme: 'grid',
       styles: {
@@ -277,13 +275,12 @@ const ReportsPage = () => {
         fontSize: 8,
       },
       columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 65 },
-        2: { cellWidth: 26 },
-        3: { cellWidth: 26 },
-        4: { cellWidth: 22 },
-        5: { cellWidth: 22 },
-        6: { cellWidth: 32 },
+        0: { cellWidth: 55 },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 26 },
+        5: { cellWidth: 32 },
       },
       alternateRowStyles: {
         fillColor: [248, 249, 250]
@@ -301,7 +298,7 @@ const ReportsPage = () => {
             data.cell.styles.textColor = [220, 38, 38];
           }
         }
-        if (data.section === 'body' && data.column.index === 6) {
+        if (data.section === 'body' && data.column.index === 5) {
           const sit = data.cell.raw;
           if (sit.includes('Vencido')) {
             data.cell.styles.textColor = [220, 38, 38];
@@ -581,7 +578,6 @@ const ReportsPage = () => {
                   { field: 'title', label: 'Entregável' },
                   { field: 'type', label: 'Tipo' },
                   { field: 'status', label: 'Status' },
-                  { field: 'dueDate', label: 'Prazo' },
                   { field: 'validityDate', label: 'Validade' },
                   { field: null, label: 'Situação' },
                 ].map(col => (
@@ -635,9 +631,6 @@ const ReportsPage = () => {
                       }}>
                         {statusConf.icon} {statusConf.label}
                       </span>
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                      {d.dueDate ? new Date(d.dueDate + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                       {d.validityDate ? (
