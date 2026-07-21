@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Gerador de Cronograma de Entregáveis - Gestão Integrada em Saúde e Segurança do Trabalho">
+    <title>Gerador de Cronograma</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- PDF.js -->
+    <script src="js/pdf.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Background Animated Particles -->
+    <div class="bg-particles" id="bgParticles"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-brand">
+            <div class="nav-text">
+                <span class="nav-title">Gerador de Cronograma</span>
+            </div>
+        </div>
+        <div class="nav-actions">
+            <button class="btn-manual-mode" id="btnManualMode" onclick="App.showManualEditor()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Modo Manual
+            </button>
+            <div class="api-status" id="apiStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Verificando...</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        
+        <!-- Hero Section -->
+        <section class="hero-section" id="heroSection">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    Gerador de <span class="gradient-text">Cronograma</span>
+                    <br>de Entregáveis
+                </h1>
+                <p class="hero-description">
+                    Submeta o contrato do projeto e gere automaticamente 
+                    um cronograma profissional para a reunião de <strong>Kickoff</strong> com seu cliente.
+                </p>
+
+                <!-- Upload Zone -->
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-zone-inner">
+                        <div class="upload-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="12" y1="18" x2="12" y2="12"/>
+                                <polyline points="9 15 12 12 15 15"/>
+                            </svg>
+                        </div>
+                        <h3 class="upload-title">Arraste o contrato PDF aqui</h3>
+                        <p class="upload-subtitle">ou clique para selecionar o arquivo</p>
+                        <input type="file" id="fileInput" accept=".pdf" hidden>
+                        <div class="upload-formats">
+                            <span class="format-badge">PDF</span>
+                            <span class="format-info">Máx. 20MB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manual Mode Link -->
+                <p class="manual-mode-link">
+                    Não tem o PDF? <a href="#" id="linkManualMode" onclick="event.preventDefault(); event.stopPropagation(); App.showManualEditor()">Configure manualmente →</a>
+                </p>
+
+                <!-- File Info (shown after upload) -->
+                <div class="file-info hidden" id="fileInfo">
+                    <div class="file-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </div>
+                    <div class="file-details">
+                        <span class="file-name" id="fileName">contrato.pdf</span>
+                        <span class="file-size" id="fileSize">2.4 MB</span>
+                    </div>
+                    <button class="btn-remove-file" id="btnRemoveFile" title="Remover arquivo">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Decorative Elements -->
+            <div class="hero-decoration">
+                <div class="deco-ring ring-1"></div>
+                <div class="deco-ring ring-2"></div>
+                <div class="deco-ring ring-3"></div>
+            </div>
+        </section>
+
+        <!-- Progress Steps -->
+        <section class="progress-section hidden" id="progressSection">
+            <div class="progress-steps">
+                <div class="step active" id="step1">
+                    <div class="step-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </div>
+                    <span class="step-label">Upload</span>
+                    <div class="step-line"></div>
+                </div>
+                <div class="step" id="step2">
+                    <div class="step-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </div>
+                    <span class="step-label">Extração</span>
+                    <div class="step-line"></div>
+                </div>
+                <div class="step" id="step3">
+                    <div class="step-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M20 12a8 8 0 0 0-8-8v8h8z" fill="currentColor" opacity="0.3"/></svg>
+                    </div>
+                    <span class="step-label">Análise IA</span>
+                    <div class="step-line"></div>
+                </div>
+                <div class="step" id="step4">
+                    <div class="step-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                    </div>
+                    <span class="step-label">Cronograma</span>
+                </div>
+            </div>
+            
+            <!-- Processing Message -->
+            <div class="processing-message" id="processingMessage">
+                <div class="processing-spinner"></div>
+                <p class="processing-text" id="processingText">Extraindo texto do contrato...</p>
+            </div>
+        </section>
+
+        <!-- Manual Input Section (fallback when no API) -->
+        <section class="manual-section hidden" id="manualSection">
+            <div class="section-header">
+                <h2>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Configurar Cronograma Manualmente
+                </h2>
+                <p>A API de IA não está configurada. Adicione os entregáveis manualmente.</p>
+            </div>
+
+            <div class="manual-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="clientName">Nome do Cliente</label>
+                        <input type="text" id="clientName" placeholder="Ex: Empresa ABC Ltda" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="contractDuration">Duração (meses)</label>
+                        <input type="number" id="contractDuration" value="12" min="1" max="60" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="startDate">Data de Início</label>
+                        <input type="date" id="startDate" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Deliverable Templates -->
+                <div class="template-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Selecione os entregáveis do escopo:</h3>
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; user-select: none;">
+                            <input type="checkbox" id="selectAllDeliverables">
+                            Selecionar Todos
+                        </label>
+                    </div>
+                    <div class="template-grid" id="templateGrid">
+                        <!-- Templates will be injected by JS -->
+                    </div>
+                </div>
+
+                <button class="btn-primary btn-generate" id="btnGenerate">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                    Gerar Cronograma
+                </button>
+            </div>
+        </section>
+
+        <!-- Deliverables Editor Section -->
+        <section class="manual-section hidden" id="deliverablesEditorSection">
+            <div class="section-header">
+                <h2>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Editar Entregáveis
+                </h2>
+                <p>Ajuste as datas de início e a duração em dias para cada entregável do cronograma.</p>
+            </div>
+            <div class="manual-form">
+                <div style="overflow-x: auto; margin-bottom: 1.5rem;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border-color);">
+                                <th style="padding: 10px; color: var(--text-muted); font-weight: 600;">Entregável</th>
+                                <th style="padding: 10px; color: var(--text-muted); font-weight: 600; width: 140px;">Data de Início</th>
+                                <th style="padding: 10px; color: var(--text-muted); font-weight: 600; width: 120px;">Duração (dias)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="editorTableBody">
+                            <!-- Injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button class="btn-secondary" id="btnCancelEdit">Cancelar</button>
+                    <button class="btn-primary" id="btnSaveDeliverables">Salvar e Atualizar</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Gantt Chart Section -->
+        <section class="gantt-section hidden" id="ganttSection">
+            <div class="gantt-toolbar">
+                <div class="toolbar-left">
+                    <h2 class="gantt-title" id="ganttTitle">Cronograma de Entregáveis</h2>
+                </div>
+                <div class="toolbar-right">
+                    <div class="view-toggles">
+                        <button class="view-btn active" data-view="months" id="viewMonths">Meses</button>
+                        <button class="view-btn" data-view="weeks" id="viewWeeks">Semanas</button>
+                    </div>
+                    <button class="btn-secondary" id="btnEditDeliverables">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Editar
+                    </button>
+                    <button class="btn-primary" id="btnDownload">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Editable Project Settings -->
+            <div class="gantt-settings-bar" id="ganttSettingsBar">
+                <div class="settings-group">
+                    <label>Cliente</label>
+                    <input type="text" id="editClientName" class="settings-input" placeholder="Nome do cliente" />
+                </div>
+                <div class="settings-group">
+                    <label>Data de Início</label>
+                    <input type="date" id="editStartDate" class="settings-input" />
+                </div>
+                <div class="settings-group">
+                    <label>Duração (meses)</label>
+                    <input type="number" id="editDuration" class="settings-input" min="1" max="60" />
+                </div>
+                <button class="btn-primary btn-apply-settings" id="btnApplySettings">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Aplicar
+                </button>
+            </div>
+
+            <!-- Gantt Presentation Container -->
+            <div class="gantt-presentation" id="ganttPresentation">
+                <!-- Cover Slide -->
+                <div class="presentation-slide cover-slide" id="coverSlide">
+                    <div class="cover-bg-pattern"></div>
+                    <div class="cover-content">
+                        <div class="cover-divider"></div>
+                        <h1 class="cover-title" id="coverTitle">Cronograma de Entregáveis</h1>
+                        <h2 class="cover-project" id="coverProject">Projeto</h2>
+                        <p class="cover-client" id="coverClient">Nome do Cliente</p>
+                        <div class="cover-date" id="coverDate"></div>
+                    </div>
+                    <div class="cover-footer">
+                        <span>Gestão Integrada em Saúde e Segurança do Trabalho</span>
+                    </div>
+                </div>
+
+                <!-- Gantt Chart Slide -->
+                <div class="presentation-slide gantt-slide" id="ganttSlide">
+                    <div class="slide-header">
+                        <div class="slide-header-text">
+                            <h2>Cronograma de Entregáveis</h2>
+                            <span class="slide-client-name" id="slideClientName"></span>
+                        </div>
+                    </div>
+                    <div class="gantt-container" id="ganttContainer">
+                        <!-- Gantt chart will be rendered here -->
+                    </div>
+                    <div class="gantt-legend" id="ganttLegend">
+                        <!-- Legend will be rendered here -->
+                    </div>
+                    <div class="slide-footer">
+                        <span>Gestão Integrada em SST</span>
+                        <span class="slide-page">Reunião de Kickoff</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons (below presentation) -->
+            <div class="gantt-actions">
+                <button class="btn-outline" id="btnNewSchedule">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Novo Cronograma
+                </button>
+                <button class="btn-primary btn-large" id="btnDownloadBottom">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Baixar PDF
+                </button>
+                <button class="btn-primary btn-large" id="btnDownloadPPTX" style="background: #D04423;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><path d="M13 13h4v4h-4z"/></svg>
+                    Baixar PowerPoint
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- External Libraries for Export -->
+    <script src="js/html2canvas.min.js"></script>
+    <script src="js/html2pdf.bundle.min.js"></script>
+    <script src="js/pptxgen.bundle.js"></script>
+
+    <!-- Scripts -->
+    <script src="js/pdf-extractor.js?v=3"></script>
+    <script src="js/ai-analyzer.js?v=3"></script>
+    <script src="js/gantt-renderer.js?v=3"></script>
+    <script src="js/export-manager.js?v=3"></script>
+    <script src="js/app.js?v=3"></script>
+</body>
+</html>

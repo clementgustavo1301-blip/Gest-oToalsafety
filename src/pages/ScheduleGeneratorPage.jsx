@@ -18,14 +18,14 @@ const ScheduleGeneratorPage = () => {
         minHeight: '600px'
       }}>
         <iframe 
-          src="http://localhost:3000" 
+          src={`/gerador-cronograma/index.html?apiKey=${import.meta.env.VITE_GEMINI_API_KEY || ''}`}
           title="Gerador de Cronograma"
           style={{ width: '100%', height: '100%', border: 'none' }}
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
         />
       </div>
       <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-        Nota: Esta ferramenta requer que o servidor do "Gerador de Cronograma" esteja em execução localmente (porta 3000).
+        Gerador de Cronograma integrado localmente (sem necessidade de servidor externo).
       </div>
     </div>
   );
