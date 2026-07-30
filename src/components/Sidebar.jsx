@@ -18,6 +18,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     }));
   };
 
+  const isAdminDiretoria = activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria';
+
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
     { name: 'Empresas', path: '/companies', icon: <Building2 size={20} /> },
@@ -27,29 +29,24 @@ const Sidebar = ({ isOpen, onClose }) => {
       name: 'Ferramentas', 
       icon: <Wrench size={20} />, 
       subItems: [
+        ...(isAdminDiretoria ? [
+          { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={18} /> },
+          { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> }
+        ] : []),
         { name: 'Contatos', path: '/contacts', icon: <Users size={18} /> },
         { name: 'Cronograma', path: '/schedule-generator', icon: <Wand2 size={18} /> },
-        { name: 'Relatórios', path: '/reports', icon: <BarChart3 size={18} /> },
+        ...(isAdminDiretoria ? [
+          { name: 'Relatórios', path: '/reports', icon: <BarChart3 size={18} /> },
+          { name: 'Armazenamento', path: '/storage', icon: <Database size={18} /> }
+        ] : [])
       ]
     },
     { name: 'Assistente IA', path: '/ai-assistant', icon: <Sparkles size={20} /> },
     { name: 'Configurações', path: '/settings', icon: <Settings size={20} /> },
+    ...(isAdminDiretoria ? [
+      { name: 'Equipe e Acessos', path: '/team', icon: <ShieldCheck size={20} /> }
+    ] : [])
   ];
-
-  // Apenas Admins veem a aba de Equipe, Armazenamento, Convocações e Estoque
-  if (activeLink?.role === 'Admin') {
-    navItems.push({ name: 'Equipe e Acessos', path: '/team', icon: <ShieldCheck size={20} /> });
-    
-    const ferramentas = navItems.find(item => item.name === 'Ferramentas');
-    if (ferramentas) {
-      // Insere Convocações e Estoque no início da lista, e Armazenamento no final
-      ferramentas.subItems.unshift(
-        { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={18} /> },
-        { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> }
-      );
-      ferramentas.subItems.push({ name: 'Armazenamento', path: '/storage', icon: <Database size={18} /> });
-    }
-  }
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`} style={{ 
