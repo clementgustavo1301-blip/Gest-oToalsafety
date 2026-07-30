@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2, Plus, ChevronDown, ChevronRight, Search,
-  Trash2, Users, FileText, MapPin
+  Trash2, Users, FileText, MapPin, Edit2
 } from 'lucide-react';
-import { getGroups, getCompanies, addGroup, addCompany, deleteGroup, deleteCompany } from '../services/storageService';
+import { getGroups, getCompanies, addGroup, updateGroup, addCompany, deleteGroup, deleteCompany } from '../services/storageService';
 import AddGroupModal from '../components/AddGroupModal';
 import AddCompanyModal from '../components/AddCompanyModal';
 
@@ -18,6 +18,7 @@ const CompaniesPage = () => {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [editingGroup, setEditingGroup] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -46,9 +47,14 @@ const CompaniesPage = () => {
   };
 
   const handleAddGroup = async (groupData) => {
-    await addGroup(groupData);
+    if (editingGroup) {
+      await updateGroup(editingGroup.id, groupData);
+    } else {
+      await addGroup(groupData);
+    }
     await loadData();
     setShowGroupModal(false);
+    setEditingGroup(null);
   };
 
   const handleAddCompany = async (companyData) => {
@@ -165,6 +171,17 @@ const CompaniesPage = () => {
                   </button>
                   <button
                     style={{ padding: '0.375rem', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)' }}
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setEditingGroup(group);
+                      setShowGroupModal(true);
+                    }}
+                    title="Editar Grupo"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button
+                    style={{ padding: '0.375rem', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)' }}
                     onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id); }}
                     title="Excluir Grupo"
                   >
@@ -264,7 +281,16 @@ const CompaniesPage = () => {
         )}
       </div>
 
-      {showGroupModal && <AddGroupModal onClose={() => setShowGroupModal(false)} onSave={handleAddGroup} />}
+      {showGroupModal && (
+        <AddGroupModal 
+          onClose={() => {
+            setShowGroupModal(false);
+            setEditingGroup(null);
+          }} 
+          onSave={handleAddGroup} 
+          initialGroup={editingGroup}
+        />
+      )}
       {showCompanyModal && <AddCompanyModal onClose={() => setShowCompanyModal(false)} onSave={handleAddCompany} />}
     </div>
   );

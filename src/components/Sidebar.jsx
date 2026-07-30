@@ -1,12 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database } from 'lucide-react';
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, userProfile, activeLink, setActiveLink } = useAuth();
   const { unreadCount } = useAI();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState({});
@@ -37,6 +37,16 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Assistente IA', path: '/ai-assistant', icon: <Sparkles size={20} /> },
     { name: 'Configurações', path: '/settings', icon: <Settings size={20} /> },
   ];
+
+  // Apenas Admins veem a aba de Equipe e Armazenamento
+  if (userProfile?.role === 'Admin') {
+    navItems.push({ name: 'Equipe e Acessos', path: '/team', icon: <ShieldCheck size={20} /> });
+    
+    const ferramentas = navItems.find(item => item.name === 'Ferramentas');
+    if (ferramentas) {
+      ferramentas.subItems.push({ name: 'Armazenamento', path: '/storage', icon: <Database size={18} /> });
+    }
+  }
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`} style={{ 
@@ -108,183 +118,191 @@ const Sidebar = ({ isOpen, onClose }) => {
       <nav style={{
         position: 'relative',
         display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1,
-        overflowY: 'auto', overflowX: 'hidden'
+        overflowY: 'auto', overflowX: 'hidden', minHeight: 0
       }}>
-        {navItems.map((item) => {
-          if (item.subItems) {
-            const isExpanded = expandedMenus[item.name];
-            const isAnySubActive = item.subItems.some(sub => 
-              sub.path !== '#' && location.pathname.startsWith(sub.path)
-            );
-            
-            return (
-              <div key={item.name} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <button 
-                  onClick={() => {
-                    if (isCollapsed) {
-                      setIsCollapsed(false);
-                      if (!isExpanded) toggleMenu(item.name);
-                    } else {
-                      toggleMenu(item.name);
-                    }
-                  }}
-                  style={{
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: isCollapsed ? '0.75rem' : '0.75rem 1rem',
-                    justifyContent: isCollapsed ? 'center' : 'space-between',
-                    borderRadius: 'var(--radius-md)',
-                    color: isAnySubActive ? 'var(--primary)' : 'var(--text-secondary)',
-                    backgroundColor: isAnySubActive && !isExpanded ? 'var(--primary-light)' : 'transparent',
-                    fontWeight: isAnySubActive ? '600' : '500',
-                    transition: 'var(--transition)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    width: '100%',
-                    textAlign: 'left'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isAnySubActive || isExpanded) {
-                      e.currentTarget.style.backgroundColor = 'var(--background)';
-                      e.currentTarget.style.color = 'var(--text-primary)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isAnySubActive || isExpanded) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
-                    }
-                  }}
-                  title={isCollapsed ? item.name : ''}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: isCollapsed ? 0 : 1 }}>
-                    <div>{item.icon}</div>
-                    {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>{item.name}</span>}
-                  </div>
-                  {!isCollapsed && (
-                    <div>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
-                  )}
-                </button>
-                
-                {isExpanded && !isCollapsed && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '1rem', marginTop: '0.25rem' }}>
-                    {item.subItems.map((subItem) => {
-                      const isSubActive = subItem.path !== '#' && location.pathname.startsWith(subItem.path);
-                      return (
-                        <Link 
-                          key={subItem.name}
-                          to={subItem.path}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            padding: '0.5rem 1rem',
-                            borderRadius: 'var(--radius-md)',
-                            color: isSubActive ? 'var(--primary)' : 'var(--text-secondary)',
-                            backgroundColor: isSubActive ? 'var(--primary-light)' : 'transparent',
-                            fontWeight: isSubActive ? '600' : '500',
-                            transition: 'var(--transition)',
-                            fontSize: '0.9em'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isSubActive) {
-                              e.currentTarget.style.backgroundColor = 'var(--background)';
-                              e.currentTarget.style.color = 'var(--text-primary)';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isSubActive) {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                              e.currentTarget.style.color = 'var(--text-secondary)';
-                            }
-                          }}
-                        >
-                          <div>{subItem.icon}</div>
-                          <span style={{ whiteSpace: 'nowrap' }}>{subItem.name}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          const isActive = item.path !== '#' && (
-            item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
-          );
-          return (
-            <Link 
-              key={item.name}
-              to={item.path}
-              style={{
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: isCollapsed ? '0.75rem' : '0.75rem 1rem',
-                justifyContent: isCollapsed ? 'center' : 'flex-start',
-                borderRadius: 'var(--radius-md)',
-                color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
-                fontWeight: isActive ? '600' : '500',
-                transition: 'var(--transition)'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'var(--background)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }
-              }}
-              title={isCollapsed ? item.name : ''}
-            >
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem', flex: isCollapsed ? 0 : 1 
-              }}>
-                <div>{item.icon}</div>
-                {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>{item.name}</span>}
-              </div>
+        {/* Renderiza o menu apenas se o usuário tiver escolhido um vínculo (Cadeado Aberto) */}
+        {!activeLink ? (
+          <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            <ShieldCheck size={32} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <p>Selecione um vínculo para desbloquear o menu.</p>
+          </div>
+        ) : (
+          navItems.map((item) => {
+            if (item.subItems) {
+              const isExpanded = expandedMenus[item.name];
+              const isAnySubActive = item.subItems.some(sub => 
+                sub.path !== '#' && location.pathname.startsWith(sub.path)
+              );
               
-              {item.path === '/ai-assistant' && (
-                <div style={{
-                  backgroundColor: unreadCount > 0 && !isCollapsed ? 'var(--danger)' : 'transparent',
-                  color: unreadCount > 0 ? 'white' : 'var(--text-secondary)',
-                  fontSize: '0.6875rem',
-                  fontWeight: 'bold',
-                  padding: unreadCount > 0 && !isCollapsed ? '0.125rem 0.5rem' : '0',
-                  borderRadius: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  justifyContent: 'center',
-                  position: isCollapsed ? 'absolute' : 'static',
-                  right: isCollapsed ? '8px' : 'auto',
-                  top: isCollapsed ? '8px' : 'auto',
-                  minWidth: '20px',
-                  transition: 'var(--transition)'
-                }}>
-                  {unreadCount > 0 ? (
-                    isCollapsed ? (
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--danger)' }} title={`${unreadCount} notificações`} />
-                    ) : (
-                      <><Bell size={14} fill="currentColor" /> {unreadCount}</>
-                    )
-                  ) : (
-                    !isCollapsed && <Bell size={16} />
+              return (
+                <div key={item.name} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <button 
+                    onClick={() => {
+                      if (isCollapsed) {
+                        setIsCollapsed(false);
+                        if (!isExpanded) toggleMenu(item.name);
+                      } else {
+                        toggleMenu(item.name);
+                      }
+                    }}
+                    style={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: isCollapsed ? '0.75rem' : '0.75rem 1rem',
+                      justifyContent: isCollapsed ? 'center' : 'space-between',
+                      borderRadius: 'var(--radius-md)',
+                      color: isAnySubActive ? 'var(--primary)' : 'var(--text-secondary)',
+                      backgroundColor: isAnySubActive && !isExpanded ? 'var(--primary-light)' : 'transparent',
+                      fontWeight: isAnySubActive ? '600' : '500',
+                      transition: 'var(--transition)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      width: '100%',
+                      textAlign: 'left'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isAnySubActive || isExpanded) {
+                        e.currentTarget.style.backgroundColor = 'var(--background)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isAnySubActive || isExpanded) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-secondary)';
+                      }
+                    }}
+                    title={isCollapsed ? item.name : ''}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: isCollapsed ? 0 : 1 }}>
+                      <div>{item.icon}</div>
+                      {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>{item.name}</span>}
+                    </div>
+                    {!isCollapsed && (
+                      <div>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
+                    )}
+                  </button>
+                  
+                  {isExpanded && !isCollapsed && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '1rem', marginTop: '0.25rem' }}>
+                      {item.subItems.map((subItem) => {
+                        const isSubActive = subItem.path !== '#' && location.pathname.startsWith(subItem.path);
+                        return (
+                          <Link 
+                            key={subItem.name}
+                            to={subItem.path}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              padding: '0.5rem 1rem',
+                              borderRadius: 'var(--radius-md)',
+                              color: isSubActive ? 'var(--primary)' : 'var(--text-secondary)',
+                              backgroundColor: isSubActive ? 'var(--primary-light)' : 'transparent',
+                              fontWeight: isSubActive ? '600' : '500',
+                              transition: 'var(--transition)',
+                              fontSize: '0.9em'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSubActive) {
+                                e.currentTarget.style.backgroundColor = 'var(--background)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSubActive) {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-secondary)';
+                              }
+                            }}
+                          >
+                            <div>{subItem.icon}</div>
+                            <span style={{ whiteSpace: 'nowrap' }}>{subItem.name}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              )}
-            </Link>
-          );
-        })}
+              );
+            }
+
+            const isActive = item.path !== '#' && (
+              item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+            );
+            return (
+              <Link 
+                key={item.name}
+                to={item.path}
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: isCollapsed ? '0.75rem' : '0.75rem 1rem',
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  borderRadius: 'var(--radius-md)',
+                  color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+                  backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
+                  fontWeight: isActive ? '600' : '500',
+                  transition: 'var(--transition)'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'var(--background)';
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }
+                }}
+                title={isCollapsed ? item.name : ''}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.75rem', flex: isCollapsed ? 0 : 1 
+                }}>
+                  <div>{item.icon}</div>
+                  {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>{item.name}</span>}
+                </div>
+                
+                {item.path === '/ai-assistant' && (
+                  <div style={{
+                    backgroundColor: unreadCount > 0 && !isCollapsed ? 'var(--danger)' : 'transparent',
+                    color: unreadCount > 0 ? 'white' : 'var(--text-secondary)',
+                    fontSize: '0.6875rem',
+                    fontWeight: 'bold',
+                    padding: unreadCount > 0 && !isCollapsed ? '0.125rem 0.5rem' : '0',
+                    borderRadius: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    justifyContent: 'center',
+                    position: isCollapsed ? 'absolute' : 'static',
+                    right: isCollapsed ? '8px' : 'auto',
+                    top: isCollapsed ? '8px' : 'auto',
+                    minWidth: '20px',
+                    transition: 'var(--transition)'
+                  }}>
+                    {unreadCount > 0 ? (
+                      isCollapsed ? (
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--danger)' }} title={`${unreadCount} notificações`} />
+                      ) : (
+                        <><Bell size={14} fill="currentColor" /> {unreadCount}</>
+                      )
+                    ) : (
+                      !isCollapsed && <Bell size={16} />
+                    )}
+                  </div>
+                )}
+              </Link>
+            );
+          })
+        )}
       </nav>
 
       <div style={{
@@ -318,6 +336,28 @@ const Sidebar = ({ isOpen, onClose }) => {
               </span>
             )}
           </div>
+          <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--border)', margin: '0.5rem 0' }} />
+          
+          {activeLink && (
+            <button 
+              onClick={() => setActiveLink(null)}
+              title={isCollapsed ? "Alterar Vínculo" : ""}
+              style={{
+                position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'flex-start', gap: '0.5rem', width: '100%',
+                padding: '0.5rem', background: 'transparent', border: 'none',
+                color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8125rem',
+                fontWeight: '600', transition: 'var(--transition)', borderRadius: 'var(--radius-sm)',
+                marginBottom: '0.25rem'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--primary-light)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <Users size={16} style={{ flexShrink: 0 }} /> 
+              {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>Alterar Vínculo</span>}
+            </button>
+          )}
+
           <button 
             onClick={signOut}
             title={isCollapsed ? "Sair do Sistema" : ""}

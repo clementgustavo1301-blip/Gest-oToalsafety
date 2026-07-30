@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getTrainings, getCompanies, addTraining } from '../services/storageService';
+import { getTrainings, getCompanies, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from '../components/AddTrainingModal';
+import EditTrainingModal from '../components/EditTrainingModal';
 
 const STATUS_CONFIG = {
   agendado: { label: 'Agendado', color: 'var(--primary)', bg: 'var(--primary-light)' },
@@ -16,6 +17,7 @@ const CalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
 
   const [trainings, setTrainings] = useState([]);
@@ -49,6 +51,18 @@ const CalendarView = () => {
     }
     setShowModal(false);
     await loadData(false);
+  };
+
+  const handleStatusChange = async (trainingId, newStatus) => {
+    await updateTraining(trainingId, { status: newStatus });
+    await loadData(false);
+  };
+
+  const handleDeleteTraining = async (trainingId) => {
+    if (window.confirm('Deseja realmente cancelar este agendamento? Ele voltará para a lista de pendentes.')) {
+      await deleteTraining(trainingId);
+      await loadData(false);
+    }
   };
 
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
@@ -231,18 +245,23 @@ const CalendarView = () => {
             </div>
           </div>
 
-          {/* Weekday Headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--background)' }}>
-            {weekDays.map(d => (
-              <div key={d} style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                {d}
+          {/* Calendar Scroll Area */}
+          <div className="calendar-scroll-area">
+            <div className="calendar-scroll-inner">
+              {/* Weekday Headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--background)' }}>
+                {weekDays.map(d => (
+                  <div key={d} style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    {d}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Calendar Grid */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            {rows}
+              {/* Calendar Grid */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {rows}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -250,12 +269,23 @@ const CalendarView = () => {
         {selectedDate && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', animation: 'fadeIn 0.2s ease' }}>
             <div className="card" style={{ padding: '1rem' }}>
-              <h3 style={{ fontWeight: '600', fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                {format(new Date(selectedDate + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                {selectedDayEvents.length} treinamento{selectedDayEvents.length !== 1 ? 's' : ''}
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 style={{ fontWeight: '600', fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                    {format(new Date(selectedDate + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {selectedDayEvents.length} treinamento{selectedDayEvents.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowModal(true)}
+                  style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                >
+                  <Plus size={14} /> Agendar
+                </button>
+              </div>
             </div>
 
             {selectedDayEvents.length === 0 ? (
@@ -276,6 +306,13 @@ const CalendarView = () => {
                       }}>
                         {sc.label}
                       </span>
+                      <button 
+                        onClick={() => setEditingEvent(event)}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.25rem' }}
+                        title="Editar Agendamento"
+                      >
+                        <Edit2 size={14} /> Editar
+                      </button>
                     </div>
                     <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: '0.375rem' }}>
                       {event.title}
@@ -291,6 +328,84 @@ const CalendarView = () => {
                         <span>Instrutor: {event.instructor}</span>
                       )}
                     </div>
+                    {/* Status Actions */}
+                    <div style={{
+                      display: 'flex', gap: '0.5rem', paddingTop: '0.75rem', marginTop: '1rem',
+                      borderTop: '1px solid var(--border)', flexWrap: 'wrap'
+                    }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', alignSelf: 'center', marginRight: '0.25rem' }}>
+                        Ações:
+                      </span>
+                      {event.status !== 'concluido' && (
+                        <button
+                          className="btn"
+                          onClick={() => handleStatusChange(event.id, 'concluido')}
+                          style={{
+                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                            backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
+                            border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
+                            fontWeight: '600', gap: '0.375rem'
+                          }}
+                        >
+                          <CheckCircle size={12} /> Concluir
+                        </button>
+                      )}
+                      {event.status !== 'adiado' && (
+                        <button
+                          className="btn"
+                          onClick={() => handleStatusChange(event.id, 'adiado')}
+                          style={{
+                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                            backgroundColor: '#fef3c7', color: '#b45309',
+                            border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
+                            fontWeight: '600', gap: '0.375rem'
+                          }}
+                        >
+                          <PauseCircle size={12} /> Adiar
+                        </button>
+                      )}
+                      {event.status !== 'nao_feito' && (
+                        <button
+                          className="btn"
+                          onClick={() => handleStatusChange(event.id, 'nao_feito')}
+                          style={{
+                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                            backgroundColor: '#fee2e2', color: 'var(--danger)',
+                            border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
+                            fontWeight: '600', gap: '0.375rem'
+                          }}
+                        >
+                          <XCircle size={12} /> Não Feito
+                        </button>
+                      )}
+                      {event.status !== 'agendado' && (
+                        <button
+                          className="btn"
+                          onClick={() => handleStatusChange(event.id, 'agendado')}
+                          style={{
+                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                            backgroundColor: 'var(--primary-light)', color: 'var(--primary)',
+                            border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)',
+                            fontWeight: '600', gap: '0.375rem'
+                          }}
+                        >
+                          <CalendarIcon size={12} /> Reagendar
+                        </button>
+                      )}
+                      <button
+                        className="btn"
+                        onClick={() => handleDeleteTraining(event.id)}
+                        style={{
+                          padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                          backgroundColor: 'transparent', color: 'var(--danger)',
+                          border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
+                          fontWeight: '600', gap: '0.375rem', marginLeft: 'auto'
+                        }}
+                        title="Remover do calendário e voltar para pendentes"
+                      >
+                        <Trash2 size={12} /> Cancelar Agendamento
+                      </button>
+                    </div>
                   </div>
                 );
               })
@@ -305,6 +420,14 @@ const CalendarView = () => {
           companyId={null} // Global calendar doesn't have a specific company
           onClose={() => setShowModal(false)}
           onSave={handleAddTraining}
+        />
+      )}
+
+      {editingEvent && (
+        <EditTrainingModal
+          training={editingEvent}
+          onClose={() => setEditingEvent(null)}
+          onSave={() => { setEditingEvent(null); loadData(false); }}
         />
       )}
     </div>

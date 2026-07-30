@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { X, Building2 } from 'lucide-react';
 
-const AddGroupModal = ({ onClose, onSave }) => {
-  const [name, setName] = useState('');
+const AddGroupModal = ({ onClose, onSave, initialGroup = null }) => {
+  const [name, setName] = useState(initialGroup?.name || '');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -25,7 +25,9 @@ const AddGroupModal = ({ onClose, onSave }) => {
             }}>
               <Building2 size={18} color="white" />
             </div>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Novo Grupo Econômico</h2>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+              {initialGroup ? 'Editar Grupo Econômico' : 'Novo Grupo Econômico'}
+            </h2>
           </div>
           <button onClick={onClose} style={{ padding: '0.375rem', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)' }}>
             <X size={20} />
@@ -53,7 +55,7 @@ const AddGroupModal = ({ onClose, onSave }) => {
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={!name.trim() || loading}>
-              {loading ? 'Criando...' : 'Criar Grupo'}
+              {loading ? 'Salvando...' : (initialGroup ? 'Salvar Alterações' : 'Criar Grupo')}
             </button>
           </div>
         </form>

@@ -47,7 +47,9 @@ const ExportManager = {
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#FFFFFF',
-                    logging: false
+                    logging: false,
+                    scrollY: -window.scrollY,
+                    scrollX: 0
                 });
                 canvases.push(canvas);
             }
@@ -151,7 +153,9 @@ const ExportManager = {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#FFFFFF',
-                logging: false
+                logging: false,
+                scrollY: -window.scrollY,
+                scrollX: 0
             });
             canvases.push(canvas);
         }
@@ -236,7 +240,9 @@ const ExportManager = {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#FFFFFF',
-                logging: false
+                logging: false,
+                scrollY: -window.scrollY,
+                scrollX: 0
             });
 
             const link = document.createElement('a');
@@ -403,7 +409,9 @@ const ExportManager = {
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#FFFFFF',
-                    logging: false
+                    logging: false,
+                    scrollY: -window.scrollY,
+                    scrollX: 0
                 });
 
                 ganttSlide.style.boxShadow = origStyles.boxShadow;
@@ -610,7 +618,9 @@ const ExportManager = {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#FFFFFF',
-                logging: false
+                logging: false,
+                scrollY: -window.scrollY,
+                scrollX: 0
             });
 
             slideEl.style.boxShadow = origStyles.boxShadow;

@@ -354,6 +354,7 @@ select.modal-input {
 .app-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   flex-direction: column; /* Mobile by default */
 }
@@ -367,6 +368,8 @@ select.modal-input {
 
 .main-content {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem; /* Smaller padding on mobile */
 }
@@ -611,6 +614,22 @@ input, select, textarea {
 .tabs-container {
   -ms-overflow-style: none;
   scrollbar-width: none;
+.grid-responsive-calendar {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
 }
 
+@media (max-width: 1024px) {
+  .grid-responsive-calendar {
+    grid-template-columns: 1fr !important;
+  }
+}
 
+.calendar-scroll-area {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.calendar-scroll-inner {
+  min-width: 800px;
+}

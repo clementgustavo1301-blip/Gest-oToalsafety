@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, Clock, User, Users,
   CheckCircle, PauseCircle, XCircle, Calendar as CalendarIcon,
-  Trash2
+  Trash2, Edit2
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getTrainingsByCompany, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from './AddTrainingModal';
+import EditTrainingModal from './EditTrainingModal';
 
 const STATUS_CONFIG = {
   agendado: { label: 'Agendado', color: 'var(--primary)', bg: 'var(--primary-light)', icon: <CalendarIcon size={14} /> },
@@ -19,6 +20,7 @@ const STATUS_CONFIG = {
 const TrainingCalendar = ({ companyId, onUpdate }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEvents, setSelectedEvents] = useState([]);
   
@@ -214,23 +216,27 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
           </div>
         </div>
 
-        {/* Weekday Headers */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-          borderBottom: '1px solid var(--border)', backgroundColor: 'var(--background)'
-        }}>
-          {weekDays.map(d => (
-            <div key={d} style={{
-              padding: '0.625rem', textAlign: 'center', fontWeight: '600',
-              fontSize: '0.8125rem', color: 'var(--text-secondary)'
+        <div className="calendar-scroll-area">
+          <div className="calendar-scroll-inner">
+            {/* Weekday Headers */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+              borderBottom: '1px solid var(--border)', backgroundColor: 'var(--background)'
             }}>
-              {d}
+              {weekDays.map(d => (
+                <div key={d} style={{
+                  padding: '0.625rem', textAlign: 'center', fontWeight: '600',
+                  fontSize: '0.8125rem', color: 'var(--text-secondary)'
+                }}>
+                  {d}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Calendar Grid */}
-        <div>{rows}</div>
+            {/* Calendar Grid */}
+            <div>{rows}</div>
+          </div>
+        </div>
       </div>
 
       {/* Event Detail Panel with Status Controls */}
@@ -253,6 +259,13 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                       {sc.icon} {sc.label}
                     </span>
                   </div>
+                  <button 
+                    onClick={() => setEditingEvent(event)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.25rem' }}
+                    title="Editar Agendamento"
+                  >
+                    <Edit2 size={14} /> Editar
+                  </button>
                 </div>
 
                 <div className="grid-responsive-2" style={{ gap: '0.75rem', marginBottom: '1rem' }}>
@@ -382,6 +395,14 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
           companyId={companyId}
           onClose={() => { setShowModal(false); }}
           onSave={handleAddTraining}
+        />
+      )}
+
+      {editingEvent && (
+        <EditTrainingModal
+          training={editingEvent}
+          onClose={() => setEditingEvent(null)}
+          onSave={() => { setEditingEvent(null); loadData(); if (onUpdate) onUpdate(); }}
         />
       )}
     </div>

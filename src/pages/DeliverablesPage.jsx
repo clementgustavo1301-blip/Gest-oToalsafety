@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getAllDeliverablesSummary, getContracts } from '../services/storageService';
 import DeliverablesViewer from '../components/DeliverablesViewer';
+import HasAccess from '../components/HasAccess';
 
 const TYPE_CONFIG = {
   programa: { label: 'Programa', icon: <FileSpreadsheet size={14} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
@@ -78,6 +79,11 @@ const DeliverablesPage = () => {
           <h1 className="text-h1">Entregáveis & Contratos</h1>
           <p className="text-subtitle">Visualize todos os programas, laudos e entregáveis de cada contrato.</p>
         </div>
+        <HasAccess sectors={['SST']} roles={['Técnico', 'Supervisor']}>
+          <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileText size={16} /> Gerar Laudo PCMSO (Acesso Restrito)
+          </button>
+        </HasAccess>
       </header>
 
       {/* View Switcher */}
