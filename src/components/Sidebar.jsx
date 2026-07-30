@@ -27,9 +27,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       name: 'Ferramentas', 
       icon: <Wrench size={20} />, 
       subItems: [
-        { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={18} /> },
         { name: 'Contatos', path: '/contacts', icon: <Users size={18} /> },
-        { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> },
         { name: 'Cronograma', path: '/schedule-generator', icon: <Wand2 size={18} /> },
         { name: 'Relatórios', path: '/reports', icon: <BarChart3 size={18} /> },
       ]
@@ -38,12 +36,17 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Configurações', path: '/settings', icon: <Settings size={20} /> },
   ];
 
-  // Apenas Admins veem a aba de Equipe e Armazenamento
-  if (userProfile?.role === 'Admin') {
+  // Apenas Admins veem a aba de Equipe, Armazenamento, Convocações e Estoque
+  if (activeLink?.role === 'Admin') {
     navItems.push({ name: 'Equipe e Acessos', path: '/team', icon: <ShieldCheck size={20} /> });
     
     const ferramentas = navItems.find(item => item.name === 'Ferramentas');
     if (ferramentas) {
+      // Insere Convocações e Estoque no início da lista, e Armazenamento no final
+      ferramentas.subItems.unshift(
+        { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={18} /> },
+        { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> }
+      );
       ferramentas.subItems.push({ name: 'Armazenamento', path: '/storage', icon: <Database size={18} /> });
     }
   }
