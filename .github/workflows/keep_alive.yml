@@ -1,0 +1,25 @@
+name: Manter Supabase Ativo
+
+on:
+  schedule:
+    # Roda a cada 3 dias às 10:00 da manhã (UTC)
+    - cron: '0 10 */3 * *'
+  workflow_dispatch: # Permite rodar manualmente no painel do GitHub Actions
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase API (Evita pausa por inatividade)
+        env:
+          SUPABASE_URL: "https://uqwdepwqrrwzwesfysbz.supabase.co"
+          SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxd2RlcHdxcnJ3endlc2Z5c2J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0OTI3NDgsImV4cCI6MjA5NzA2ODc0OH0._miOzAIZK6EaGymw-amCMpnVKDC5bIB7HBsOCO14zcM"
+        run: |
+          echo "Disparando requisição para manter o projeto Supabase acordado..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1")
+          
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "Sucesso! O Supabase está ativo. Status Code: $HTTP_STATUS"
+          else
+            echo "Aviso: Código de status inesperado: $HTTP_STATUS"
+          fi
