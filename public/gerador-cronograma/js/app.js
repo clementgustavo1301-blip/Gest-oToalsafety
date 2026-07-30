@@ -82,6 +82,7 @@ const App = {
             btnDownload: document.getElementById('btnDownload'),
             btnDownloadBottom: document.getElementById('btnDownloadBottom'),
             btnDownloadPPTX: document.getElementById('btnDownloadPPTX'),
+            btnSaveToSystem: document.getElementById('btnSaveToSystem'),
             btnEditDeliverables: document.getElementById('btnEditDeliverables'),
             btnNewSchedule: document.getElementById('btnNewSchedule'),
             viewMonths: document.getElementById('viewMonths'),
@@ -153,6 +154,11 @@ const App = {
         this.els.btnDownloadBottom.addEventListener('click', () => this.downloadPDF());
         if(this.els.btnDownloadPPTX) {
             this.els.btnDownloadPPTX.addEventListener('click', () => this.downloadPPTX());
+        }
+
+        // Save to System button
+        if (this.els.btnSaveToSystem) {
+            this.els.btnSaveToSystem.addEventListener('click', () => this.saveToSystem());
         }
 
         // Edit button
@@ -573,6 +579,52 @@ const App = {
         );
 
         this.showToast('Datas dos entregáveis atualizadas!', 'success');
+    },
+
+    /**
+     * Sends the current project data and timeline to the parent React application
+     */
+    saveToSystem() {
+        if (!this.state.projectData || !GanttRenderer.positionedDeliverables) {
+            this.showToast('Nenhum cronograma gerado para salvar.', 'error');
+            return;
+        }
+
+        const btn = this.els.btnSaveToSystem;
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = 'Salvando...';
+        btn.disabled = true;
+
+        try {
+            // Build the payload
+            const payload = {
+                clientName: this.state.projectData.clientName,
+                startDate: this.state.projectData.startDate,
+                durationMonths: this.state.projectData.contractDuration,
+                deliverables: GanttRenderer.positionedDeliverables.map(d => ({
+                    title: d.name,
+                    area: d.category,
+                    deadline: d.barEnd ? d.barEnd.toISOString().split('T')[0] : null,
+                    description: d.description || ''
+                }))
+            };
+
+            window.parent.postMessage({
+                type: 'CREATE_COMPANY_FROM_SCHEDULE',
+                payload: payload
+            }, '*');
+
+            // Wait for response from parent or just timeout and restore button
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }, 3000);
+        } catch (error) {
+            console.error('Error sending message:', error);
+            this.showToast('Erro ao comunicar com o sistema principal.', 'error');
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        }
     },
 
     /**
