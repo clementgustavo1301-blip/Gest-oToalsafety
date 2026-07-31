@@ -277,7 +277,7 @@ async function sendDeliverablesReport(type) {
     if (genAI) {
       console.log('🧠 Melhorando relatório com IA...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Foi solicitado o relatório: ${title}.
 
@@ -361,7 +361,7 @@ async function sendWeeklyReport() {
     if (genAI) {
       console.log('🧠 Melhorando relatório semanal com IA...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere um relatório de agendamentos para enviar ao administrador.
 
