@@ -82,7 +82,8 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
                   onChange={(e) => setSelectedCompanyId(e.target.value)}
                   className="modal-input"
                   required
-                  disabled={saving}
+                  disabled={saving || training.deliverableId}
+                  title={training.deliverableId ? "Não é possível alterar a empresa de um treinamento vinculado a uma pendência" : ""}
                 >
                   <option value="" disabled>Selecione a empresa...</option>
                   {companies.map(c => (

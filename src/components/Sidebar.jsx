@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
+import { supabase } from '../lib/supabase';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
@@ -10,6 +11,31 @@ const Sidebar = ({ isOpen, onClose }) => {
   const { unreadCount } = useAI();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState({});
+  const [pendingTeamCount, setPendingTeamCount] = useState(0);
+
+  const isAdminDiretoria = activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria';
+
+  useEffect(() => {
+    if (isAdminDiretoria) {
+      const fetchPending = async () => {
+        const { count } = await supabase
+          .from('user_links')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+        setPendingTeamCount(count || 0);
+      };
+      fetchPending();
+
+      const subscription = supabase
+        .channel('public:user_links')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_links' }, fetchPending)
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [isAdminDiretoria]);
 
   const toggleMenu = (name) => {
     setExpandedMenus(prev => ({
@@ -17,8 +43,6 @@ const Sidebar = ({ isOpen, onClose }) => {
       [name]: !prev[name]
     }));
   };
-
-  const isAdminDiretoria = activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria';
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
@@ -44,7 +68,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Assistente IA', path: '/ai-assistant', icon: <Sparkles size={20} /> },
     { name: 'Configurações', path: '/settings', icon: <Settings size={20} /> },
     ...(isAdminDiretoria ? [
-      { name: 'Equipe e Acessos', path: '/team', icon: <ShieldCheck size={20} /> }
+      { name: 'Equipe e Acessos', path: '/team', icon: <ShieldCheck size={20} />, badge: pendingTeamCount > 0 ? '!' : null }
     ] : [])
   ];
 
@@ -267,8 +291,45 @@ const Sidebar = ({ isOpen, onClose }) => {
                   display: 'flex', alignItems: 'center', gap: '0.75rem', flex: isCollapsed ? 0 : 1 
                 }}>
                   <div>{item.icon}</div>
-                  {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>{item.name}</span>}
+                  {!isCollapsed && (
+                    <span style={{ 
+                      whiteSpace: 'nowrap',
+                      color: item.badge && !isActive ? 'var(--danger)' : 'inherit'
+                    }}>
+                      {item.name}
+                    </span>
+                  )}
                 </div>
+                
+                {item.badge && !isCollapsed && (
+                  <div style={{
+                    color: 'var(--danger)',
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    marginLeft: 'auto'
+                  }}>
+                    {item.badge}
+                  </div>
+                )}
+                {item.badge && isCollapsed && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    backgroundColor: 'var(--danger)',
+                    color: 'white',
+                    fontSize: '0.625rem',
+                    fontWeight: 'bold',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {item.badge}
+                  </div>
+                )}
                 
                 {item.path === '/ai-assistant' && (
                   <div style={{

@@ -187,6 +187,8 @@ export async function updateTraining(trainingId, updates) {
   if (updates.description !== undefined) snakeUpdates.description = updates.description;
   if (updates.date !== undefined) snakeUpdates.date = updates.date;
   if (updates.time !== undefined) snakeUpdates.time = updates.time;
+  if (updates.title !== undefined) snakeUpdates.title = updates.title;
+  if (updates.companyId !== undefined) snakeUpdates.company_id = updates.companyId;
 
   const { data, error } = await supabase.from('trainings').update(snakeUpdates).eq('id', trainingId).select().single();
   if (error) { console.error('Error updating training:', error); return null; }
