@@ -301,35 +301,8 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                 </div>
               </div>
 
-              {/* Instructor and Participants */}
+              {/* Responsible and Participants */}
               <div className="grid-responsive-2">
-                <div>
-                  <label className="modal-label" htmlFor="training-instructor">Instrutor</label>
-                  <input
-                    id="training-instructor"
-                    type="text"
-                    value={instructor}
-                    onChange={(e) => setInstructor(e.target.value)}
-                    placeholder="Nome do instrutor"
-                    className="modal-input"
-                    disabled={saving}
-                  />
-                </div>
-                <div>
-                  <label className="modal-label" htmlFor="training-participants">Nº de Participantes</label>
-                  <input
-                    id="training-participants"
-                    type="number"
-                    value={participants}
-                    onChange={(e) => setParticipants(e.target.value)}
-                    placeholder="0"
-                    className="modal-input"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label className="modal-label" htmlFor="training-responsible">Responsável (Técnico)</label>
                   <select
@@ -344,6 +317,18 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                       <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="training-participants">Nº de Participantes</label>
+                  <input
+                    id="training-participants"
+                    type="number"
+                    value={participants}
+                    onChange={(e) => setParticipants(e.target.value)}
+                    placeholder="0"
+                    className="modal-input"
+                    min="0"
+                  />
                 </div>
               </div>
 

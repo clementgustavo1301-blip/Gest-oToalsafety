@@ -28,20 +28,23 @@ const CalendarView = () => {
 
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [pendingTrainings, setPendingTrainings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
-    const [trn, comp, { getDeliverables }] = await Promise.all([
+    const [trn, comp, { getDeliverables, getProfiles }] = await Promise.all([
       getTrainings(),
       getCompanies(),
       import('../services/storageService')
     ]);
     const deliverables = await getDeliverables();
+    const profs = await getProfiles();
     
     setTrainings(trn);
     setCompanies(comp);
+    setProfiles(profs);
     setPendingTrainings(deliverables.filter(d => d.type === 'treinamento' && d.status === 'pendente'));
     if (showLoading) setLoading(false);
   };
@@ -72,6 +75,7 @@ const CalendarView = () => {
   };
 
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
+  const getProfileName = (profileId) => profiles.find(p => p.id === profileId)?.full_name || 'Desconhecido';
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -381,8 +385,8 @@ const CalendarView = () => {
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                         <Clock size={12} /> {event.time}
                       </span>
-                      {event.instructor && (
-                        <span>Instrutor: {event.instructor}</span>
+                      {event.responsibleId && (
+                        <span>Responsável: {getProfileName(event.responsibleId)}</span>
                       )}
                     </div>
                     {/* Status Actions */}
