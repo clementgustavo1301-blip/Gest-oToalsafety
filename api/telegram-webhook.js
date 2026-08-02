@@ -2,7 +2,7 @@ import {
   supabase, 
   telegramBotToken, 
   sendDeliverablesReport, 
-  sendWeeklyReport, 
+  sendDailyReport, 
   sendTelegramMessage 
 } from './_utils.js';
 
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
         await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}`);
         
         if (reportType === 'agendamentos') {
-          await sendWeeklyReport(replyChatId);
+          await sendDailyReport(replyChatId);
         } else {
           await sendDeliverablesReport(reportType, replyChatId);
         }

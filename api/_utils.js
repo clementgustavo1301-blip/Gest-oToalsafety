@@ -176,8 +176,8 @@ NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um tí
   }
 }
 
-export async function sendWeeklyReport(replyChatId = null) {
-  console.log('\n📊 Iniciando geração do relatório de agendamentos...');
+export async function sendDailyReport(replyChatId = null) {
+  console.log('\n📊 Iniciando geração do relatório diário de agendamentos...');
   
   try {
     if (!supabase) throw new Error("Supabase cliente não inicializado");
@@ -192,58 +192,47 @@ export async function sendWeeklyReport(replyChatId = null) {
     if (companiesData) companiesData.forEach(c => compMap[c.id] = c.name);
 
     const now = new Date();
-    const startOfPastWeek = startOfDay(subDays(now, 7));
-    const endOfNextWeek = endOfDay(addDays(now, 7));
+    const startOfToday = startOfDay(now);
+    const endOfNext7Days = endOfDay(addDays(now, 7));
 
-    const completedLastWeek = trainings.filter(t => {
-      if (t.status !== 'concluido' && t.status !== 'entregue' && t.status !== 'feito') return false;
-      const tDate = t.date ? parseISO(t.date) : null;
-      if (!tDate) return false;
-      return isWithinInterval(tDate, { start: startOfPastWeek, end: now });
-    });
-
-    const scheduledNextWeek = trainings.filter(t => {
+    // Pegar treinamentos agendados ou pendentes de hoje até 7 dias
+    const upcomingTrainings = trainings.filter(t => {
       if (t.status !== 'agendado' && t.status !== 'pendente') return false;
       const tDate = t.date ? parseISO(t.date) : null;
       if (!tDate) return false;
-      return isWithinInterval(tDate, { start: now, end: endOfNextWeek });
+      return isWithinInterval(tDate, { start: startOfToday, end: endOfNext7Days });
     });
 
-    let detalhesPendentes = scheduledNextWeek.map(t => {
+    // Ordenar por data
+    upcomingTrainings.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let detalhesPendentes = upcomingTrainings.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = t.instructor || t.participants || 'Responsável não informado';
-      const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'Data indefinida';
-      return `- ${t.title || 'Treinamento'} na **${nomeEmpresa}** (Quem: ${quem}) - ${dataFormatada}`;
+      const quem = t.instructor || t.participants || 'N/A';
+      const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
+      const horario = t.time || 'Horário não definido';
+      
+      return `📌 *${t.title || 'Treinamento'}*\n🏢 Empresa: ${nomeEmpresa}\n🗓️ Data: ${dataFormatada} às ${horario}\n👤 Responsável: ${quem}\n`;
     }).join('\n');
 
-    if (!detalhesPendentes) detalhesPendentes = "Nenhum agendamento previsto.";
+    if (!detalhesPendentes) detalhesPendentes = "_Nenhum agendamento previsto para os próximos 7 dias._";
 
-    let reportMessage = `📊 *Resumo Semanal de Agendamentos*\n\n`;
-    reportMessage += `✅ *Concluídos nos últimos 7 dias:* ${completedLastWeek.length}\n`;
-    reportMessage += `📅 *Agendados p/ os próximos 7 dias:* ${scheduledNextWeek.length}\n\n`;
-    
-    if (scheduledNextWeek.length > 0) {
-      reportMessage += `*Detalhes dos próximos compromissos:*\n${detalhesPendentes}\n`;
-    } else {
-      reportMessage += `Tudo tranquilo para a próxima semana! Aproveite o fim de semana. 🍻`;
-    }
+    let reportMessage = `📊 *Relatório Diário de Agendamentos*\n\n`;
+    reportMessage += `Total agendado (próximos 7 dias): ${upcomingTrainings.length}\n\n`;
+    reportMessage += `*Próximos Compromissos:*\n\n${detalhesPendentes}\n`;
 
     if (genAI) {
-      console.log('🧠 Melhorando relatório semanal com IA...');
+      console.log('🧠 Melhorando relatório diário com IA...');
       try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
-Gere um relatório de agendamentos para enviar ao administrador.
+Gere o relatório diário de agendamentos.
 
-DADOS:
-- Concluídos (7 dias): ${completedLastWeek.length}
-- Pendentes (próximos 7 dias): ${scheduledNextWeek.length}
-
-DETALHES DOS PRÓXIMOS:
+DETALHES DOS COMPROMISSOS (HOJE + 7 DIAS):
 ${detalhesPendentes}
 
-Crie uma mensagem profissional, amigável e motivadora (com emojis). 
-Se houver agendamentos, **liste as empresas e quem irá realizar** de forma organizada.
+Crie uma mensagem muito profissional, amigável e direta (com emojis). 
+Liste todos os compromissos detalhados, mantendo as informações de Data, Horário, Empresa e Responsável claramente legíveis em tópicos para fácil leitura pelo administrador no celular.
 NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um título legal). Formate em Markdown (*negrito*). Retorne apenas a mensagem final.`;
         
         const result = await model.generateContent(prompt);
@@ -254,7 +243,7 @@ NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um tí
       }
     }
 
-    console.log('✈️ Enviando relatório de agendamentos...');
+    console.log('✈️ Enviando relatório diário de agendamentos...');
     await sendTelegramMessage(reportMessage, { replyChatId });
 
   } catch (err) {
