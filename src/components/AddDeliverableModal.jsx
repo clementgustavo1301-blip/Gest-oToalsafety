@@ -233,7 +233,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                   >
                     <option value="">Nenhum</option>
                     {profiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
+                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
                     ))}
                   </select>
                 </div>

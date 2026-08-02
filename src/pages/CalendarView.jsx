@@ -75,7 +75,7 @@ const CalendarView = () => {
   };
 
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
-  const getProfileName = (profileId) => profiles.find(p => p.id === profileId)?.full_name || 'Desconhecido';
+  const getProfileName = (profileId) => profiles.find(p => p.id === profileId)?.name || 'Desconhecido';
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));

@@ -502,7 +502,7 @@ export async function deleteInventoryItem(itemId) {
 
 // --- Profiles / Users ---
 export async function getProfiles() {
-  const { data, error } = await supabase.from('profiles').select('id, full_name, role').order('full_name', { ascending: true });
+  const { data, error } = await supabase.from('profiles').select('id, name, role').order('name', { ascending: true });
   if (error) { console.error('Error fetching profiles:', error); return []; }
   return data;
 }
