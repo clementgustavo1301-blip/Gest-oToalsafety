@@ -1,20 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { User, Bell, Shield, Key, Sparkles, LogOut, Save } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const SettingsPage = () => {
-  const { user, signOut } = useAuth();
+  const { user, userProfile, refreshProfile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   
-  // Fake state for form
-  const [profileName, setProfileName] = useState('Usuário TotalSafety');
+  // Real state for form
+  const [profileName, setProfileName] = useState(userProfile?.name || '');
+  const [profileRole, setProfileRole] = useState(userProfile?.role || '');
   const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = (e) => {
+  useEffect(() => {
+    if (userProfile) {
+      setProfileName(userProfile.name || '');
+      setProfileRole(userProfile.role || '');
+    }
+  }, [userProfile]);
+
+  const handleSave = async (e) => {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    if (activeTab === 'profile') {
+      setSaving(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ name: profileName, role: profileRole })
+        .eq('id', user.id);
+      
+      if (!error) {
+        await refreshProfile();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+      setSaving(false);
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
   };
 
   const tabs = [
@@ -106,6 +131,18 @@ const SettingsPage = () => {
                     />
                   </div>
                   <div>
+                    <label className="modal-label">Cargo / Função</label>
+                    <input 
+                      type="text" 
+                      className="modal-input" 
+                      value={profileRole} 
+                      onChange={(e) => setProfileRole(e.target.value)}
+                      placeholder="Ex: Técnico de Segurança, Engenheiro..."
+                    />
+                  </div>
+                </div>
+                
+                <div>
                     <label className="modal-label">E-mail</label>
                     <input 
                       type="email" 
@@ -201,8 +238,8 @@ const SettingsPage = () => {
 
             <div style={{ marginTop: '2.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem' }}>
               {saved && <span style={{ color: 'var(--secondary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Save size={14} /> Configurações Salvas!</span>}
-              <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Save size={16} /> Salvar Alterações
+              <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} disabled={saving}>
+                <Save size={16} /> {saving ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>
 
