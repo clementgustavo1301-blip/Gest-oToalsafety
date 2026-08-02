@@ -1,33 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
-import cron from 'node-cron';
 import { isWithinInterval, subDays, addDays, parseISO, startOfDay, endOfDay } from 'date-fns';
-
-dotenv.config({ path: '.env.local' });
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 const geminiApiKey = process.env.VITE_GEMINI_API_KEY;
-const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
-const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+export const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+export const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Erro: VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não estão definidos.');
-  process.exit(1);
+  console.warn('⚠️ Aviso: VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não estão definidos.');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
+export const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+export const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
 
-const notifiedIds = new Set();
-let lastTelegramUpdateId = 0;
-
-// ==========================================
-// FUNÇÕES DO MODO DE APROVAÇÃO EM TEMPO REAL
-// ==========================================
-
-async function generateMessage(name, role, sector) {
+export async function generateMessage(name, role, sector) {
   const baseMessage = `🚨 *Nova Solicitação de Acesso!*\n\n*Usuário:* ${name}\n*Função:* ${role || 'Não informada'}\n*Setor:* ${sector || 'Não informado'}`;
   if (!genAI) return baseMessage;
   try {
@@ -50,12 +38,18 @@ NÃO inclua saudações genéricas como "Olá" ou "Aqui está a mensagem". Retor
   }
 }
 
-async function sendTelegramMessage(text, options = {}) {
-  if (!telegramBotToken || !telegramChatId) return;
+export async function sendTelegramMessage(text, options = {}) {
+  if (!telegramBotToken || !telegramChatId) {
+    console.log('Falta token ou chatId do Telegram, ignorando...');
+    return;
+  }
+  
+  // If replyChatId is passed, use it (for commands sent directly to the bot), otherwise fallback to the admin's chatId
+  const chatId = options.replyChatId || telegramChatId;
   const url = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
   
   const payload = {
-    chat_id: telegramChatId, 
+    chat_id: chatId, 
     text: text, 
     parse_mode: 'Markdown'
   };
@@ -86,134 +80,11 @@ async function sendTelegramMessage(text, options = {}) {
   }
 }
 
-async function checkPendingLinks() {
-  const { data: pendingLinks, error } = await supabase
-    .from('user_links')
-    .select('*')
-    .eq('status', 'pending');
-
-  if (error) {
-    console.error('Erro ao checar vínculos:', error.message);
-    return;
-  }
-
-  for (const link of pendingLinks) {
-    if (!notifiedIds.has(link.id)) {
-      notifiedIds.add(link.id);
-      
-      console.log(`\n🔔 Nova solicitação detectada (ID: ${link.id}) para o usuário: ${link.user_id}`);
-      
-      let userName = 'Usuário Desconhecido';
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('name')
-        .eq('id', link.user_id)
-        .single();
-        
-      if (profile && profile.name) userName = profile.name;
-
-      console.log('🧠 Gerando mensagem inteligente...');
-      const message = await generateMessage(userName, link.role, link.sector);
-      
-      console.log('✈️ Enviando mensagem com botão...');
-      await sendTelegramMessage(message, { linkId: link.id });
-    }
-  }
-}
-
-async function checkTelegramUpdates() {
-  if (!telegramBotToken) return;
-  
-  const url = `https://api.telegram.org/bot${telegramBotToken}/getUpdates?offset=${lastTelegramUpdateId}&timeout=5`;
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data.ok && data.result.length > 0) {
-      for (const update of data.result) {
-        lastTelegramUpdateId = update.update_id + 1;
-        
-        if (update.callback_query) {
-          const callbackQuery = update.callback_query;
-          const callbackData = callbackQuery.data;
-          
-          if (callbackData.startsWith('approve_')) {
-            const linkId = callbackData.replace('approve_', '');
-            console.log(`\n📲 Comando de APROVAÇÃO via Telegram para o vínculo: ${linkId}`);
-            
-            const { error } = await supabase
-              .from('user_links')
-              .update({ status: 'approved' })
-              .eq('id', linkId);
-              
-            if (error) {
-              console.error('Erro ao aprovar vínculo:', error.message);
-              await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}&text=Erro ao aprovar.&show_alert=true`);
-            } else {
-              console.log('✅ Vínculo aprovado com sucesso no Supabase!');
-              await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}&text=Acesso Aprovado!`);
-              
-              let originalText = callbackQuery.message.text || 'Acesso solicitado.';
-              await fetch(`https://api.telegram.org/bot${telegramBotToken}/editMessageText`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id: callbackQuery.message.chat.id,
-                  message_id: callbackQuery.message.message_id,
-                  text: originalText + '\n\n✅ *Aprovado por você via Telegram*',
-                  parse_mode: 'Markdown',
-                  reply_markup: { inline_keyboard: [] }
-                })
-              });
-            }
-          } 
-          else if (callbackData.startsWith('report_')) {
-            const reportType = callbackData.replace('report_', '');
-            console.log(`\n📲 Comando de RELATÓRIO '${reportType}' selecionado no menu!`);
-            
-            // Remove the loading clock from the button
-            await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}`);
-            
-            if (reportType === 'agendamentos') {
-              await sendWeeklyReport();
-            } else {
-              await sendDeliverablesReport(reportType);
-            }
-          }
-        } else if (update.message && update.message.text) {
-          const text = update.message.text.toLowerCase().trim();
-          if (text === 'relatorio' || text === '/relatorio' || text === 'relatório' || text === '/relatório') {
-            console.log(`\n📲 Menu de RELATÓRIOS acionado via Telegram!`);
-            
-            const menuOptions = {
-              inline_keyboard: [
-                [{ text: "📅 Treinamentos/Agendamentos", callback_data: "report_agendamentos" }],
-                [{ text: "⚠️ Programas Vencidos", callback_data: "report_vencidos" }],
-                [{ text: "⏳ Programas Pendentes", callback_data: "report_pendentes" }],
-                [{ text: "🚨 Entregas no Próximo Mês", callback_data: "report_proximos" }]
-              ]
-            };
-            
-            await sendTelegramMessage("Qual relatório você deseja gerar agora?", menuOptions);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    if (!error.message.includes('timeout')) {
-      console.error('Erro ao checar botões do Telegram:', error.message);
-    }
-  }
-}
-
-// ==========================================
-// FUNÇÕES DE RELATÓRIO
-// ==========================================
-
-async function sendDeliverablesReport(type) {
+export async function sendDeliverablesReport(type, replyChatId = null) {
   console.log(`\n📊 Iniciando geração do relatório de entregáveis (${type})...`);
   
   try {
+    if (!supabase) throw new Error("Supabase cliente não inicializado");
     const { data: deliverables, error } = await supabase.from('deliverables').select('*');
     if (error) {
       console.error('Erro ao buscar entregáveis:', error.message);
@@ -234,7 +105,6 @@ async function sendDeliverablesReport(type) {
       title = '⚠️ Programas Vencidos';
       filtered = deliverables.filter(d => {
         if (d.type !== 'programa') return false;
-        // Não filtra por status: mesmo se estiver 'entregue', a validade pode ter expirado.
         if (!d.validity_date) return false;
         const vDate = new Date(d.validity_date + 'T00:00:00');
         return vDate < today;
@@ -249,7 +119,6 @@ async function sendDeliverablesReport(type) {
         if (!d.due_date) return false;
         const dDate = new Date(d.due_date + 'T00:00:00');
         const daysUntilDue = Math.ceil((dDate - today) / (1000 * 60 * 60 * 24));
-        // Próximo mês = até 31 dias a partir de hoje
         return daysUntilDue >= 0 && daysUntilDue <= 31;
       });
     }
@@ -300,17 +169,18 @@ NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um tí
     }
 
     console.log(`✈️ Enviando relatório ${type}...`);
-    await sendTelegramMessage(reportMessage);
+    await sendTelegramMessage(reportMessage, { replyChatId });
 
   } catch (err) {
     console.error(`Erro geral ao gerar relatório ${type}:`, err.message);
   }
 }
 
-async function sendWeeklyReport() {
+export async function sendWeeklyReport(replyChatId = null) {
   console.log('\n📊 Iniciando geração do relatório de agendamentos...');
   
   try {
+    if (!supabase) throw new Error("Supabase cliente não inicializado");
     const { data: trainings, error } = await supabase.from('trainings').select('*');
     if (error) {
       console.error('Erro ao buscar treinamentos para o relatório:', error.message);
@@ -385,36 +255,9 @@ NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um tí
     }
 
     console.log('✈️ Enviando relatório de agendamentos...');
-    await sendTelegramMessage(reportMessage);
+    await sendTelegramMessage(reportMessage, { replyChatId });
 
   } catch (err) {
     console.error('Erro geral ao gerar relatório de agendamentos:', err.message);
   }
 }
-
-// ==========================================
-// AGENDAMENTOS (CRON) E INICIALIZAÇÃO
-// ==========================================
-
-// Agenda o relatório de agendamentos para toda sexta-feira às 17h00
-cron.schedule('0 17 * * 5', () => {
-  console.log('⏰ Disparando tarefa agendada: Relatório Semanal (Agendamentos)');
-  sendWeeklyReport();
-});
-
-console.log('🤖 Agente de IA do Telegram iniciado (Menu de Relatórios Interativo + Cron)!');
-console.log('👀 Monitorando novas solicitações e cliques em botões...');
-
-// Verifica novos links a cada 5 segundos
-setInterval(checkPendingLinks, 5000);
-
-// Verifica cliques e mensagens do Telegram a cada 3 segundos
-setInterval(checkTelegramUpdates, 3000);
-
-checkPendingLinks();
-checkTelegramUpdates();
-
-process.on('SIGINT', () => {
-  console.log('\n🛑 Encerrando agente...');
-  process.exit();
-});
