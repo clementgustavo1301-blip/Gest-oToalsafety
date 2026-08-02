@@ -193,33 +193,56 @@ export async function sendDailyReport(replyChatId = null) {
 
     const now = new Date();
     const startOfToday = startOfDay(now);
-    const endOfNext7Days = endOfDay(addDays(now, 7));
+    const endOfNext9Days = endOfDay(addDays(now, 9));
 
-    // Pegar treinamentos agendados ou pendentes de hoje até 7 dias
-    const upcomingTrainings = trainings.filter(t => {
+    // 1. Agendamentos totais
+    const totalAgendamentos = trainings.length;
+
+    // 2. Os executados
+    const executados = trainings.filter(t => t.status === 'concluido' || t.status === 'entregue' || t.status === 'feito');
+
+    // 3. Agendamentos nos próximos 9 dias
+    const proximos9Dias = trainings.filter(t => {
       if (t.status !== 'agendado' && t.status !== 'pendente') return false;
       const tDate = t.date ? parseISO(t.date) : null;
       if (!tDate) return false;
-      return isWithinInterval(tDate, { start: startOfToday, end: endOfNext7Days });
+      return isWithinInterval(tDate, { start: startOfToday, end: endOfNext9Days });
     });
+    proximos9Dias.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // Ordenar por data
-    upcomingTrainings.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // 4. Data já passou e pendente de resposta
+    const atrasadosPendentes = trainings.filter(t => {
+      if (t.status !== 'agendado' && t.status !== 'pendente') return false;
+      const tDate = t.date ? parseISO(t.date) : null;
+      if (!tDate) return false;
+      // Usando parseISO e testando se é antes do início de hoje
+      return parseISO(t.date) < startOfToday;
+    });
+    atrasadosPendentes.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    let detalhesPendentes = upcomingTrainings.map(t => {
+    // Formatar detalhes dos próximos 9 dias
+    let detalhesProximos = proximos9Dias.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
       const quem = t.instructor || t.participants || 'N/A';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
-      const horario = t.time || 'Horário não definido';
-      
-      return `📌 *${t.title || 'Treinamento'}*\n🏢 Empresa: ${nomeEmpresa}\n🗓️ Data: ${dataFormatada} às ${horario}\n👤 Responsável: ${quem}\n`;
+      const horario = t.time || 'Sem horário';
+      return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} às ${horario} | 👤 ${quem})`;
     }).join('\n');
+    if (!detalhesProximos) detalhesProximos = "_Nenhum agendamento previsto para os próximos 9 dias._";
 
-    if (!detalhesPendentes) detalhesPendentes = "_Nenhum agendamento previsto para os próximos 7 dias._";
+    // Formatar detalhes dos atrasados
+    let detalhesAtrasados = atrasadosPendentes.map(t => {
+      const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
+      const quem = t.instructor || t.participants || 'N/A';
+      const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
+      return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada} | 👤 ${quem})`;
+    }).join('\n');
+    if (!detalhesAtrasados) detalhesAtrasados = "_Nenhum agendamento atrasado sem resposta._";
 
     let reportMessage = `📊 *Relatório Diário de Agendamentos*\n\n`;
-    reportMessage += `Total agendado (próximos 7 dias): ${upcomingTrainings.length}\n\n`;
-    reportMessage += `*Próximos Compromissos:*\n\n${detalhesPendentes}\n`;
+    reportMessage += `📈 *Geral:*\n- Total Registrado: ${totalAgendamentos}\n- Total Executados: ${executados.length}\n\n`;
+    reportMessage += `🚨 *Atrasados/Sem Resposta (${atrasadosPendentes.length}):*\n${detalhesAtrasados}\n\n`;
+    reportMessage += `📅 *Próximos 9 Dias (${proximos9Dias.length}):*\n${detalhesProximos}\n`;
 
     if (genAI) {
       console.log('🧠 Melhorando relatório diário com IA...');
@@ -228,12 +251,22 @@ export async function sendDailyReport(replyChatId = null) {
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere o relatório diário de agendamentos.
 
-DETALHES DOS COMPROMISSOS (HOJE + 7 DIAS):
-${detalhesPendentes}
+DADOS RELEVANTES:
+- Agendamentos totais (histórico): ${totalAgendamentos}
+- Agendamentos já executados: ${executados.length}
+- Atrasados/Pendentes: ${atrasadosPendentes.length}
+- Próximos (9 dias): ${proximos9Dias.length}
+
+DETALHES ATRASADOS:
+${detalhesAtrasados}
+
+DETALHES PRÓXIMOS 9 DIAS:
+${detalhesProximos}
 
 Crie uma mensagem muito profissional, amigável e direta (com emojis). 
-Liste todos os compromissos detalhados, mantendo as informações de Data, Horário, Empresa e Responsável claramente legíveis em tópicos para fácil leitura pelo administrador no celular.
-NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um título legal). Formate em Markdown (*negrito*). Retorne apenas a mensagem final.`;
+Comece direto com um título legal, sem "Olá". Formate em Markdown (*negrito*). 
+Deixe claro o panorama geral (Total e Executados) de forma resumida, mas FOQUE BASTANTE em listar os itens Atrasados (dando destaque de alerta) e os itens para os Próximos 9 dias em tópicos (bullet points) para fácil leitura.
+Retorne apenas a mensagem final do Telegram.`;
         
         const result = await model.generateContent(prompt);
         const response = await result.response;
