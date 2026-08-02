@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '../context/AuthContext';
 import { getTrainings, getCompanies, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from '../components/AddTrainingModal';
 import EditTrainingModal from '../components/EditTrainingModal';
@@ -19,6 +20,11 @@ const CalendarView = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  
+  const [calendarScope, setCalendarScope] = useState('geral');
+  const [calendarCompanyId, setCalendarCompanyId] = useState('');
+  
+  const { userProfile } = useAuth();
 
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -83,7 +89,17 @@ const CalendarView = () => {
   const startDate = startOfWeek(monthStart);
   const endDate = endOfWeek(monthEnd);
 
-  const filteredTrainings = trainings.filter(t => filterStatus === 'all' || t.status === filterStatus);
+  const filteredTrainings = trainings.filter(t => {
+    const matchStatus = filterStatus === 'all' || t.status === filterStatus;
+    const matchScope = calendarScope === 'geral' 
+      ? true 
+      : calendarScope === 'minha_agenda'
+      ? t.responsibleId === userProfile?.id
+      : calendarScope === 'empresa'
+      ? t.companyId === calendarCompanyId
+      : true;
+    return matchStatus && matchScope;
+  });
 
   const rows = [];
   let days = [];
@@ -182,16 +198,19 @@ const CalendarView = () => {
           <h1 className="text-h1">Agenda de Treinamentos</h1>
           <p className="text-subtitle">Visão geral de todas as empresas. Acesse a empresa para agendar.</p>
         </div>
-        {pendingTrainings.length > 0 && (
-          <div style={{
-            padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
-            borderRadius: 'var(--radius-md)', color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.5rem',
-            fontSize: '0.8125rem', fontWeight: '500'
-          }}>
-            <PauseCircle size={16} />
-            Você tem {pendingTrainings.length} treinamento(s) aguardando agendamento! (Vá na Empresa para agendar)
-          </div>
-        )}
+        
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {pendingTrainings.length > 0 && (
+            <div style={{
+              padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
+              borderRadius: 'var(--radius-md)', color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.5rem',
+              fontSize: '0.8125rem', fontWeight: '500'
+            }}>
+              <PauseCircle size={16} />
+              Você tem {pendingTrainings.length} treinamento(s) aguardando agendamento! (Vá na Empresa para agendar)
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Legend and Filter */}
@@ -222,6 +241,44 @@ const CalendarView = () => {
             <option value="adiado">Adiados</option>
             <option value="nao_feito">Não Feitos</option>
           </select>
+          
+          <select
+            value={calendarScope}
+            onChange={(e) => {
+              setCalendarScope(e.target.value);
+              if (e.target.value === 'empresa' && companies.length > 0 && !calendarCompanyId) {
+                setCalendarCompanyId(companies[0].id);
+              }
+            }}
+            style={{
+              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)', fontSize: '0.8125rem',
+              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+              fontFamily: 'inherit', cursor: 'pointer'
+            }}
+          >
+            <option value="geral">Agenda Geral</option>
+            <option value="minha_agenda">Minha Agenda</option>
+            <option value="empresa">Por Empresa</option>
+          </select>
+
+          {calendarScope === 'empresa' && (
+            <select
+              value={calendarCompanyId}
+              onChange={(e) => setCalendarCompanyId(e.target.value)}
+              style={{
+                padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)', fontSize: '0.8125rem',
+                backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                fontFamily: 'inherit', cursor: 'pointer', maxWidth: '200px'
+              }}
+            >
+              <option value="" disabled>Selecione a Empresa</option>
+              {companies.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 

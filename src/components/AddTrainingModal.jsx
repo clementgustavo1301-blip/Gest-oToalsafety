@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
-import { getDeliverablesByCompany, getCompanies } from '../services/storageService';
+import { getDeliverablesByCompany, getCompanies, getProfiles } from '../services/storageService';
 
 const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyId || '');
@@ -12,6 +12,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [instructor, setInstructor] = useState('');
   const [participants, setParticipants] = useState('');
   const [description, setDescription] = useState('');
+  const [responsibleId, setResponsibleId] = useState('');
 
   const [recurrence, setRecurrence] = useState('none');
   const [customDays, setCustomDays] = useState(7);
@@ -21,16 +22,19 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [isStandalone, setIsStandalone] = useState(false);
 
   const [pendingTrainings, setPendingTrainings] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
       setLoadingData(true);
-      if (!companyId) {
-        const comps = await getCompanies();
-        setCompanies(comps);
-      }
+      const [comps, profs] = await Promise.all([
+        !companyId ? getCompanies() : Promise.resolve([]),
+        getProfiles()
+      ]);
+      if (!companyId) setCompanies(comps);
+      setProfiles(profs);
       
       if (selectedCompanyId) {
         const deliverables = await getDeliverablesByCompany(selectedCompanyId);
@@ -70,7 +74,8 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       description: description.trim(),
       status: 'agendado',
       deliverableId,
-      companyId: selectedCompanyId
+      companyId: selectedCompanyId,
+      responsibleId: responsibleId || null
     };
 
     const itemsToSave = [];
@@ -321,6 +326,24 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                     className="modal-input"
                     min="0"
                   />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label className="modal-label" htmlFor="training-responsible">Responsável (Técnico)</label>
+                  <select
+                    id="training-responsible"
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

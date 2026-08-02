@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Edit2 } from 'lucide-react';
-import { getCompanies, updateTraining } from '../services/storageService';
+import { getCompanies, updateTraining, getProfiles } from '../services/storageService';
 
 const EditTrainingModal = ({ training, onClose, onSave }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState(training.companyId || '');
@@ -12,15 +12,21 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
   const [instructor, setInstructor] = useState(training.instructor || '');
   const [participants, setParticipants] = useState(training.participants || '');
   const [description, setDescription] = useState(training.description || '');
+  const [responsibleId, setResponsibleId] = useState(training.responsibleId || '');
 
+  const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
       setLoadingData(true);
-      const comps = await getCompanies();
+      const [comps, profs] = await Promise.all([
+        getCompanies(),
+        getProfiles()
+      ]);
       setCompanies(comps);
+      setProfiles(profs);
       setLoadingData(false);
     }
     load();
@@ -39,7 +45,8 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
       instructor: instructor.trim(),
       participants: parseInt(participants) || 0,
       description: description.trim(),
-      companyId: selectedCompanyId
+      companyId: selectedCompanyId,
+      responsibleId: responsibleId || null
     };
 
     await updateTraining(training.id, updatedData);
@@ -161,6 +168,24 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
                     className="modal-input"
                     min="0"
                   />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label className="modal-label" htmlFor="edit-responsible">Responsável (Técnico)</label>
+                  <select
+                    id="edit-responsible"
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

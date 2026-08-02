@@ -44,6 +44,7 @@ function mapDeliverable(row) {
     fileName: row.file_name,
     reason: row.reason,
     description: row.description,
+    responsibleId: row.responsible_id,
   };
 }
 
@@ -59,7 +60,9 @@ function mapTraining(row) {
     status: row.status,
     instructor: row.instructor,
     participants: row.participants,
-    description: row.description
+    description: row.description,
+    notes: row.notes,
+    responsibleId: row.responsible_id,
   };
 }
 
@@ -168,7 +171,9 @@ export async function addTraining(training) {
     status: training.status,
     instructor: training.instructor,
     participants: training.participants,
-    description: training.description
+    description: training.description,
+    notes: training.notes,
+    responsible_id: training.responsibleId || null,
   }]).select().single();
   if (error) { console.error('Error adding training:', error); return null; }
 
@@ -189,6 +194,8 @@ export async function updateTraining(trainingId, updates) {
   if (updates.time !== undefined) snakeUpdates.time = updates.time;
   if (updates.title !== undefined) snakeUpdates.title = updates.title;
   if (updates.companyId !== undefined) snakeUpdates.company_id = updates.companyId;
+  if (updates.notes !== undefined) snakeUpdates.notes = updates.notes;
+  if (updates.responsibleId !== undefined) snakeUpdates.responsible_id = updates.responsibleId;
 
   const { data, error } = await supabase.from('trainings').update(snakeUpdates).eq('id', trainingId).select().single();
   if (error) { console.error('Error updating training:', error); return null; }
@@ -323,7 +330,8 @@ export async function addDeliverable(deliverable) {
             delivered_date: deliverable.deliveredDate,
             file_name: deliverable.fileName,
             reason: deliverable.reason,
-            description: deliverable.description
+            description: deliverable.description,
+            responsible_id: deliverable.responsibleId || null,
           }]).select().single();
           
           if (error) console.error('Error adding deliverable to group company:', error);
@@ -349,7 +357,8 @@ export async function addDeliverable(deliverable) {
             delivered_date: deliverable.deliveredDate,
             file_name: deliverable.fileName,
             reason: deliverable.reason,
-            description: deliverable.description
+            description: deliverable.description,
+            responsible_id: deliverable.responsibleId || null,
          }]).select().single();
          createdDeliverable = data;
       }
@@ -369,7 +378,8 @@ export async function addDeliverable(deliverable) {
     delivered_date: deliverable.deliveredDate,
     file_name: deliverable.fileName,
     reason: deliverable.reason,
-    description: deliverable.description
+    description: deliverable.description,
+    responsible_id: deliverable.responsibleId || null,
   }]).select().single();
   if (error) { console.error('Error adding deliverable:', error); return null; }
   return mapDeliverable(data);
@@ -393,6 +403,7 @@ export async function updateDeliverable(deliverableId, updates) {
   if (updates.reason !== undefined) snakeUpdates.reason = updates.reason;
   if (updates.fileName !== undefined) snakeUpdates.file_name = updates.fileName;
   if (updates.deliveredDate !== undefined) snakeUpdates.delivered_date = updates.deliveredDate;
+  if (updates.responsibleId !== undefined) snakeUpdates.responsible_id = updates.responsibleId;
 
   const { data, error } = await supabase.from('deliverables').update(snakeUpdates).eq('id', deliverableId).select().single();
   if (error) { console.error('Error updating deliverable:', error); return null; }
@@ -487,4 +498,11 @@ export async function updateInventoryItem(itemId, updates) {
 export async function deleteInventoryItem(itemId) {
   const { error } = await supabase.from('inventory').delete().eq('id', itemId);
   if (error) console.error('Error deleting inventory item:', error);
+}
+
+// --- Profiles / Users ---
+export async function getProfiles() {
+  const { data, error } = await supabase.from('profiles').select('id, full_name, role').order('full_name', { ascending: true });
+  if (error) { console.error('Error fetching profiles:', error); return []; }
+  return data;
 }

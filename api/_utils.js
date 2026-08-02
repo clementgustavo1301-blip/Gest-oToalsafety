@@ -130,17 +130,18 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
     let detalhes = itemsToShow.map(d => {
       const nomeEmpresa = compMap[d.company_id] || 'Empresa Desconhecida';
       const dataFormatada = type === 'vencidos' || type === 'pendentes' 
-        ? (d.validity_date ? d.validity_date.split('-').reverse().join('/') : (d.due_date ? d.due_date.split('-').reverse().join('/') : 'Data indefinida'))
-        : (d.due_date ? d.due_date.split('-').reverse().join('/') : 'Data indefinida');
+        ? (d.validity_date ? d.validity_date.split('-').reverse().join('/') : (d.due_date ? d.due_date.split('-').reverse().join('/') : 'S/D'))
+        : (d.due_date ? d.due_date.split('-').reverse().join('/') : 'S/D');
       
-      return `- ${d.title || 'Documento'} na **${nomeEmpresa}** (Data: ${dataFormatada})`;
+      const icon = type === 'vencidos' ? '🚨' : (type === 'pendentes' ? '⏳' : '📌');
+      return `${icon} *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | Data: ${dataFormatada}`;
     }).join('\n');
 
-    if (!detalhes) detalhes = "Nenhum registro encontrado para este filtro.";
+    if (!detalhes) detalhes = "_Nenhum registro encontrado para este filtro._";
     if (isTruncated) detalhes += `\n\n_...e mais ${filtered.length - MAX_ITEMS} registros. Acesse o sistema para ver todos._`;
 
     let reportMessage = `📊 *${title}*\n\n`;
-    reportMessage += `Total de registros: ${filtered.length}\n\n`;
+    reportMessage += `Total de registros nesta categoria: ${filtered.length}\n\n`;
     reportMessage += `*Detalhes:*\n${detalhes}\n`;
 
     if (genAI) {
@@ -156,9 +157,10 @@ DADOS:
 DETALHES:
 ${detalhes}
 
-Crie uma mensagem profissional, direta e com emojis, apresentando esses dados. 
-Se houver registros, liste as empresas e os documentos afetados de forma organizada. 
-NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um título legal, ex: "📊 ${title}"). Formate em Markdown (*negrito*). Retorne apenas a mensagem final.`;
+Crie uma mensagem muito profissional, amigável e direta (com emojis). 
+Se houver registros vencidos, ENFATIZE A URGÊNCIA de regularização de forma educada.
+Agrupe ou liste as empresas e os documentos afetados de forma extremamente organizada e fácil de ler (em bullet points). 
+NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um título legal, ex: "📊 ${title}"). Formate em Markdown (*negrito*). Retorne apenas a mensagem final do Telegram.`;
         
         const result = await model.generateContent(prompt);
         const response = await result.response;

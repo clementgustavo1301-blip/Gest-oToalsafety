@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Edit3 } from 'lucide-react';
-import { getContractsByCompany } from '../services/storageService';
+import { getContractsByCompany, getProfiles } from '../services/storageService';
 
 const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const [title, setTitle] = useState(deliverable?.title || '');
@@ -11,8 +11,10 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const [validityDate, setValidityDate] = useState(deliverable?.validityDate || '');
   const [deliveredDate, setDeliveredDate] = useState(deliverable?.deliveredDate || '');
   const [status, setStatus] = useState(deliverable?.status || 'pendente');
+  const [responsibleId, setResponsibleId] = useState(deliverable?.responsibleId || '');
 
   const [contracts, setContracts] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -21,10 +23,16 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
       setLoadingData(true);
       // fallback if companyId isn't provided directly
       const compId = companyId || deliverable?.companyId || deliverable?.company_id;
-      if (compId) {
-        const ctrs = await getContractsByCompany(compId);
-        setContracts(ctrs);
-      }
+      const [profs] = await Promise.all([
+        getProfiles(),
+        (async () => {
+          if (compId) {
+            const ctrs = await getContractsByCompany(compId);
+            setContracts(ctrs);
+          }
+        })()
+      ]);
+      setProfiles(profs);
       setLoadingData(false);
     }
     load();
@@ -43,6 +51,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
       dueDate: dueDate || null,
       validityDate: validityDate || null,
       deliveredDate: deliveredDate || null,
+      responsibleId: responsibleId || null,
       status
     });
     setSaving(false);
@@ -197,6 +206,24 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                   </div>
                 </div>
               )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginTop: type !== 'treinamento' ? '0' : '1rem' }}>
+                <div>
+                  <label className="modal-label" htmlFor="dlv-responsible">Responsável (Técnico)</label>
+                  <select
+                    id="dlv-responsible"
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
             </div>
 

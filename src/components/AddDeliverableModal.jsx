@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
-import { getContractsByCompany } from '../services/storageService';
+import { getContractsByCompany, getProfiles } from '../services/storageService';
 
 const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
   const [title, setTitle] = useState('');
@@ -10,6 +10,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
   const [dueDate, setDueDate] = useState('');
   const [validityDate, setValidityDate] = useState('');
   const [deliveredDate, setDeliveredDate] = useState('');
+  const [responsibleId, setResponsibleId] = useState('');
   const [file, setFile] = useState(null);
 
   const [recurrence, setRecurrence] = useState('none');
@@ -17,14 +18,19 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
   const [repeatCount, setRepeatCount] = useState(4);
 
   const [contracts, setContracts] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
       setLoadingData(true);
-      const ctrs = await getContractsByCompany(companyId);
+      const [ctrs, profs] = await Promise.all([
+        getContractsByCompany(companyId),
+        getProfiles()
+      ]);
       setContracts(ctrs);
+      setProfiles(profs);
       setLoadingData(false);
     }
     load();
@@ -44,6 +50,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
       validityDate: validityDate || null,
       status: file ? 'entregue' : 'pendente',
       deliveredDate: deliveredDate || (file ? new Date().toISOString() : null),
+      responsibleId: responsibleId || null,
       fileName: null,
       file: file
     };
@@ -212,6 +219,24 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                     />
                   </div>
                 )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label className="modal-label" htmlFor="dlv-responsible">Responsável (Técnico)</label>
+                  <select
+                    id="dlv-responsible"
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
