@@ -343,55 +343,20 @@ export async function sendFullSystemDigest() {
     }).join('\n');
     if (!detalhesAtrasadosA) detalhesAtrasadosA = "_Nenhum._";
 
-    // --- ENTREGÁVEIS (Programas, Laudos) ---
-    const vencidosEnt = deliverables.filter(d => {
-      if (!d.validity_date) return false;
-      const vDate = new Date(d.validity_date + 'T00:00:00');
-      return vDate < startOfToday;
-    });
-
-    const pendentesEnt = deliverables.filter(d => d.status === 'pendente');
-
-    const proximosVencerEnt = deliverables.filter(d => {
-      if (!d.validity_date) return false;
-      const vDate = new Date(d.validity_date + 'T00:00:00');
-      const daysUntilDue = Math.ceil((vDate - now) / (1000 * 60 * 60 * 24));
-      return daysUntilDue >= 0 && daysUntilDue <= 15;
-    });
-
-    let detalhesVencidosE = vencidosEnt.map(d => {
-      const nomeEmpresa = compMap[d.company_id] || 'Empresa Desconhecida';
-      const dataFormatada = d.validity_date ? d.validity_date.split('-').reverse().join('/') : 'S/D';
-      return `🚨 *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | Venceu: ${dataFormatada}`;
-    }).join('\n');
-    if (!detalhesVencidosE) detalhesVencidosE = "_Nenhum._";
-
-    let detalhesProximosE = proximosVencerEnt.map(d => {
-      const nomeEmpresa = compMap[d.company_id] || 'Empresa Desconhecida';
-      const dataFormatada = d.validity_date ? d.validity_date.split('-').reverse().join('/') : 'S/D';
-      return `⚠️ *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | Vence: ${dataFormatada}`;
-    }).join('\n');
-    if (!detalhesProximosE) detalhesProximosE = "_Nenhum._";
-
-    let reportMessage = `📊 *Resumo Diário do Sistema*\n\n`;
-    reportMessage += `*--- AGENDAMENTOS ---*\n`;
+    let reportMessage = `📊 *Resumo Diário de Agendamentos*\n\n`;
+    reportMessage += `*--- PANORAMA GERAL ---*\n`;
     reportMessage += `Total: ${totalAgendamentos} | Executados: ${executados.length}\n`;
     reportMessage += `🚨 Atrasados:\n${detalhesAtrasadosA}\n`;
     reportMessage += `📅 Próximos 9 Dias:\n${detalhesProximosA}\n\n`;
-    
-    reportMessage += `*--- ENTREGÁVEIS (Documentos/Programas) ---*\n`;
-    reportMessage += `🚨 Vencidos (${vencidosEnt.length}):\n${detalhesVencidosE}\n`;
-    reportMessage += `⏳ Próximos a Vencer (<= 15 dias) (${proximosVencerEnt.length}):\n${detalhesProximosE}\n`;
 
     if (genAI) {
       console.log('🧠 Melhorando Resumo Diário Completo com IA...');
       try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
-Gere o Resumo Diário Completo do Sistema. Este é um panorama geral para os diretores.
+Gere o Resumo Diário de Agendamentos. Este é um panorama geral detalhado.
 
 DADOS RELEVANTES:
--- AGENDAMENTOS --
 - Total (histórico): ${totalAgendamentos}
 - Executados: ${executados.length}
 - Atrasados/Sem Resposta:
@@ -399,18 +364,10 @@ ${detalhesAtrasadosA}
 - Próximos 9 dias:
 ${detalhesProximosA}
 
--- ENTREGÁVEIS (Laudos e Programas) --
-- Documentos já Vencidos:
-${detalhesVencidosE}
-- Documentos Próximos a Vencer (<= 15 dias):
-${detalhesProximosE}
-- Documentos Pendentes (Total): ${pendentesEnt.length}
-
 INSTRUÇÕES:
 Crie uma mensagem executiva, altamente organizada (bullet points, emojis) e de fácil leitura.
-Comece com "📊 Resumo Diário do Sistema". Não use "Olá" ou saudações, vá direto ao ponto.
-Divida claramente as seções de "Agendamentos" e "Documentos/Laudos".
-Destaque o que é URGENTE (atrasados e vencidos).
+Comece com "📊 Resumo Diário de Agendamentos". Não use "Olá" ou saudações, vá direto ao ponto.
+Destaque o que é URGENTE (atrasados).
 NÃO invente dados. Formate em Markdown (*negrito*). Retorne APENAS o texto da mensagem do Telegram.`;
         
         const result = await model.generateContent(prompt);
