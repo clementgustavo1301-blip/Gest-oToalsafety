@@ -284,3 +284,148 @@ Retorne apenas a mensagem final do Telegram.`;
     console.error('Erro geral ao gerar relatório de agendamentos:', err.message);
   }
 }
+
+export async function sendFullSystemDigest() {
+  console.log('\n📊 Iniciando geração do Resumo Diário Completo do Sistema (Automação)...');
+  
+  try {
+    if (!supabase) throw new Error("Supabase cliente não inicializado");
+    
+    // 1. Fetch data
+    const { data: trainings, error: errT } = await supabase.from('trainings').select('*');
+    const { data: deliverables, error: errD } = await supabase.from('deliverables').select('*');
+    const { data: companiesData } = await supabase.from('companies').select('id, name');
+    
+    if (errT || errD) {
+      console.error('Erro ao buscar dados para o digest:', errT?.message || errD?.message);
+      return;
+    }
+
+    const compMap = {};
+    if (companiesData) companiesData.forEach(c => compMap[c.id] = c.name);
+
+    const now = new Date();
+    const startOfToday = startOfDay(now);
+    const endOfNext9Days = endOfDay(addDays(now, 9));
+
+    // --- AGENDAMENTOS ---
+    const totalAgendamentos = trainings.length;
+    const executados = trainings.filter(t => t.status === 'concluido' || t.status === 'entregue' || t.status === 'feito');
+    
+    const proximos9Dias = trainings.filter(t => {
+      if (t.status !== 'agendado' && t.status !== 'pendente') return false;
+      const tDate = t.date ? parseISO(t.date) : null;
+      if (!tDate) return false;
+      return isWithinInterval(tDate, { start: startOfToday, end: endOfNext9Days });
+    });
+    proximos9Dias.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const atrasadosPendentes = trainings.filter(t => {
+      if (t.status !== 'agendado' && t.status !== 'pendente') return false;
+      const tDate = t.date ? parseISO(t.date) : null;
+      if (!tDate) return false;
+      return parseISO(t.date) < startOfToday;
+    });
+    atrasadosPendentes.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let detalhesProximosA = proximos9Dias.map(t => {
+      const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
+      const quem = t.instructor || t.participants || 'N/A';
+      const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
+      return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} | 👤 ${quem})`;
+    }).join('\n');
+    if (!detalhesProximosA) detalhesProximosA = "_Nenhum._";
+
+    let detalhesAtrasadosA = atrasadosPendentes.map(t => {
+      const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
+      const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
+      return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada})`;
+    }).join('\n');
+    if (!detalhesAtrasadosA) detalhesAtrasadosA = "_Nenhum._";
+
+    // --- ENTREGÁVEIS (Programas, Laudos) ---
+    const vencidosEnt = deliverables.filter(d => {
+      if (!d.validity_date) return false;
+      const vDate = new Date(d.validity_date + 'T00:00:00');
+      return vDate < startOfToday;
+    });
+
+    const pendentesEnt = deliverables.filter(d => d.status === 'pendente');
+
+    const proximosVencerEnt = deliverables.filter(d => {
+      if (!d.validity_date) return false;
+      const vDate = new Date(d.validity_date + 'T00:00:00');
+      const daysUntilDue = Math.ceil((vDate - now) / (1000 * 60 * 60 * 24));
+      return daysUntilDue >= 0 && daysUntilDue <= 15;
+    });
+
+    let detalhesVencidosE = vencidosEnt.map(d => {
+      const nomeEmpresa = compMap[d.company_id] || 'Empresa Desconhecida';
+      const dataFormatada = d.validity_date ? d.validity_date.split('-').reverse().join('/') : 'S/D';
+      return `🚨 *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | Venceu: ${dataFormatada}`;
+    }).join('\n');
+    if (!detalhesVencidosE) detalhesVencidosE = "_Nenhum._";
+
+    let detalhesProximosE = proximosVencerEnt.map(d => {
+      const nomeEmpresa = compMap[d.company_id] || 'Empresa Desconhecida';
+      const dataFormatada = d.validity_date ? d.validity_date.split('-').reverse().join('/') : 'S/D';
+      return `⚠️ *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | Vence: ${dataFormatada}`;
+    }).join('\n');
+    if (!detalhesProximosE) detalhesProximosE = "_Nenhum._";
+
+    let reportMessage = `📊 *Resumo Diário do Sistema*\n\n`;
+    reportMessage += `*--- AGENDAMENTOS ---*\n`;
+    reportMessage += `Total: ${totalAgendamentos} | Executados: ${executados.length}\n`;
+    reportMessage += `🚨 Atrasados:\n${detalhesAtrasadosA}\n`;
+    reportMessage += `📅 Próximos 9 Dias:\n${detalhesProximosA}\n\n`;
+    
+    reportMessage += `*--- ENTREGÁVEIS (Documentos/Programas) ---*\n`;
+    reportMessage += `🚨 Vencidos (${vencidosEnt.length}):\n${detalhesVencidosE}\n`;
+    reportMessage += `⏳ Próximos a Vencer (<= 15 dias) (${proximosVencerEnt.length}):\n${detalhesProximosE}\n`;
+
+    if (genAI) {
+      console.log('🧠 Melhorando Resumo Diário Completo com IA...');
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
+Gere o Resumo Diário Completo do Sistema. Este é um panorama geral para os diretores.
+
+DADOS RELEVANTES:
+-- AGENDAMENTOS --
+- Total (histórico): ${totalAgendamentos}
+- Executados: ${executados.length}
+- Atrasados/Sem Resposta:
+${detalhesAtrasadosA}
+- Próximos 9 dias:
+${detalhesProximosA}
+
+-- ENTREGÁVEIS (Laudos e Programas) --
+- Documentos já Vencidos:
+${detalhesVencidosE}
+- Documentos Próximos a Vencer (<= 15 dias):
+${detalhesProximosE}
+- Documentos Pendentes (Total): ${pendentesEnt.length}
+
+INSTRUÇÕES:
+Crie uma mensagem executiva, altamente organizada (bullet points, emojis) e de fácil leitura.
+Comece com "📊 Resumo Diário do Sistema". Não use "Olá" ou saudações, vá direto ao ponto.
+Divida claramente as seções de "Agendamentos" e "Documentos/Laudos".
+Destaque o que é URGENTE (atrasados e vencidos).
+NÃO invente dados. Formate em Markdown (*negrito*). Retorne APENAS o texto da mensagem do Telegram.`;
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        reportMessage = response.text();
+      } catch (aiError) {
+        console.error('Erro na IA do relatório completo:', aiError.message);
+      }
+    }
+
+    console.log('✈️ Enviando Resumo Diário Completo (Automação)...');
+    await sendTelegramMessage(reportMessage, { replyChatId: null });
+
+  } catch (err) {
+    console.error('Erro geral ao gerar Resumo Diário Completo:', err.message);
+  }
+}
+
