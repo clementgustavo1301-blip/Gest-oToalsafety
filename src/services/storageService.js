@@ -61,7 +61,6 @@ function mapTraining(row) {
     instructor: row.instructor,
     participants: row.participants,
     description: row.description,
-    notes: row.notes,
     responsibleId: row.responsible_id,
   };
 }
@@ -172,7 +171,6 @@ export async function addTraining(training) {
     instructor: training.instructor,
     participants: training.participants,
     description: training.description,
-    notes: training.notes,
     responsible_id: training.responsibleId || null,
   }]).select().single();
   if (error) { console.error('Error adding training:', error); return null; }
@@ -194,7 +192,6 @@ export async function updateTraining(trainingId, updates) {
   if (updates.time !== undefined) snakeUpdates.time = updates.time;
   if (updates.title !== undefined) snakeUpdates.title = updates.title;
   if (updates.companyId !== undefined) snakeUpdates.company_id = updates.companyId;
-  if (updates.notes !== undefined) snakeUpdates.notes = updates.notes;
   if (updates.responsibleId !== undefined) snakeUpdates.responsible_id = updates.responsibleId;
 
   const { data, error } = await supabase.from('trainings').update(snakeUpdates).eq('id', trainingId).select().single();
