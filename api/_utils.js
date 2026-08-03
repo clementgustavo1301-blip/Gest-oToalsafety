@@ -115,11 +115,10 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
     } else if (type === 'proximos') {
       title = '🚨 Próximos a Vencer';
       filtered = deliverables.filter(d => {
-        if (d.status === 'entregue' || d.status === 'feito' || d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
-        if (!d.due_date) return false;
-        const dDate = new Date(d.due_date + 'T00:00:00');
-        const daysUntilDue = Math.ceil((dDate - today) / (1000 * 60 * 60 * 24));
-        return daysUntilDue >= 0 && daysUntilDue <= 31;
+        if (!d.validity_date) return false;
+        const vDate = new Date(d.validity_date + 'T00:00:00');
+        const daysUntilDue = Math.ceil((vDate - today) / (1000 * 60 * 60 * 24));
+        return daysUntilDue >= 0 && daysUntilDue <= 15;
       });
     }
 
