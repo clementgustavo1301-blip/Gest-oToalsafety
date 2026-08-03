@@ -143,8 +143,18 @@ export async function updateCompany(companyId, updates) {
 }
 
 export async function deleteCompany(companyId) {
+  await supabase.from('trainings').delete().eq('company_id', companyId);
+  await supabase.from('deliverables').delete().eq('company_id', companyId);
+  await supabase.from('contracts').delete().eq('company_id', companyId);
+  await supabase.from('company_convocations').delete().eq('company_id', companyId);
+
   const { error } = await supabase.from('companies').delete().eq('id', companyId);
-  if (error) console.error('Error deleting company:', error);
+  if (error) {
+    console.error('Error deleting company:', error);
+    alert(`Erro ao excluir empresa: ${error.message}`);
+    return false;
+  }
+  return true;
 }
 
 // --- Trainings ---
