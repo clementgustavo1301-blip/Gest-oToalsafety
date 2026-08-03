@@ -155,7 +155,6 @@ const SettingsPage = () => {
                       O e-mail está vinculado à sua conta Supabase e não pode ser alterado aqui.
                     </small>
                   </div>
-                </div>
               </div>
             )}
 
