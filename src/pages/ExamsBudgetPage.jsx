@@ -1,32 +1,132 @@
 import React, { useState } from 'react';
 import { 
   Stethoscope, Search, Plus, Trash2, Copy, Check, MessageSquare, 
-  RefreshCw, DollarSign, Calculator, FileText, Percent, Tag, ChevronRight, AlertCircle
+  RefreshCw, DollarSign, Calculator, FileText, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const DEFAULT_EXAMS = [
-  { id: '1', name: 'ASO - Atestado de Saúde Ocupacional', category: 'Ocupacional', price: 45.00 },
-  { id: '2', name: 'Audiometria Tonal e Vocal', category: 'Auditivo', price: 35.00 },
-  { id: '3', name: 'ECG - Eletrocardiograma', category: 'Cardiológico', price: 50.00 },
-  { id: '4', name: 'EEG - Eletroencefalograma', category: 'Neurológico', price: 75.00 },
-  { id: '5', name: 'Espirometria (Prova de Função Pulmonar)', category: 'Respiratório', price: 65.00 },
-  { id: '6', name: 'Acuidade Visual', category: 'Ocupacional', price: 25.00 },
-  { id: '7', name: 'Raio-X de Tórax (PA)', category: 'Radiologia', price: 60.00 },
-  { id: '8', name: 'Raio-X de Tórax (OIT)', category: 'Radiologia', price: 85.00 },
-  { id: '9', name: 'Hemograma Completo', category: 'Laboratorial', price: 20.00 },
-  { id: '10', name: 'Glicemia em Jejum', category: 'Laboratorial', price: 15.00 },
-  { id: '11', name: 'Exame Toxicológico (CAGED / CNH)', category: 'Toxicológico', price: 130.00 },
-  { id: '12', name: 'Avaliação Psicossocial', category: 'Psicológico', price: 90.00 },
-  { id: '13', name: 'Sumário de Urina (EAS)', category: 'Laboratorial', price: 18.00 },
-  { id: '14', name: 'EPF - Parasitológico de Fezes', category: 'Laboratorial', price: 15.00 },
-  { id: '15', name: 'Coprocultura', category: 'Laboratorial', price: 30.00 },
-  { id: '16', name: 'VDRL (Sífilis)', category: 'Laboratorial', price: 18.00 },
-  { id: '17', name: 'Tipagem Sanguínea + Fator Rh', category: 'Laboratorial', price: 22.00 },
-  { id: '18', name: 'Gama GT / TGO / TGP', category: 'Laboratorial', price: 35.00 },
+// Exames transcritos fielmente da Tabela Oficial ECOCLINIC (Anexo I - Tabela de Valores de Procedimentos)
+const ECOCLINIC_EXAMS = [
+  // CONSULTAS E PROCEDIMENTOS OCUPACIONAIS
+  { id: '1', name: 'ASO – Atestado de Saúde Ocupacional', category: 'Ocupacional', price: 40.00 },
+  { id: '2', name: 'Consulta Ocupacional PCD', category: 'Ocupacional', price: 69.00 },
+  { id: '3', name: 'Homologação de PCD', category: 'Ocupacional', price: 69.00 },
+  { id: '4', name: 'Questionário de Saúde', category: 'Ocupacional', price: 29.00 },
+  { id: '5', name: 'Questionário de Epilepsia', category: 'Ocupacional', price: 35.00 },
+  { id: '6', name: 'Anamnese do Sono / Questionário Epworth', category: 'Ocupacional', price: 28.00 },
+
+  // EXAMES COMPLEMENTARES / AUDIÇÃO E VISÃO
+  { id: '7', name: 'Audiometria (Tonal e Vocal)', category: 'Auditivo', price: 45.00 },
+  { id: '8', name: 'Acuidade Visual / Discriminação de Cores', category: 'Visão', price: 35.00 },
+  { id: '9', name: 'Teste de Ishihara', category: 'Visão', price: 0.00 }, // Incluso
+
+  // EXAMES CARDIOLÓGICOS, NEUROLÓGICOS E RESPIRATÓRIOS
+  { id: '10', name: 'Eletrocardiograma (ECG)', category: 'Cardiológico', price: 45.00 },
+  { id: '11', name: 'Eletroencefalograma (EEG)', category: 'Neurológico', price: 80.00 },
+  { id: '12', name: 'Espirometria', category: 'Respiratório', price: 60.00 },
+  { id: '13', name: 'Avaliação Psicossocial (Teste Palográfico)', category: 'Psicológico', price: 105.00 },
+
+  // RADIOLOGIA E ULTRASSONOGRAFIA
+  { id: '14', name: 'Raio X de Tórax (OIT)', category: 'Radiologia', price: 69.00 },
+  { id: '15', name: 'Ultrassonografia de Abdômen', category: 'Imagem', price: 45.00 },
+
+  // TOXICOLOGIA E BIOMONITORIZAÇÃO URINÁRIA / SANGUÍNEA
+  { id: '16', name: 'Toxicologia (Drogas Urinárias)', category: 'Toxicologia', price: 150.00 },
+  { id: '17', name: 'Acetona Urinária', category: 'Toxicologia', price: 30.00 },
+  { id: '18', name: 'Ácido Butoxiacético na Urina', category: 'Toxicologia', price: 28.00 },
+  { id: '19', name: 'Ácido Delta Amino Levulínico Urinário (ALA-U)', category: 'Toxicologia', price: 25.00 },
+  { id: '20', name: 'Ácido Hipúrico (para Tolueno)', category: 'Toxicologia', price: 23.00 },
+  { id: '21', name: 'Ácido Mandélico (para Estireno)', category: 'Toxicologia', price: 28.00 },
+  { id: '22', name: 'Ácido Metil-Hipúrico (para Xilenos)', category: 'Toxicologia', price: 23.00 },
+  { id: '23', name: 'Ácido Trans,Trans-Mucônico Urinário', category: 'Toxicologia', price: 48.00 },
+  { id: '24', name: 'Anti-HVA (Metabólito da N-Hexano)', category: 'Toxicologia', price: 31.00 },
+  { id: '25', name: 'Arsênio', category: 'Toxicologia', price: 49.00 },
+  { id: '26', name: 'Carboxi-hemoglobina', category: 'Toxicologia', price: 26.00 },
+  { id: '27', name: 'Chumbo no Sangue', category: 'Toxicologia', price: 31.00 },
+  { id: '28', name: 'Chumbo Urinário', category: 'Toxicologia', price: 29.00 },
+  { id: '29', name: 'Cobre no Sangue', category: 'Toxicologia', price: 39.00 },
+  { id: '30', name: 'Cobre Urinário', category: 'Toxicologia', price: 33.00 },
+  { id: '31', name: 'Colinesterase Plasmática', category: 'Toxicologia', price: 11.00 },
+  { id: '32', name: 'Acetilcolinesterase Eritrocitária', category: 'Toxicologia', price: 15.00 },
+  { id: '33', name: 'Cromo Urinário', category: 'Toxicologia', price: 42.00 },
+  { id: '34', name: 'Dosagem de Cádmio na Urina', category: 'Toxicologia', price: 34.00 },
+  { id: '35', name: 'Dosagem de Magnésio na Urina', category: 'Toxicologia', price: 18.00 },
+  { id: '36', name: 'Dosagem de Manganês (Sérico e Urinário)', category: 'Toxicologia', price: 44.00 },
+  { id: '37', name: 'Dosagem de Mercúrio na Urina', category: 'Toxicologia', price: 39.00 },
+  { id: '38', name: 'Estanho Urinário', category: 'Toxicologia', price: 127.00 },
+  { id: '39', name: 'Fenol Urinário', category: 'Toxicologia', price: 24.00 },
+  { id: '40', name: 'Fluoreto Urinário', category: 'Toxicologia', price: 24.00 },
+  { id: '41', name: 'Hexanodiona Urinária', category: 'Toxicologia', price: 77.00 },
+  { id: '42', name: 'Metanol na Urina', category: 'Toxicologia', price: 28.00 },
+  { id: '43', name: 'Metil-Etil-Cetona', category: 'Toxicologia', price: 25.00 },
+  { id: '44', name: 'Orto-Cresol na Urina', category: 'Toxicologia', price: 207.00 },
+  { id: '45', name: 'Triclorocompostos Totais Urinários', category: 'Toxicologia', price: 7.00 },
+  { id: '46', name: 'Zinco Sérico', category: 'Toxicologia', price: 24.00 },
+
+  // EXAMES LABORATORIAIS / BIOQUÍMICA / HEMATOLOGIA
+  { id: '47', name: 'Hemograma Completo', category: 'Laboratorial', price: 14.00 },
+  { id: '48', name: 'Hemoglobina', category: 'Laboratorial', price: 28.00 },
+  { id: '49', name: 'Glicemia (Jejum/Pós-Dextrosol)', category: 'Laboratorial', price: 10.00 },
+  { id: '50', name: 'Hemoglobina Glicada (Glicosilada)', category: 'Laboratorial', price: 27.00 },
+  { id: '51', name: 'Grupo Sanguíneo ABO e RH', category: 'Laboratorial', price: 10.00 },
+  { id: '52', name: 'Colesterol Total e Frações (Lipidograma)', category: 'Laboratorial', price: 39.00 },
+  { id: '53', name: 'Triglicerídeos', category: 'Laboratorial', price: 25.00 },
+  { id: '54', name: 'Creatinina (Sérica)', category: 'Laboratorial', price: 7.00 },
+  { id: '55', name: 'Creatina', category: 'Laboratorial', price: 57.00 },
+  { id: '56', name: 'Ureia (Sérica)', category: 'Laboratorial', price: 11.00 },
+  { id: '57', name: 'Ácido Úrico', category: 'Laboratorial', price: 13.00 },
+  { id: '58', name: 'TGO (AST)', category: 'Laboratorial', price: 9.00 },
+  { id: '59', name: 'TGP (ALT)', category: 'Laboratorial', price: 9.00 },
+  { id: '60', name: 'Gama-Glutamil Transferase (GGT)', category: 'Laboratorial', price: 10.00 },
+  { id: '61', name: 'Fosfatase Alcalina', category: 'Laboratorial', price: 10.00 },
+  { id: '62', name: 'Albumina', category: 'Laboratorial', price: 23.00 },
+  { id: '63', name: 'Bilirrubinas Total e Frações', category: 'Laboratorial', price: 12.00 },
+  { id: '64', name: 'Cálcio', category: 'Laboratorial', price: 12.00 },
+  { id: '65', name: 'Coagulograma', category: 'Laboratorial', price: 18.00 },
+  { id: '66', name: 'Contagem de Plaquetas', category: 'Laboratorial', price: 10.00 },
+  { id: '67', name: 'Determinação de VHS', category: 'Laboratorial', price: 11.00 },
+  { id: '68', name: 'Ferritina', category: 'Laboratorial', price: 28.00 },
+  { id: '69', name: 'Ferro Sérico', category: 'Laboratorial', price: 9.00 },
+  { id: '70', name: 'Dosagem de Potássio', category: 'Laboratorial', price: 9.00 },
+  { id: '71', name: 'Sódio', category: 'Laboratorial', price: 11.00 },
+  { id: '72', name: 'Proteína C Reativa (PCR)', category: 'Laboratorial', price: 21.00 },
+  { id: '73', name: 'PSA Total e Frações', category: 'Laboratorial', price: 60.00 },
+  { id: '74', name: 'T3 Total', category: 'Laboratorial', price: 17.00 },
+  { id: '75', name: 'T4 Livre', category: 'Laboratorial', price: 22.00 },
+  { id: '76', name: 'Beta HCG', category: 'Laboratorial', price: 21.00 },
+  { id: '77', name: 'Mucoproteínas', category: 'Laboratorial', price: 15.00 },
+  { id: '78', name: 'Reticulócitos', category: 'Laboratorial', price: 11.00 },
+
+  // URINA, FEZES E PARASITOLOGIA / MICROBIOLOGIA
+  { id: '79', name: 'Sumário de Urina (EAS/Urina Rotina)', category: 'Urina/Fezes', price: 9.00 },
+  { id: '80', name: 'Urocultura', category: 'Urina/Fezes', price: 40.00 },
+  { id: '81', name: 'Exame Parasitológico de Fezes (EPF)', category: 'Urina/Fezes', price: 12.00 },
+  { id: '82', name: 'Coprocultura', category: 'Urina/Fezes', price: 35.00 },
+  { id: '83', name: 'Pesquisa de Sangue Oculto nas Fezes', category: 'Urina/Fezes', price: 22.00 },
+  { id: '84', name: 'Pesquisa de BAAR no Escarro', category: 'Microbiologia', price: 23.00 },
+  { id: '85', name: 'Micológico de Unhas', category: 'Microbiologia', price: 22.00 },
+
+  // SOROLOGIA E IMUNOLOGIA
+  { id: '86', name: 'Sífilis (VDRL)', category: 'Sorologia', price: 9.00 },
+  { id: '87', name: 'HBsAg (Hepatite B)', category: 'Sorologia', price: 27.00 },
+  { id: '88', name: 'Anti-HBs (Sorologia para Hepatite B)', category: 'Sorologia', price: 25.00 },
+  { id: '89', name: 'Anti-HBc Total', category: 'Sorologia', price: 25.00 },
+  { id: '90', name: 'Sorologia para Hepatite B (Anti-HBc IgM)', category: 'Sorologia', price: 39.00 },
+  { id: '91', name: 'Anti-HCV (Hepatite C)', category: 'Sorologia', price: 38.00 },
+  { id: '92', name: 'Hepatite C - Anti-HCV IgM', category: 'Sorologia', price: 40.00 },
+  { id: '93', name: 'Anti-HAV IgG', category: 'Sorologia', price: 30.00 },
+  { id: '94', name: 'Anti-HAV IgM', category: 'Sorologia', price: 30.00 },
+  { id: '95', name: 'Chagas (Machado Guerreiro)', category: 'Sorologia', price: 33.00 },
+  { id: '96', name: 'COVID-19 - Testes', category: 'Sorologia', price: 58.00 },
+  { id: '97', name: 'IgE Específica (Abelhas/Vespas/Marimbondo)', category: 'Imunologia', price: 45.00 },
+  { id: '98', name: 'IgE Total', category: 'Imunologia', price: 22.00 },
 ];
 
-const CATEGORIES = ['Todos', 'Ocupacional', 'Auditivo', 'Cardiológico', 'Neurológico', 'Respiratório', 'Radiologia', 'Laboratorial', 'Toxicológico', 'Psicológico'];
+const CATEGORIES = [
+  'Todos', 'Ocupacional', 'Auditivo', 'Visão', 'Cardiológico', 'Neurológico', 
+  'Respiratório', 'Psicológico', 'Radiologia', 'Imagem', 'Toxicologia', 
+  'Laboratorial', 'Urina/Fezes', 'Microbiologia', 'Sorologia', 'Imunologia'
+];
 
 const ExamsBudgetPage = () => {
   const { activeLink } = useAuth();
@@ -35,14 +135,14 @@ const ExamsBudgetPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [selectedExams, setSelectedExams] = useState([
-    { id: '1', name: 'ASO - Atestado de Saúde Ocupacional', category: 'Ocupacional', price: 45.00, qty: 1 },
-    { id: '2', name: 'Audiometria Tonal e Vocal', category: 'Auditivo', price: 35.00, qty: 1 }
+    { id: '1', name: 'ASO – Atestado de Saúde Ocupacional', category: 'Ocupacional', price: 40.00, qty: 1 },
+    { id: '7', name: 'Audiometria (Tonal e Vocal)', category: 'Auditivo', price: 45.00, qty: 1 }
   ]);
 
   // Discount & Payment terms state
   const [discountType, setDiscountType] = useState('none'); // 'none', 'fixed', 'percent'
   const [discountValue, setDiscountValue] = useState(0);
-  const [paymentTerms, setPaymentTerms] = useState('À vista ou faturamento em até 15 dias.');
+  const [paymentTerms, setPaymentTerms] = useState('À vista ou faturamento faturado.');
   const [observations, setObservations] = useState('');
 
   // Custom exam creation modal/inputs
@@ -55,7 +155,7 @@ const ExamsBudgetPage = () => {
   const [copied, setCopied] = useState(false);
 
   // Filter exams from catalog
-  const filteredCatalog = DEFAULT_EXAMS.filter(exam => {
+  const filteredCatalog = ECOCLINIC_EXAMS.filter(exam => {
     const matchesSearch = exam.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todos' || exam.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -145,8 +245,8 @@ const ExamsBudgetPage = () => {
       return 'Nenhum exame selecionado ainda.';
     }
 
-    let text = `🏥 *ORÇAMENTO DE EXAMES OCUPACIONAIS*\n`;
-    text += `*TotalSafety - Gestão Integrada*\n\n`;
+    let text = `🏥 *ORÇAMENTO DE EXAMES - ECOCLINIC*\n`;
+    text += `*Medicina do Trabalho*\n\n`;
     text += `📋 *EXAMES SELECIONADOS:*\n`;
 
     selectedExams.forEach((item, index) => {
@@ -173,8 +273,8 @@ const ExamsBudgetPage = () => {
       text += `📝 *Observações:* ${observations.trim()}\n`;
     }
 
-    text += `\n📍 *Endereço:* Atendimento na nossa clínica ou in company.\n`;
-    text += `📞 Entre em contato para confirmação de agendamento!`;
+    text += `\n📍 *Ecoclinic Medicina do Trabalho*\n`;
+    text += `📞 Entre em contato para confirmação e agendamento dos exames!`;
 
     return text;
   };
@@ -209,7 +309,7 @@ const ExamsBudgetPage = () => {
               backgroundColor: 'var(--primary-light)', color: 'var(--primary)', 
               padding: '0.25rem 0.625rem', borderRadius: '1rem', fontSize: '0.75rem', fontWeight: '600' 
             }}>
-              Vínculo Clínica
+              Tabela Oficial Ecoclinic ({ECOCLINIC_EXAMS.length} Exames)
             </span>
           </div>
           <h1 className="text-h1" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
@@ -217,7 +317,7 @@ const ExamsBudgetPage = () => {
             Orçamento de Exames Ocupacionais
           </h1>
           <p className="text-subtitle">
-            Selecione os exames, ajuste quantidades e valores para gerar o orçamento pronto para envio.
+            Selecione os exames da tabela oficial Ecoclinic, ajuste quantidades e valores para gerar o orçamento de envio.
           </p>
         </div>
 
@@ -247,16 +347,21 @@ const ExamsBudgetPage = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
           <div className="card" style={{ padding: '1.25rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Search size={18} color="var(--primary)" />Catálogo de Exames
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Search size={18} color="var(--primary)" />Tabela de Exames
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {filteredCatalog.length} de {ECOCLINIC_EXAMS.length}
+              </span>
+            </div>
 
             {/* Search Bar */}
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
               <input
                 type="text"
                 className="modal-input"
-                placeholder="Buscar exame (ex: ASO, ECG, Audiometria)..."
+                placeholder="Buscar por nome do exame (ex: ASO, Orto-Cresol, Acid. Hipúrico)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ paddingLeft: '2.5rem' }}
@@ -290,7 +395,7 @@ const ExamsBudgetPage = () => {
             </div>
 
             {/* Exam Items List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '480px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '520px', overflowY: 'auto', paddingRight: '0.25rem' }}>
               {filteredCatalog.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                   Nenhum exame encontrado.
@@ -304,7 +409,7 @@ const ExamsBudgetPage = () => {
                     <div 
                       key={exam.id}
                       style={{
-                        padding: '0.75rem 1rem',
+                        padding: '0.625rem 0.875rem',
                         borderRadius: 'var(--radius-md)',
                         border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
                         backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--surface)',
@@ -316,15 +421,15 @@ const ExamsBudgetPage = () => {
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {exam.name}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.125rem' }}>
                           <span style={{ fontSize: '0.6875rem', padding: '0.125rem 0.375rem', borderRadius: '4px', backgroundColor: 'var(--background)', color: 'var(--text-secondary)', fontWeight: '500' }}>
                             {exam.category}
                           </span>
-                          <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--primary)' }}>
-                            {formatBRL(exam.price)}
+                          <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--primary)' }}>
+                            {exam.price === 0 ? 'R$ 0,00 (Incluso)' : formatBRL(exam.price)}
                           </span>
                         </div>
                       </div>
@@ -332,7 +437,7 @@ const ExamsBudgetPage = () => {
                       <button
                         className={isSelected ? "btn btn-secondary" : "btn btn-primary"}
                         onClick={() => handleAddExam(exam)}
-                        style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}
+                        style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}
                       >
                         {isSelected ? (
                           <>
@@ -375,10 +480,10 @@ const ExamsBudgetPage = () => {
               <div style={{ textAlign: 'center', padding: '2rem 1rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                 <AlertCircle size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
                 <p>Nenhum exame selecionado.</p>
-                <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Clique no botão "Incluir" no catálogo para adicionar.</p>
+                <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Clique no botão "Incluir" na tabela para adicionar.</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', maxHeight: '300px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', maxHeight: '320px', overflowY: 'auto' }}>
                 {selectedExams.map(item => (
                   <div 
                     key={item.id}
@@ -503,7 +608,7 @@ const ExamsBudgetPage = () => {
                   className="modal-input"
                   value={paymentTerms}
                   onChange={(e) => setPaymentTerms(e.target.value)}
-                  placeholder="Ex: À vista / Faturamento 15 dias"
+                  placeholder="Ex: À vista / Faturamento faturado"
                   style={{ padding: '0.375rem 0.5rem', fontSize: '0.75rem' }}
                 />
               </div>
