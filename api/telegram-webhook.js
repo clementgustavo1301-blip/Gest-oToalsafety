@@ -78,7 +78,7 @@ export default async function handler(req, res) {
             [{ text: "📅 Treinamentos/Agendamentos", callback_data: "report_agendamentos" }],
             [{ text: "⚠️ Programas Vencidos", callback_data: "report_vencidos" }],
             [{ text: "⏳ Programas Pendentes", callback_data: "report_pendentes" }],
-            [{ text: "🚨 Entregas no Próximo Mês", callback_data: "report_proximos" }]
+            [{ text: "🚨 Próximos a Vencer", callback_data: "report_proximos" }]
           ]
         };
         
