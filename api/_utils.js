@@ -113,7 +113,7 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
       title = '⏳ Programas Pendentes';
       filtered = deliverables.filter(d => d.type === 'programa' && d.status === 'pendente');
     } else if (type === 'proximos') {
-      title = '🚨 Entregas no Próximo Mês';
+      title = '🚨 Próximos a Vencer';
       filtered = deliverables.filter(d => {
         if (d.status === 'entregue' || d.status === 'feito' || d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
         if (!d.due_date) return false;
