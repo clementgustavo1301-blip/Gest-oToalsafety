@@ -142,7 +142,7 @@ const ExamsBudgetPage = () => {
   // Discount & Payment terms state
   const [discountType, setDiscountType] = useState('none'); // 'none', 'fixed', 'percent'
   const [discountValue, setDiscountValue] = useState(0);
-  const [paymentTerms, setPaymentTerms] = useState('À vista ou faturamento faturado.');
+  const [paymentTerms, setPaymentTerms] = useState('');
   const [observations, setObservations] = useState('');
 
   // Custom exam creation modal/inputs
@@ -245,8 +245,7 @@ const ExamsBudgetPage = () => {
       return 'Nenhum exame selecionado ainda.';
     }
 
-    let text = `🏥 *ORÇAMENTO DE EXAMES - ECOCLINIC*\n`;
-    text += `*Medicina do Trabalho*\n\n`;
+    let text = `🏥 *ORÇAMENTO DE EXAMES - ECOCLINIC*\n\n`;
     text += `📋 *EXAMES SELECIONADOS:*\n`;
 
     selectedExams.forEach((item, index) => {
@@ -263,18 +262,15 @@ const ExamsBudgetPage = () => {
     }
 
     text += `⭐ *VALOR TOTAL:* *${formatBRL(grandTotal)}*\n`;
-    text += `-----------------------------------\n\n`;
 
-    if (paymentTerms) {
-      text += `💳 *Condições de Pagamento:* ${paymentTerms}\n`;
+    if (paymentTerms.trim()) {
+      text += `-----------------------------------\n`;
+      text += `💳 *Condições de Pagamento:* ${paymentTerms.trim()}\n`;
     }
 
     if (observations.trim()) {
       text += `📝 *Observações:* ${observations.trim()}\n`;
     }
-
-    text += `\n📍 *Ecoclinic Medicina do Trabalho*\n`;
-    text += `📞 Entre em contato para confirmação e agendamento dos exames!`;
 
     return text;
   };
