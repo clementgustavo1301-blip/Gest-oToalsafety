@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, Stethoscope } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
@@ -14,6 +14,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const [pendingTeamCount, setPendingTeamCount] = useState(0);
 
   const isAdminDiretoria = activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria';
+  const isClinicaOrAdmin = activeLink?.sector === 'Clínica' || isAdminDiretoria;
 
   useEffect(() => {
     if (isAdminDiretoria) {
@@ -59,6 +60,9 @@ const Sidebar = ({ isOpen, onClose }) => {
         ] : []),
         { name: 'Contatos', path: '/contacts', icon: <Users size={18} /> },
         { name: 'Cronograma', path: '/schedule-generator', icon: <Wand2 size={18} /> },
+        ...(isClinicaOrAdmin ? [
+          { name: 'Orçamento de Exames', path: '/exams-budget', icon: <Stethoscope size={18} /> }
+        ] : []),
         ...(isAdminDiretoria ? [
           { name: 'Relatórios', path: '/reports', icon: <BarChart3 size={18} /> },
           { name: 'Armazenamento', path: '/storage', icon: <Database size={18} /> }

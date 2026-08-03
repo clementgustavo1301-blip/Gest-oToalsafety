@@ -17,6 +17,7 @@ import ScheduleGeneratorPage from './pages/ScheduleGeneratorPage';
 import ReportsPage from './pages/ReportsPage';
 import TeamPage from './pages/TeamPage';
 import StorageManagementPage from './pages/StorageManagementPage';
+import ExamsBudgetPage from './pages/ExamsBudgetPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -56,6 +57,11 @@ const AppLayout = () => {
             <Route path="/convocations" element={<ConvocationsPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/schedule-generator" element={<ScheduleGeneratorPage />} />
+            <Route path="/exams-budget" element={
+              <ProtectedRoute allowedSectors={['Clínica', 'Diretoria']}>
+                <ExamsBudgetPage />
+              </ProtectedRoute>
+            } />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/team" element={
