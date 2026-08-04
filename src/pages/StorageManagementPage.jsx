@@ -134,12 +134,23 @@ const StorageManagementPage = () => {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-              <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-                Usado: {loading ? '...' : formatBytes(usedBytes)} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>(inclui ~14MB de segurança/sistema do Supabase)</span>
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Tamanho das Suas Tabelas (Dados Reais):</span>
+                <span style={{ fontWeight: '500' }}>{loading ? '...' : formatBytes(exactSize || 0)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Diário de Segurança Supabase (WAL):</span>
+                <span style={{ fontWeight: '500' }}>~ {formatBytes(SYSTEM_OVERHEAD)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.25rem' }}>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>Uso Total no Disco (O que conta pro limite):</span>
+                <span style={{ color: 'var(--primary)', fontWeight: '700' }}>{loading ? '...' : formatBytes(usedBytes)}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.8125rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>
-                Livre: {loading ? '...' : formatBytes(remainingBytes)} (Total: {formatBytes(totalLimitBytes)})
+                Livre: {loading ? '...' : formatBytes(remainingBytes)} (Máximo: {formatBytes(totalLimitBytes)})
               </span>
             </div>
 
