@@ -62,7 +62,12 @@ const StorageManagementPage = () => {
   }, []);
 
   const totalLimitBytes = 500 * 1024 * 1024; // 500 MB (Plano Gratuito Supabase)
-  const usedBytes = exactSize || 0;
+  
+  // O Supabase tem um overhead interno de ~14MB (WAL, logs de sistema, schema base).
+  // Adicionamos esse valor para o número do sistema bater mais próximo com o painel oficial.
+  const SYSTEM_OVERHEAD = 14 * 1024 * 1024; 
+  const usedBytes = exactSize ? exactSize + SYSTEM_OVERHEAD : 0;
+  
   const remainingBytes = Math.max(0, totalLimitBytes - usedBytes);
   const usedPercentage = Math.min(100, (usedBytes / totalLimitBytes) * 100);
 
@@ -131,7 +136,7 @@ const StorageManagementPage = () => {
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
               <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-                Usado: {loading ? '...' : formatBytes(usedBytes)}
+                Usado: {loading ? '...' : formatBytes(usedBytes)} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>(inclui ~14MB de segurança/sistema do Supabase)</span>
               </span>
               <span style={{ color: 'var(--text-secondary)' }}>
                 Livre: {loading ? '...' : formatBytes(remainingBytes)} (Total: {formatBytes(totalLimitBytes)})
