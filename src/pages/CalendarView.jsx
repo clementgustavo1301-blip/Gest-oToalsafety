@@ -157,15 +157,31 @@ const CalendarView = () => {
           <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
             {dayEvents.map(event => {
               const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
+              const compName = getCompanyName(event.companyId);
               return (
                 <div key={event.id} style={{
                   fontSize: '0.6875rem', padding: '0.125rem 0.375rem',
                   backgroundColor: sc.bg, color: sc.color,
                   borderRadius: '3px', borderLeft: `3px solid ${sc.color}`,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  overflow: 'hidden',
                   fontWeight: '500'
                 }}>
-                  {event.title}
+                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600' }}>
+                    {event.title}
+                  </div>
+                  {compName && compName !== 'N/A' && (
+                    <div style={{
+                      fontSize: '0.5625rem',
+                      opacity: 0.85,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      marginTop: '1px',
+                      lineHeight: '1.1'
+                    }}>
+                      {compName}
+                    </div>
+                  )}
                 </div>
               );
             })}
