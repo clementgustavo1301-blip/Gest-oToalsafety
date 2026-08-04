@@ -19,7 +19,7 @@ export async function generateMessage(name, role, sector) {
   const baseMessage = `🚨 *Nova Solicitação de Acesso!*\n\n*Usuário:* ${name}\n*Função:* ${role || 'Não informada'}\n*Setor:* ${sector || 'Não informado'}`;
   if (!genAI) return baseMessage;
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
     const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Alguém acabou de solicitar um novo vínculo no sistema. 
 Nome: ${name}
@@ -29,7 +29,9 @@ Setor: ${sector || 'Não informado'}
 Crie uma notificação curta, profissional mas com um leve tom bem-humorado, avisando o administrador da solicitação. 
 Use no máximo 2-3 frases curtas. Formate em Markdown (pode usar *negrito*). 
 NÃO inclua saudações genéricas como "Olá" ou "Aqui está a mensagem". Retorne apenas o texto da notificação.`;
-    const result = await model.generateContent(prompt);
+    const aiPromise = model.generateContent(prompt);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 7000));
+    const result = await Promise.race([aiPromise, timeoutPromise]);
     const response = await result.response;
     return response.text();
   } catch (error) {
@@ -147,10 +149,13 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
     reportMessage += `Total de registros nesta categoria: ${filtered.length}\n\n`;
     reportMessage += `*Detalhes:*\n${detalhes}\n`;
 
+    // Enviar relatório imediatamente - a IA é opcional e não pode bloquear
+    console.log(`✈️ Enviando relatório ${type}...`);
+    
     if (genAI) {
-      console.log('🧠 Melhorando relatório com IA...');
+      console.log('🧠 Tentando melhorar com IA (timeout 7s)...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Foi solicitado o relatório: ${title}.
 
@@ -165,15 +170,16 @@ Se houver registros vencidos, ENFATIZE A URGÊNCIA de regularização de forma e
 Agrupe ou liste as empresas, responsáveis (👤 Responsável) e os documentos afetados de forma extremamente organizada e fácil de ler (em bullet points). 
 NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um título legal, ex: "📊 ${title}"). Formate em Markdown (*negrito*). Retorne apenas a mensagem final do Telegram.`;
         
-        const result = await model.generateContent(prompt);
+        const aiPromise = model.generateContent(prompt);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 7000));
+        const result = await Promise.race([aiPromise, timeoutPromise]);
         const response = await result.response;
         reportMessage = response.text();
       } catch (aiError) {
-        console.error('Erro na IA do relatório:', aiError.message);
+        console.warn('⏱️ IA não respondeu a tempo ou falhou, usando relatório padrão:', aiError.message);
       }
     }
 
-    console.log(`✈️ Enviando relatório ${type}...`);
     await sendTelegramMessage(reportMessage, { replyChatId });
 
   } catch (err) {
@@ -255,10 +261,13 @@ export async function sendDailyReport(replyChatId = null) {
     reportMessage += `🚨 *Atrasados/Sem Resposta (${atrasadosPendentes.length}):*\n${detalhesAtrasados}\n\n`;
     reportMessage += `📅 *Próximos 9 Dias (${proximos9Dias.length}):*\n${detalhesProximos}\n`;
 
+    // Enviar relatório imediatamente - a IA é opcional e não pode bloquear
+    console.log('✈️ Enviando relatório diário de agendamentos...');
+
     if (genAI) {
-      console.log('🧠 Melhorando relatório diário com IA...');
+      console.log('🧠 Tentando melhorar relatório diário com IA (timeout 7s)...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere o relatório diário de agendamentos.
 
@@ -280,15 +289,16 @@ Deixe claro o panorama geral (Total e Executados) de forma resumida, mas FOQUE B
 OBRIGATÓRIO: Para cada treinamento ou agendamento listado nos tópicos, VOCÊ DEVE MANTER VISÍVEL o nome do Responsável (👤 Responsável: [Nome]). Não omitir o nome do responsável em nenhuma hipótese.
 Retorne apenas a mensagem final do Telegram.`;
         
-        const result = await model.generateContent(prompt);
+        const aiPromise = model.generateContent(prompt);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 7000));
+        const result = await Promise.race([aiPromise, timeoutPromise]);
         const response = await result.response;
         reportMessage = response.text();
       } catch (aiError) {
-        console.error('Erro na IA do relatório:', aiError.message);
+        console.warn('⏱️ IA não respondeu a tempo ou falhou, usando relatório padrão:', aiError.message);
       }
     }
 
-    console.log('✈️ Enviando relatório diário de agendamentos...');
     await sendTelegramMessage(reportMessage, { replyChatId });
 
   } catch (err) {
@@ -371,7 +381,7 @@ export async function sendFullSystemDigest() {
     if (genAI) {
       console.log('🧠 Melhorando Resumo Diário Completo com IA...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere o Resumo Diário de Agendamentos. Este é um panorama geral detalhado.
 
@@ -390,7 +400,9 @@ Destaque o que é URGENTE (atrasados).
 OBRIGATÓRIO: Para cada treinamento ou agendamento listado nos tópicos, VOCÊ DEVE MANTER VISÍVEL o nome do Responsável (👤 Responsável: [Nome]). Não omitir o nome do responsável em nenhuma hipótese.
 NÃO invente dados. Formate em Markdown (*negrito*). Retorne APENAS o texto da mensagem do Telegram.`;
         
-        const result = await model.generateContent(prompt);
+        const aiPromise = model.generateContent(prompt);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 7000));
+        const result = await Promise.race([aiPromise, timeoutPromise]);
         const response = await result.response;
         reportMessage = response.text();
       } catch (aiError) {
