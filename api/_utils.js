@@ -19,7 +19,7 @@ export async function generateMessage(name, role, sector) {
   const baseMessage = `🚨 *Nova Solicitação de Acesso!*\n\n*Usuário:* ${name}\n*Função:* ${role || 'Não informada'}\n*Setor:* ${sector || 'Não informado'}`;
   if (!genAI) return baseMessage;
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Alguém acabou de solicitar um novo vínculo no sistema. 
 Nome: ${name}
@@ -137,7 +137,7 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
         : (d.due_date ? d.due_date.split('-').reverse().join('/') : 'S/D');
       
       const icon = type === 'vencidos' ? '🚨' : (type === 'pendentes' ? '⏳' : '📌');
-      return `${icon} *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | 👤 Resp: ${responsavel} | Data: ${dataFormatada}`;
+      return `${icon} *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | 👤 Responsável: ${responsavel} | Data: ${dataFormatada}`;
     }).join('\n');
 
     if (!detalhes) detalhes = "_Nenhum registro encontrado para este filtro._";
@@ -150,7 +150,7 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
     if (genAI) {
       console.log('🧠 Melhorando relatório com IA...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Foi solicitado o relatório: ${title}.
 
@@ -162,7 +162,7 @@ ${detalhes}
 
 Crie uma mensagem muito profissional, amigável e direta (com emojis). 
 Se houver registros vencidos, ENFATIZE A URGÊNCIA de regularização de forma educada.
-Agrupe ou liste as empresas, responsáveis (👤 Resp) e os documentos afetados de forma extremamente organizada e fácil de ler (em bullet points). 
+Agrupe ou liste as empresas, responsáveis (👤 Responsável) e os documentos afetados de forma extremamente organizada e fácil de ler (em bullet points). 
 NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um título legal, ex: "📊 ${title}"). Formate em Markdown (*negrito*). Retorne apenas a mensagem final do Telegram.`;
         
         const result = await model.generateContent(prompt);
@@ -223,7 +223,6 @@ export async function sendDailyReport(replyChatId = null) {
       if (t.status !== 'agendado' && t.status !== 'pendente') return false;
       const tDate = t.date ? parseISO(t.date) : null;
       if (!tDate) return false;
-      // Usando parseISO e testando se é antes do início de hoje
       return parseISO(t.date) < startOfToday;
     });
     atrasadosPendentes.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -231,7 +230,9 @@ export async function sendDailyReport(replyChatId = null) {
     // Formatar detalhes dos próximos 9 dias
     let detalhesProximos = proximos9Dias.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
+      const respName = t.responsible_id ? profMap[t.responsible_id] : null;
+      const instructorName = (t.instructor && typeof t.instructor === 'string' && t.instructor.trim()) ? t.instructor.trim() : null;
+      const quem = respName || instructorName || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
       const horario = t.time || 'Sem horário';
       return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} às ${horario} | 👤 Responsável: ${quem})`;
@@ -241,7 +242,9 @@ export async function sendDailyReport(replyChatId = null) {
     // Formatar detalhes dos atrasados
     let detalhesAtrasados = atrasadosPendentes.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
+      const respName = t.responsible_id ? profMap[t.responsible_id] : null;
+      const instructorName = (t.instructor && typeof t.instructor === 'string' && t.instructor.trim()) ? t.instructor.trim() : null;
+      const quem = respName || instructorName || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
       return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada} | 👤 Responsável: ${quem})`;
     }).join('\n');
@@ -255,7 +258,7 @@ export async function sendDailyReport(replyChatId = null) {
     if (genAI) {
       console.log('🧠 Melhorando relatório diário com IA...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere o relatório diário de agendamentos.
 
@@ -274,7 +277,7 @@ ${detalhesProximos}
 Crie uma mensagem muito profissional, amigável e direta (com emojis). 
 Comece direto com um título legal, sem "Olá". Formate em Markdown (*negrito*). 
 Deixe claro o panorama geral (Total e Executados) de forma resumida, mas FOQUE BASTANTE em listar os itens Atrasados (dando destaque de alerta) e os itens para os Próximos 9 dias em tópicos (bullet points) para fácil leitura.
-IMPORTANTE: Sempre inclua e mantenha visível o nome do Responsável (👤 Responsável) em cada item/tópico ao gerar o relatório.
+OBRIGATÓRIO: Para cada treinamento ou agendamento listado nos tópicos, VOCÊ DEVE MANTER VISÍVEL o nome do Responsável (👤 Responsável: [Nome]). Não omitir o nome do responsável em nenhuma hipótese.
 Retorne apenas a mensagem final do Telegram.`;
         
         const result = await model.generateContent(prompt);
@@ -341,7 +344,9 @@ export async function sendFullSystemDigest() {
 
     let detalhesProximosA = proximos9Dias.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
+      const respName = t.responsible_id ? profMap[t.responsible_id] : null;
+      const instructorName = (t.instructor && typeof t.instructor === 'string' && t.instructor.trim()) ? t.instructor.trim() : null;
+      const quem = respName || instructorName || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
       return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} | 👤 Responsável: ${quem})`;
     }).join('\n');
@@ -349,7 +354,9 @@ export async function sendFullSystemDigest() {
 
     let detalhesAtrasadosA = atrasadosPendentes.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
+      const respName = t.responsible_id ? profMap[t.responsible_id] : null;
+      const instructorName = (t.instructor && typeof t.instructor === 'string' && t.instructor.trim()) ? t.instructor.trim() : null;
+      const quem = respName || instructorName || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
       return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada} | 👤 Responsável: ${quem})`;
     }).join('\n');
@@ -364,7 +371,7 @@ export async function sendFullSystemDigest() {
     if (genAI) {
       console.log('🧠 Melhorando Resumo Diário Completo com IA...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere o Resumo Diário de Agendamentos. Este é um panorama geral detalhado.
 
@@ -380,7 +387,7 @@ INSTRUÇÕES:
 Crie uma mensagem executiva, altamente organizada (bullet points, emojis) e de fácil leitura.
 Comece com "📊 Resumo Diário de Agendamentos". Não use "Olá" ou saudações, vá direto ao ponto.
 Destaque o que é URGENTE (atrasados).
-IMPORTANTE: Sempre inclua e mantenha visível o nome do Responsável (👤 Responsável) em cada item/tópico ao gerar o relatório.
+OBRIGATÓRIO: Para cada treinamento ou agendamento listado nos tópicos, VOCÊ DEVE MANTER VISÍVEL o nome do Responsável (👤 Responsável: [Nome]). Não omitir o nome do responsável em nenhuma hipótese.
 NÃO invente dados. Formate em Markdown (*negrito*). Retorne APENAS o texto da mensagem do Telegram.`;
         
         const result = await model.generateContent(prompt);
