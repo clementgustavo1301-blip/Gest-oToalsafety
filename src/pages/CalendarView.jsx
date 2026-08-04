@@ -16,11 +16,10 @@ const STATUS_CONFIG = {
 
 const CalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
-  const [showSyncModal, setShowSyncModal] = useState(false);
   
   const [calendarScope, setCalendarScope] = useState('geral');
   const [calendarCompanyId, setCalendarCompanyId] = useState('');
@@ -219,16 +218,7 @@ const CalendarView = () => {
           <h1 className="text-h1">Agenda de Treinamentos</h1>
           <p className="text-subtitle">Visão geral de todas as empresas. Acesse a empresa para agendar.</p>
         </div>
-        
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button 
-            onClick={() => setShowSyncModal(true)}
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
-          >
-            <CalendarIcon size={16} />
-            Sincronizar no Celular
-          </button>
           {pendingTrainings.length > 0 && (
             <div style={{
               padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
@@ -515,56 +505,6 @@ const CalendarView = () => {
           onClose={() => setEditingEvent(null)}
           onSave={() => { setEditingEvent(null); loadData(false); }}
         />
-      )}
-      {showSyncModal && (
-        <div className="modal-overlay" style={{ zIndex: 1000 }}>
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h2 className="text-h2">Sincronizar no Celular</h2>
-              <button className="btn-icon" onClick={() => setShowSyncModal(false)}>
-                <XCircle size={20} />
-              </button>
-            </div>
-            <div style={{ padding: '1.5rem' }}>
-              <p style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-                Sua agenda exclusiva foi gerada. Copie o link abaixo para adicionar no Google Agenda ou Apple Calendar do seu celular.
-              </p>
-              
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                <input 
-                  type="text" 
-                  value={`https://gest-o-totalsafety.vercel.app/api/calendar?name=${encodeURIComponent(userProfile?.name || 'seu-nome')}`}
-                  readOnly
-                  className="input"
-                  style={{ flex: 1, backgroundColor: 'var(--background)' }}
-                  onClick={(e) => e.target.select()}
-                />
-                <button 
-                  className="btn btn-primary"
-                  onClick={(e) => {
-                    const link = `https://gest-o-totalsafety.vercel.app/api/calendar?name=${encodeURIComponent(userProfile?.name || 'seu-nome')}`;
-                    if (navigator.clipboard) {
-                      navigator.clipboard.writeText(link);
-                      const originalText = e.target.innerText;
-                      e.target.innerText = "Copiado!";
-                      setTimeout(() => e.target.innerText = originalText, 2000);
-                    }
-                  }}
-                >
-                  Copiar
-                </button>
-              </div>
-
-              <div style={{ backgroundColor: 'var(--primary-light)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
-                <h4 style={{ color: 'var(--primary)', fontWeight: 'bold', marginBottom: '0.5rem' }}>Como adicionar:</h4>
-                <ul style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', paddingLeft: '1.2rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <li><b>iPhone:</b> Ajustes {'>'} Calendário {'>'} Contas {'>'} Adicionar Conta {'>'} Outra {'>'} Adicionar Calendário Assinado (Cole o link).</li>
-                  <li><b>Android:</b> Abra o <i>Google Agenda no Computador</i> {'>'} clique no <b>+</b> (Outras agendas) na barra lateral {'>'} <b>Do URL</b> (Cole o link). No celular, basta mandar sincronizar.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
