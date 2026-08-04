@@ -92,8 +92,11 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
     }
     
     const { data: companiesData } = await supabase.from('companies').select('id, name');
+    const { data: profilesData } = await supabase.from('profiles').select('id, name');
     const compMap = {};
     if (companiesData) companiesData.forEach(c => compMap[c.id] = c.name);
+    const profMap = {};
+    if (profilesData) profilesData.forEach(p => profMap[p.id] = p.name);
 
     const now = new Date();
     const today = startOfDay(now);
@@ -128,12 +131,13 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
 
     let detalhes = itemsToShow.map(d => {
       const nomeEmpresa = compMap[d.company_id] || 'Empresa Desconhecida';
+      const responsavel = profMap[d.responsible_id] || 'Não informado';
       const dataFormatada = type === 'vencidos' || type === 'pendentes' 
         ? (d.validity_date ? d.validity_date.split('-').reverse().join('/') : (d.due_date ? d.due_date.split('-').reverse().join('/') : 'S/D'))
         : (d.due_date ? d.due_date.split('-').reverse().join('/') : 'S/D');
       
       const icon = type === 'vencidos' ? '🚨' : (type === 'pendentes' ? '⏳' : '📌');
-      return `${icon} *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | Data: ${dataFormatada}`;
+      return `${icon} *${d.title || 'Documento'}* | 🏢 ${nomeEmpresa} | 👤 Resp: ${responsavel} | Data: ${dataFormatada}`;
     }).join('\n');
 
     if (!detalhes) detalhes = "_Nenhum registro encontrado para este filtro._";
@@ -158,7 +162,7 @@ ${detalhes}
 
 Crie uma mensagem muito profissional, amigável e direta (com emojis). 
 Se houver registros vencidos, ENFATIZE A URGÊNCIA de regularização de forma educada.
-Agrupe ou liste as empresas e os documentos afetados de forma extremamente organizada e fácil de ler (em bullet points). 
+Agrupe ou liste as empresas, responsáveis (👤 Resp) e os documentos afetados de forma extremamente organizada e fácil de ler (em bullet points). 
 NÃO inclua saudações genéricas no topo como "Olá" (comece direto com um título legal, ex: "📊 ${title}"). Formate em Markdown (*negrito*). Retorne apenas a mensagem final do Telegram.`;
         
         const result = await model.generateContent(prompt);
@@ -189,8 +193,11 @@ export async function sendDailyReport(replyChatId = null) {
     }
 
     const { data: companiesData } = await supabase.from('companies').select('id, name');
+    const { data: profilesData } = await supabase.from('profiles').select('id, name');
     const compMap = {};
     if (companiesData) companiesData.forEach(c => compMap[c.id] = c.name);
+    const profMap = {};
+    if (profilesData) profilesData.forEach(p => profMap[p.id] = p.name);
 
     const now = new Date();
     const startOfToday = startOfDay(now);
@@ -224,19 +231,19 @@ export async function sendDailyReport(replyChatId = null) {
     // Formatar detalhes dos próximos 9 dias
     let detalhesProximos = proximos9Dias.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = t.instructor || t.participants || 'N/A';
+      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
       const horario = t.time || 'Sem horário';
-      return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} às ${horario} | 👤 ${quem})`;
+      return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} às ${horario} | 👤 Responsável: ${quem})`;
     }).join('\n');
     if (!detalhesProximos) detalhesProximos = "_Nenhum agendamento previsto para os próximos 9 dias._";
 
     // Formatar detalhes dos atrasados
     let detalhesAtrasados = atrasadosPendentes.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = t.instructor || t.participants || 'N/A';
+      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
-      return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada} | 👤 ${quem})`;
+      return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada} | 👤 Responsável: ${quem})`;
     }).join('\n');
     if (!detalhesAtrasados) detalhesAtrasados = "_Nenhum agendamento atrasado sem resposta._";
 
@@ -267,6 +274,7 @@ ${detalhesProximos}
 Crie uma mensagem muito profissional, amigável e direta (com emojis). 
 Comece direto com um título legal, sem "Olá". Formate em Markdown (*negrito*). 
 Deixe claro o panorama geral (Total e Executados) de forma resumida, mas FOQUE BASTANTE em listar os itens Atrasados (dando destaque de alerta) e os itens para os Próximos 9 dias em tópicos (bullet points) para fácil leitura.
+IMPORTANTE: Sempre inclua e mantenha visível o nome do Responsável (👤 Responsável) em cada item/tópico ao gerar o relatório.
 Retorne apenas a mensagem final do Telegram.`;
         
         const result = await model.generateContent(prompt);
@@ -295,6 +303,7 @@ export async function sendFullSystemDigest() {
     const { data: trainings, error: errT } = await supabase.from('trainings').select('*');
     const { data: deliverables, error: errD } = await supabase.from('deliverables').select('*');
     const { data: companiesData } = await supabase.from('companies').select('id, name');
+    const { data: profilesData } = await supabase.from('profiles').select('id, name');
     
     if (errT || errD) {
       console.error('Erro ao buscar dados para o digest:', errT?.message || errD?.message);
@@ -303,6 +312,8 @@ export async function sendFullSystemDigest() {
 
     const compMap = {};
     if (companiesData) companiesData.forEach(c => compMap[c.id] = c.name);
+    const profMap = {};
+    if (profilesData) profilesData.forEach(p => profMap[p.id] = p.name);
 
     const now = new Date();
     const startOfToday = startOfDay(now);
@@ -330,16 +341,17 @@ export async function sendFullSystemDigest() {
 
     let detalhesProximosA = proximos9Dias.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
-      const quem = t.instructor || t.participants || 'N/A';
+      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
-      return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} | 👤 ${quem})`;
+      return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} | 👤 Responsável: ${quem})`;
     }).join('\n');
     if (!detalhesProximosA) detalhesProximosA = "_Nenhum._";
 
     let detalhesAtrasadosA = atrasadosPendentes.map(t => {
       const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
+      const quem = profMap[t.responsible_id] || t.instructor || t.participants || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
-      return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada})`;
+      return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada} | 👤 Responsável: ${quem})`;
     }).join('\n');
     if (!detalhesAtrasadosA) detalhesAtrasadosA = "_Nenhum._";
 
@@ -368,6 +380,7 @@ INSTRUÇÕES:
 Crie uma mensagem executiva, altamente organizada (bullet points, emojis) e de fácil leitura.
 Comece com "📊 Resumo Diário de Agendamentos". Não use "Olá" ou saudações, vá direto ao ponto.
 Destaque o que é URGENTE (atrasados).
+IMPORTANTE: Sempre inclua e mantenha visível o nome do Responsável (👤 Responsável) em cada item/tópico ao gerar o relatório.
 NÃO invente dados. Formate em Markdown (*negrito*). Retorne APENAS o texto da mensagem do Telegram.`;
         
         const result = await model.generateContent(prompt);

@@ -13,7 +13,7 @@ export const executeDBAction = async (table, action, data = null, filters = null
     switch (action) {
       case 'select':
         if (['deliverables', 'contracts', 'trainings'].includes(table)) {
-          query = query.select('*, companies(name, cnpj)');
+          query = query.select('*, companies(name, cnpj), profiles:responsible_id(name)');
         } else {
           query = query.select('*');
         }
