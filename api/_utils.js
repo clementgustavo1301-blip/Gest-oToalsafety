@@ -19,7 +19,7 @@ export async function generateMessage(name, role, sector) {
   const baseMessage = `🚨 *Nova Solicitação de Acesso!*\n\n*Usuário:* ${name}\n*Função:* ${role || 'Não informada'}\n*Setor:* ${sector || 'Não informado'}`;
   if (!genAI) return baseMessage;
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Alguém acabou de solicitar um novo vínculo no sistema. 
 Nome: ${name}
@@ -155,7 +155,7 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
     if (genAI) {
       console.log('🧠 Tentando melhorar com IA (timeout 7s)...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Foi solicitado o relatório: ${title}.
 
@@ -267,7 +267,7 @@ export async function sendDailyReport(replyChatId = null) {
     if (genAI) {
       console.log('🧠 Tentando melhorar relatório diário com IA (timeout 7s)...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere o relatório diário de agendamentos.
 
@@ -381,7 +381,7 @@ export async function sendFullSystemDigest() {
     if (genAI) {
       console.log('🧠 Melhorando Resumo Diário Completo com IA...');
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
 Gere o Resumo Diário de Agendamentos. Este é um panorama geral detalhado.
 
