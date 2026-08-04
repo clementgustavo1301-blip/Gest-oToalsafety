@@ -220,6 +220,26 @@ const CalendarView = () => {
         </div>
         
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button 
+            onClick={() => {
+              const userName = userProfile?.name || 'seu-nome';
+              const link = `https://gest-o-totalsafety.vercel.app/api/calendar?name=${encodeURIComponent(userName)}`;
+              if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(link).then(() => {
+                  alert(`Link da sua agenda pessoal copiado!\n\nLink: ${link}\n\nAdicione este link como "Calendário Assinado" (ou "Do URL") nas configurações do seu Google Agenda ou Apple Calendar no celular.`);
+                }).catch(() => {
+                  prompt("Copie o link abaixo para adicionar no calendário do celular:", link);
+                });
+              } else {
+                prompt("Copie o link abaixo para adicionar no calendário do celular:", link);
+              }
+            }}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
+          >
+            <CalendarIcon size={16} />
+            Sincronizar no Celular
+          </button>
           {pendingTrainings.length > 0 && (
             <div style={{
               padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
