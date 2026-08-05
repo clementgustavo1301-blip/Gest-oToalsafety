@@ -2,13 +2,23 @@ import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, Clock, User, Users,
   CheckCircle, PauseCircle, XCircle, Calendar as CalendarIcon,
-  Trash2, Edit2
+  Trash2, Edit2, Sunrise, Sun
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getTrainingsByCompany, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from './AddTrainingModal';
 import EditTrainingModal from './EditTrainingModal';
+
+const getPeriod = (timeStr) => {
+  if (!timeStr) return 'manha';
+  const match = timeStr.match(/(\d{1,2})[:h]/i);
+  if (match) {
+    const hour = parseInt(match[1], 10);
+    if (hour >= 12) return 'tarde';
+  }
+  return 'manha';
+};
 
 const STATUS_CONFIG = {
   agendado: { label: 'Agendado', color: 'var(--primary)', bg: 'var(--primary-light)', icon: <CalendarIcon size={14} /> },
@@ -126,22 +136,49 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
               {format(day, 'd')}
             </span>
           </div>
-          <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-            {dayTrainings.map(t => {
+          {/* Day Events grouped by Manhã / Tarde */}
+          {(() => {
+            const manhaEvents = dayTrainings.filter(t => getPeriod(t.time) === 'manha');
+            const tardeEvents = dayTrainings.filter(t => getPeriod(t.time) === 'tarde');
+
+            const renderItem = (t) => {
               const sc = STATUS_CONFIG[t.status] || STATUS_CONFIG.agendado;
               return (
                 <div key={t.id} style={{
                   fontSize: '0.6875rem', padding: '0.125rem 0.375rem',
                   backgroundColor: sc.bg, color: sc.color,
                   borderRadius: '3px', borderLeft: `3px solid ${sc.color}`,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  fontWeight: '500'
+                  overflow: 'hidden', fontWeight: '500'
                 }}>
-                  {t.title}
+                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</span>
+                    {t.time && <span style={{ fontSize: '0.5625rem', opacity: 0.8, marginLeft: '0.25rem', flexShrink: 0 }}>{t.time.split(' ')[0]}</span>}
+                  </div>
                 </div>
               );
-            })}
-          </div>
+            };
+
+            return (
+              <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {manhaEvents.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                      <Sunrise size={10} /> Manhã
+                    </div>
+                    {manhaEvents.map(renderItem)}
+                  </div>
+                )}
+                {tardeEvents.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                      <Sun size={10} /> Tarde
+                    </div>
+                    {tardeEvents.map(renderItem)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       );
       day = addDays(day, 1);
@@ -241,8 +278,11 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
 
       {/* Event Detail Panel with Status Controls */}
       {selectedEvents.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {selectedEvents.map(event => {
+        (() => {
+          const manha = selectedEvents.filter(e => getPeriod(e.time) === 'manha');
+          const tarde = selectedEvents.filter(e => getPeriod(e.time) === 'tarde');
+
+          const renderCard = (event, periodLabel, periodColor, PeriodIcon) => {
             const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
             return (
               <div key={event.id} className="card" style={{ animation: 'fadeIn 0.2s ease' }}>
@@ -251,13 +291,22 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                     <h3 style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                       {event.title}
                     </h3>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                      fontSize: '0.75rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                      backgroundColor: sc.bg, color: sc.color, fontWeight: '600'
-                    }}>
-                      {sc.icon} {sc.label}
-                    </span>
+                    <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                        fontSize: '0.75rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                        backgroundColor: sc.bg, color: sc.color, fontWeight: '600'
+                      }}>
+                        {sc.icon} {sc.label}
+                      </span>
+                      <span style={{
+                        fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                        backgroundColor: periodColor === 'var(--primary)' ? 'var(--primary-light)' : '#fef3c7',
+                        color: periodColor, fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                      }}>
+                        <PeriodIcon size={12} /> {periodLabel}
+                      </span>
+                    </div>
                   </div>
                   <button 
                     onClick={() => setEditingEvent(event)}
@@ -370,8 +419,29 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                 </div>
               </div>
             );
-          })}
-        </div>
+          };
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {manha.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', fontWeight: '700', color: 'var(--primary)', borderBottom: '2px solid var(--primary-light)', paddingBottom: '0.25rem' }}>
+                    <Sunrise size={16} /> Turno da Manhã ({manha.length})
+                  </div>
+                  {manha.map(e => renderCard(e, 'Manhã', 'var(--primary)', Sunrise))}
+                </div>
+              )}
+              {tarde.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', fontWeight: '700', color: '#d97706', borderBottom: '2px solid #fef3c7', paddingBottom: '0.25rem' }}>
+                    <Sun size={16} /> Turno da Tarde ({tarde.length})
+                  </div>
+                  {tarde.map(e => renderCard(e, 'Tarde', '#d97706', Sun))}
+                </div>
+              )}
+            </div>
+          );
+        })()
       )}
 
       {/* No events for selected day */}

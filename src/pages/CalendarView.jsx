@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2, Sunrise, Sun } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 import { getTrainings, getCompanies, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from '../components/AddTrainingModal';
 import EditTrainingModal from '../components/EditTrainingModal';
+
+const getPeriod = (timeStr) => {
+  if (!timeStr) return 'manha';
+  const match = timeStr.match(/(\d{1,2})[:h]/i);
+  if (match) {
+    const hour = parseInt(match[1], 10);
+    if (hour >= 12) return 'tarde';
+  }
+  return 'manha';
+};
 
 const STATUS_CONFIG = {
   agendado: { label: 'Agendado', color: 'var(--primary)', bg: 'var(--primary-light)' },
@@ -154,8 +164,12 @@ const CalendarView = () => {
             </span>
           </div>
           
-          <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-            {dayEvents.map(event => {
+          {/* Day Events grouped by Manhã / Tarde */}
+          {(() => {
+            const manhaEvents = dayEvents.filter(t => getPeriod(t.time) === 'manha');
+            const tardeEvents = dayEvents.filter(t => getPeriod(t.time) === 'tarde');
+
+            const renderEventItem = (event) => {
               const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
               const compName = getCompanyName(event.companyId);
               return (
@@ -166,8 +180,9 @@ const CalendarView = () => {
                   overflow: 'hidden',
                   fontWeight: '500'
                 }}>
-                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600' }}>
-                    {event.title}
+                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
+                    {event.time && <span style={{ fontSize: '0.5625rem', opacity: 0.8, marginLeft: '0.25rem', flexShrink: 0 }}>{event.time.split(' ')[0]}</span>}
                   </div>
                   {compName && compName !== 'N/A' && (
                     <div style={{
@@ -184,8 +199,29 @@ const CalendarView = () => {
                   )}
                 </div>
               );
-            })}
-          </div>
+            };
+
+            return (
+              <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {manhaEvents.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                      <Sunrise size={10} /> Manhã
+                    </div>
+                    {manhaEvents.map(renderEventItem)}
+                  </div>
+                )}
+                {tardeEvents.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                      <Sun size={10} /> Tarde
+                    </div>
+                    {tardeEvents.map(renderEventItem)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       );
       day = addDays(day, 1);
@@ -234,13 +270,20 @@ const CalendarView = () => {
 
       {/* Legend and Filter */}
       <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {Object.entries(STATUS_CONFIG).map(([key, val]) => (
             <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
               <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: val.color }} />
               {val.label}
             </div>
           ))}
+          <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border)', margin: '0 0.25rem' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600' }}>
+            <Sunrise size={14} /> Manhã (&lt; 12h)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: '#d97706', fontWeight: '600' }}>
+            <Sun size={14} /> Tarde (≥ 12h)
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Filter size={16} color="var(--text-secondary)" />
@@ -370,121 +413,154 @@ const CalendarView = () => {
                 <p style={{ fontSize: '0.8125rem' }}>Nenhum treinamento neste dia.</p>
               </div>
             ) : (
-              selectedDayEvents.map(event => {
-                const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
-                return (
-                  <div key={event.id} className="card" style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      {statusIcons[event.status]}
-                      <span style={{
-                        fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                        backgroundColor: sc.bg, color: sc.color, fontWeight: '600'
+              (() => {
+                const manha = selectedDayEvents.filter(e => getPeriod(e.time) === 'manha');
+                const tarde = selectedDayEvents.filter(e => getPeriod(e.time) === 'tarde');
+
+                const renderCard = (event, periodLabel, periodColor, PeriodIcon) => {
+                  const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
+                  return (
+                    <div key={event.id} className="card" style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        {statusIcons[event.status]}
+                        <span style={{
+                          fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                          backgroundColor: sc.bg, color: sc.color, fontWeight: '600'
+                        }}>
+                          {sc.label}
+                        </span>
+                        <span style={{
+                          fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                          backgroundColor: periodColor === 'var(--primary)' ? 'var(--primary-light)' : '#fef3c7',
+                          color: periodColor, fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem'
+                        }}>
+                          <PeriodIcon size={12} /> {periodLabel}
+                        </span>
+                        <button 
+                          onClick={() => setEditingEvent(event)}
+                          style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.25rem' }}
+                          title="Editar Agendamento"
+                        >
+                          <Edit2 size={14} /> Editar
+                        </button>
+                      </div>
+                      <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: '0.375rem' }}>
+                        {event.title}
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <Building2 size={12} /> {event.companyName}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <Clock size={12} /> {event.time}
+                        </span>
+                        {event.responsibleId && (
+                          <span>Responsável: {getProfileName(event.responsibleId)}</span>
+                        )}
+                      </div>
+                      {/* Status Actions */}
+                      <div style={{
+                        display: 'flex', gap: '0.5rem', paddingTop: '0.75rem', marginTop: '1rem',
+                        borderTop: '1px solid var(--border)', flexWrap: 'wrap'
                       }}>
-                        {sc.label}
-                      </span>
-                      <button 
-                        onClick={() => setEditingEvent(event)}
-                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.25rem' }}
-                        title="Editar Agendamento"
-                      >
-                        <Edit2 size={14} /> Editar
-                      </button>
-                    </div>
-                    <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: '0.375rem' }}>
-                      {event.title}
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                        <Building2 size={12} /> {event.companyName}
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                        <Clock size={12} /> {event.time}
-                      </span>
-                      {event.responsibleId && (
-                        <span>Responsável: {getProfileName(event.responsibleId)}</span>
-                      )}
-                    </div>
-                    {/* Status Actions */}
-                    <div style={{
-                      display: 'flex', gap: '0.5rem', paddingTop: '0.75rem', marginTop: '1rem',
-                      borderTop: '1px solid var(--border)', flexWrap: 'wrap'
-                    }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', alignSelf: 'center', marginRight: '0.25rem' }}>
-                        Ações:
-                      </span>
-                      {event.status !== 'concluido' && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', alignSelf: 'center', marginRight: '0.25rem' }}>
+                          Ações:
+                        </span>
+                        {event.status !== 'concluido' && (
+                          <button
+                            className="btn"
+                            onClick={() => handleStatusChange(event.id, 'concluido')}
+                            style={{
+                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                              backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
+                              border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
+                              fontWeight: '600', gap: '0.375rem'
+                            }}
+                          >
+                            <CheckCircle size={12} /> Concluir
+                          </button>
+                        )}
+                        {event.status !== 'adiado' && (
+                          <button
+                            className="btn"
+                            onClick={() => handleStatusChange(event.id, 'adiado')}
+                            style={{
+                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                              backgroundColor: '#fef3c7', color: '#b45309',
+                              border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
+                              fontWeight: '600', gap: '0.375rem'
+                            }}
+                          >
+                            <PauseCircle size={12} /> Adiar
+                          </button>
+                        )}
+                        {event.status !== 'nao_feito' && (
+                          <button
+                            className="btn"
+                            onClick={() => handleStatusChange(event.id, 'nao_feito')}
+                            style={{
+                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                              backgroundColor: '#fee2e2', color: 'var(--danger)',
+                              border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
+                              fontWeight: '600', gap: '0.375rem'
+                            }}
+                          >
+                            <XCircle size={12} /> Não Feito
+                          </button>
+                        )}
+                        {event.status !== 'agendado' && (
+                          <button
+                            className="btn"
+                            onClick={() => handleStatusChange(event.id, 'agendado')}
+                            style={{
+                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                              backgroundColor: 'var(--primary-light)', color: 'var(--primary)',
+                              border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)',
+                              fontWeight: '600', gap: '0.375rem'
+                            }}
+                          >
+                            <CalendarIcon size={12} /> Reagendar
+                          </button>
+                        )}
                         <button
                           className="btn"
-                          onClick={() => handleStatusChange(event.id, 'concluido')}
+                          onClick={() => handleDeleteTraining(event.id)}
                           style={{
                             padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                            backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
-                            border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
-                            fontWeight: '600', gap: '0.375rem'
-                          }}
-                        >
-                          <CheckCircle size={12} /> Concluir
-                        </button>
-                      )}
-                      {event.status !== 'adiado' && (
-                        <button
-                          className="btn"
-                          onClick={() => handleStatusChange(event.id, 'adiado')}
-                          style={{
-                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                            backgroundColor: '#fef3c7', color: '#b45309',
-                            border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
-                            fontWeight: '600', gap: '0.375rem'
-                          }}
-                        >
-                          <PauseCircle size={12} /> Adiar
-                        </button>
-                      )}
-                      {event.status !== 'nao_feito' && (
-                        <button
-                          className="btn"
-                          onClick={() => handleStatusChange(event.id, 'nao_feito')}
-                          style={{
-                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                            backgroundColor: '#fee2e2', color: 'var(--danger)',
+                            backgroundColor: 'transparent', color: 'var(--danger)',
                             border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
-                            fontWeight: '600', gap: '0.375rem'
+                            fontWeight: '600', gap: '0.375rem', marginLeft: 'auto'
                           }}
+                          title="Remover do calendário e voltar para pendentes"
                         >
-                          <XCircle size={12} /> Não Feito
+                          <Trash2 size={12} /> Cancelar Agendamento
                         </button>
-                      )}
-                      {event.status !== 'agendado' && (
-                        <button
-                          className="btn"
-                          onClick={() => handleStatusChange(event.id, 'agendado')}
-                          style={{
-                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                            backgroundColor: 'var(--primary-light)', color: 'var(--primary)',
-                            border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)',
-                            fontWeight: '600', gap: '0.375rem'
-                          }}
-                        >
-                          <CalendarIcon size={12} /> Reagendar
-                        </button>
-                      )}
-                      <button
-                        className="btn"
-                        onClick={() => handleDeleteTraining(event.id)}
-                        style={{
-                          padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                          backgroundColor: 'transparent', color: 'var(--danger)',
-                          border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
-                          fontWeight: '600', gap: '0.375rem', marginLeft: 'auto'
-                        }}
-                        title="Remover do calendário e voltar para pendentes"
-                      >
-                        <Trash2 size={12} /> Cancelar Agendamento
-                      </button>
+                      </div>
                     </div>
+                  );
+                };
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {manha.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', fontWeight: '700', color: 'var(--primary)', borderBottom: '2px solid var(--primary-light)', paddingBottom: '0.25rem' }}>
+                          <Sunrise size={16} /> Turno da Manhã ({manha.length})
+                        </div>
+                        {manha.map(e => renderCard(e, 'Manhã', 'var(--primary)', Sunrise))}
+                      </div>
+                    )}
+                    {tarde.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', fontWeight: '700', color: '#d97706', borderBottom: '2px solid #fef3c7', paddingBottom: '0.25rem' }}>
+                          <Sun size={16} /> Turno da Tarde ({tarde.length})
+                        </div>
+                        {tarde.map(e => renderCard(e, 'Tarde', '#d97706', Sun))}
+                      </div>
+                    )}
                   </div>
                 );
-              })
+              })()
             )}
           </div>
         )}
