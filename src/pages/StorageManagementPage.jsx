@@ -63,9 +63,11 @@ const StorageManagementPage = () => {
 
   const totalLimitBytes = 500 * 1024 * 1024; // 500 MB (Plano Gratuito Supabase)
   
-  // O tamanho exato agora será buscado 100% diretamente do servidor Supabase (incluindo WAL e Logs)
-  // através do novo comando SQL que o usuário vai rodar.
-  const usedBytes = exactSize || 0;
+  // O Supabase tem um overhead interno de ~14MB (WAL, logs de sistema, schema base).
+  // Adicionamos esse valor para o número do sistema bater mais próximo com o painel oficial.
+  const SYSTEM_OVERHEAD = 14 * 1024 * 1024; 
+  const usedBytes = exactSize ? exactSize + SYSTEM_OVERHEAD : 0;
+  
   const remainingBytes = Math.max(0, totalLimitBytes - usedBytes);
   const usedPercentage = Math.min(100, (usedBytes / totalLimitBytes) * 100);
 
@@ -83,7 +85,7 @@ const StorageManagementPage = () => {
 
     setClearing(table);
     try {
-      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'); 
+      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Deletes all rows where ID is not zero-uuid (which matches all standard UUIDs)
       if (error) {
         alert(`Erro ao limpar a tabela ${table}: ${error.message}`);
       } else {
@@ -101,8 +103,8 @@ const StorageManagementPage = () => {
       <header className="header-responsive" style={{ marginBottom: '2rem' }}>
         <div>
           <h1 className="text-h1" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Database size={32} color="var(--primary)" />
-            Armazenamento (Tempo Real)
+            <HardDrive size={28} color="var(--primary)" />
+            Armazenamento do Banco de Dados
           </h1>
           <p className="text-subtitle">
             Gerencie e visualize o uso de dados das tabelas do sistema.
@@ -117,7 +119,7 @@ const StorageManagementPage = () => {
       {/* Storage Progress Bar (Exact) */}
       <div className="card" style={{ marginBottom: '2rem', padding: '1.5rem' }}>
         <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-          Uso Total de Espaço do Banco (Real)
+          Uso de Espaço do Banco de Dados
         </h3>
         
         {rpcError ? (
@@ -126,12 +128,23 @@ const StorageManagementPage = () => {
             <p style={{ color: '#b91c1c', fontSize: '0.875rem' }}>
               Para visualizar os valores exatos de armazenamento em tempo real, você precisa executar um pequeno script SQL no painel do seu Supabase para habilitar a leitura do tamanho do banco.
             </p>
+            <p style={{ color: '#b91c1c', fontSize: '0.875rem', marginTop: '0.5rem', fontWeight: '500' }}>
+              O script foi salvo na raiz do projeto com o nome: <code>setup_storage_rpc.sql</code>
+            </p>
           </div>
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Tamanho das Suas Tabelas (Dados Reais):</span>
+                <span style={{ fontWeight: '500' }}>{loading ? '...' : formatBytes(exactSize || 0)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Diário de Segurança Supabase (WAL):</span>
+                <span style={{ fontWeight: '500' }}>~ {formatBytes(SYSTEM_OVERHEAD)}</span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.25rem' }}>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>Uso Total no Servidor Supabase:</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>Uso Total no Disco (O que conta pro limite):</span>
                 <span style={{ color: 'var(--primary)', fontWeight: '700' }}>{loading ? '...' : formatBytes(usedBytes)}</span>
               </div>
             </div>
