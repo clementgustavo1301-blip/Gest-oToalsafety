@@ -85,6 +85,7 @@ const CalendarView = () => {
   };
 
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
+  const getCompanyCategory = (companyId) => companies.find(c => c.id === companyId)?.category || 'TotalSafety';
   const getProfileName = (profileId) => profiles.find(p => p.id === profileId)?.name || 'Desconhecido';
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
@@ -186,15 +187,28 @@ const CalendarView = () => {
                   </div>
                   {compName && compName !== 'N/A' && (
                     <div style={{
-                      fontSize: '0.5625rem',
-                      opacity: 0.85,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
                       marginTop: '1px',
-                      lineHeight: '1.1'
                     }}>
-                      {compName}
+                      <span 
+                        title={getCompanyCategory(event.companyId)}
+                        style={{
+                          width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                          backgroundColor: getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
+                        }} 
+                      />
+                      <div style={{
+                        fontSize: '0.5625rem',
+                        opacity: 0.85,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        lineHeight: '1.1'
+                      }}>
+                        {compName}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -449,7 +463,15 @@ const CalendarView = () => {
                       </h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                          <Building2 size={12} /> {event.companyName}
+                          <Building2 size={12} />
+                          <span 
+                            title={getCompanyCategory(event.companyId)}
+                            style={{
+                              width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                              backgroundColor: getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
+                            }} 
+                          />
+                          {event.companyName}
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                           <Clock size={12} /> {event.time}

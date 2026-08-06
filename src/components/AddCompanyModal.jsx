@@ -15,13 +15,14 @@ const AddCompanyModal = ({ onClose, onSave }) => {
   const [cnpj, setCnpj] = useState('');
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
+  const [category, setCategory] = useState('TotalSafety');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !cnpj.trim()) return;
     setLoading(true);
-    await onSave({ name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim() });
+    await onSave({ name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim(), category });
     setLoading(false);
   };
 
@@ -99,6 +100,21 @@ const AddCompanyModal = ({ onClose, onSave }) => {
                   disabled={loading}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="modal-label" htmlFor="company-category">Categoria</label>
+              <select
+                id="company-category"
+                className="modal-input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                disabled={loading}
+                required
+              >
+                <option value="TotalSafety">TotalSafety</option>
+                <option value="Consultoria Fixa">Consultoria Fixa</option>
+              </select>
             </div>
           </div>
 

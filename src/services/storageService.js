@@ -11,6 +11,7 @@ function mapCompany(row) {
     cnpj: row.cnpj,
     contact: row.contact,
     phone: row.phone,
+    category: row.category || 'TotalSafety',
   };
 }
 
@@ -114,7 +115,8 @@ export async function addCompany(company) {
     name: company.name,
     cnpj: company.cnpj,
     contact: company.contact,
-    phone: company.phone
+    phone: company.phone,
+    category: company.category || 'TotalSafety'
   }]).select().single();
   if (error) { 
     console.error('Error adding company:', error); 
@@ -136,6 +138,7 @@ export async function updateCompany(companyId, updates) {
   if (updates.cnpj !== undefined) snakeUpdates.cnpj = updates.cnpj;
   if (updates.contact !== undefined) snakeUpdates.contact = updates.contact;
   if (updates.phone !== undefined) snakeUpdates.phone = updates.phone;
+  if (updates.category !== undefined) snakeUpdates.category = updates.category;
 
   const { data, error } = await supabase.from('companies').update(snakeUpdates).eq('id', companyId).select().single();
   if (error) { console.error('Error updating company:', error); return null; }

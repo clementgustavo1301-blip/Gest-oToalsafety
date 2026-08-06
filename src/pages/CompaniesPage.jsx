@@ -151,7 +151,19 @@ const CompaniesPage = () => {
                     <Building2 size={20} color="white" />
                   </div>
                   <div>
-                    <h3 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '1rem' }}>{group.name}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <h3 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '1rem', margin: 0 }}>{group.name}</h3>
+                      {Array.from(new Set(companiesInGroup.map(c => c.category || 'TotalSafety'))).map(cat => (
+                        <span key={cat} style={{
+                          fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                          backgroundColor: cat === 'Consultoria Fixa' ? '#ffedd5' : '#dcfce7',
+                          color: cat === 'Consultoria Fixa' ? '#c2410c' : '#15803d',
+                          border: `1px solid ${cat === 'Consultoria Fixa' ? '#fdba74' : '#86efac'}`
+                        }}>
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
                     <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                       {companiesInGroup.length} empresa{companiesInGroup.length !== 1 ? 's' : ''}
                     </span>
@@ -226,7 +238,18 @@ const CompaniesPage = () => {
                             <Building2 size={16} color="var(--secondary)" />
                           </div>
                           <div>
-                            <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{company.name}</h4>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{company.name}</h4>
+                              {company.category && (
+                                <span 
+                                  title={company.category}
+                                  style={{
+                                    width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
+                                    backgroundColor: company.category === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
+                                  }} 
+                                />
+                              )}
+                            </div>
                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginTop: '0.125rem' }}>
                               <span style={{
                                 fontSize: '0.8125rem', color: 'var(--text-secondary)',
