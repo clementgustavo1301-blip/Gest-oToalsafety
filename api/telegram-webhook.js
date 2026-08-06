@@ -2,7 +2,8 @@ import {
   supabase, 
   telegramBotToken, 
   sendDeliverablesReport, 
-  sendDailyReport, 
+  sendDailyReport,
+  sendDailyReportByResponsible,
   sendTelegramMessage 
 } from './_utils.js';
 
@@ -61,7 +62,19 @@ export default async function handler(req, res) {
         await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}`);
         
         if (reportType === 'agendamentos') {
+          // Sub-menu for Agendamentos
+          const menuOptions = {
+            replyChatId,
+            inline_keyboard: [
+              [{ text: "📊 Geral", callback_data: "report_agendamentos_geral" }],
+              [{ text: "👤 Por Responsável", callback_data: "report_agendamentos_responsavel" }]
+            ]
+          };
+          await sendTelegramMessage("Como deseja visualizar o relatório de Agendamentos/Treinamentos?", menuOptions);
+        } else if (reportType === 'agendamentos_geral') {
           await sendDailyReport(replyChatId);
+        } else if (reportType === 'agendamentos_responsavel') {
+          await sendDailyReportByResponsible(replyChatId);
         } else {
           await sendDeliverablesReport(reportType, replyChatId);
         }

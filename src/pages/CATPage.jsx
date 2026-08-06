@@ -95,7 +95,7 @@ const CATPage = () => {
     t += `Especificação: ${cat.l_especifico}\n\n`;
 
     t += `[3] Lesão:\n`;
-    t += `Parte: ${cat.p_parte} (${cat.lateral})\n`;
+    t += `Parte: ${cat.p_parte} (${cat.p_lateral})\n`;
     if(cat.a_natureza) t += `Natureza: ${cat.a_natureza}\n\n`;
 
     t += `[4] Atendimento:\n`;
@@ -337,7 +337,7 @@ const CATPage = () => {
                     <p><strong>Cidade/UF:</strong> {selectedCat.l_cidade}/{selectedCat.l_uf}</p>
                     <p><strong>Específico:</strong> {selectedCat.l_especifico}</p>
                     <br/>
-                    <p><strong>Parte Atingida:</strong> {selectedCat.p_parte} ({selectedCat.lateral})</p>
+                    <p><strong>Parte Atingida:</strong> {selectedCat.p_parte} ({selectedCat.p_lateral})</p>
                     <p><strong>Outras Partes:</strong> {selectedCat.p_outras || 'N/A'}</p>
                   </div>
                 </div>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Stethoscope, Search, Plus, Trash2, Copy, Check, MessageSquare, 
-  RefreshCw, DollarSign, Calculator, FileText, AlertCircle
+  RefreshCw, DollarSign, Calculator, FileText, AlertCircle,
+  UserCheck, Building2, ClipboardList, Send, Info, ShieldAlert, FileCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -294,50 +295,187 @@ const ExamsBudgetPage = () => {
     window.open(`https://api.whatsapp.com/send?text=${encodedText}`, '_blank');
   };
 
+  // Active Tab ('budget' | 'scheduling')
+  const [activeTab, setActiveTab] = useState('budget');
+
+  // State for Scheduling Data Template
+  const [schedExamType, setSchedExamType] = useState('ASO Admissional / Periódico / Exames Ocupacionais');
+  const [schedInstructions, setSchedInstructions] = useState('Por favor, enviar os dados preenchidos com antecedência. No dia do atendimento, o colaborador deve apresentar documento oficial com foto.');
+  const [schedIncludeExplanation, setSchedIncludeExplanation] = useState(true);
+  const [schedCopied, setSchedCopied] = useState(false);
+  const [customSchedText, setCustomSchedText] = useState('');
+  const [isEditingSchedText, setIsEditingSchedText] = useState(false);
+
+  const [requiredFields, setRequiredFields] = useState({
+    cnpj: true,
+    pcmso: true,
+    employeeName: true,
+    cpf: true,
+    birthDate: true,
+    role: true,
+    sector: true,
+    admissionDate: true,
+  });
+
+  const toggleRequiredField = (field) => {
+    setRequiredFields(prev => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  // Generate Scheduling Message Text
+  const generateSchedulingText = () => {
+    if (isEditingSchedText && customSchedText) {
+      return customSchedText;
+    }
+    let text = `🏥 *SOLICITAÇÃO DE DADOS E PCMSO - TOTALSAFETY / ECOCLINIC*\n\n`;
+    text += `Olá! 👋 Para realizarmos o agendamento dos exames ocupacionais (${schedExamType}) e a elaboração do orçamento de acordo com os riscos da empresa, solicitamos o envio das seguintes informações:\n\n`;
+
+    text += `🏢 *DADOS DA EMPRESA:*\n`;
+    if (requiredFields.cnpj) text += `• CNPJ da Empresa:\n`;
+    if (requiredFields.pcmso) text += `• Cópia do PCMSO / PGR da Empresa (para elaboração do orçamento e inclusão dos riscos em cada função):\n`;
+
+    text += `\n👤 *DADOS DO COLABORADOR:*\n`;
+    if (requiredFields.employeeName) text += `• Nome Completo:\n`;
+    if (requiredFields.cpf) text += `• CPF:\n`;
+    if (requiredFields.birthDate) text += `• Data de Nascimento:\n`;
+    if (requiredFields.role) text += `• Função / Cargo:\n`;
+    if (requiredFields.sector) text += `• Setor / Departamento:\n`;
+    if (requiredFields.admissionDate) text += `• Data de Admissão:\n`;
+
+    if (schedIncludeExplanation) {
+      text += `\n-----------------------------------\n`;
+      text += `ℹ️ *POR QUE ESTES DADOS E O PCMSO SÃO NECESSÁRIOS?*\n`;
+      text += `Estes dados e a cópia do PCMSO da empresa são fundamentais para a correta identificação dos riscos ocupacionais da função, cadastro oficial em nosso sistema de Gestão Ocupacional e emissão do ASO (Atestado de Saúde Ocupacional).\n`;
+    }
+
+    if (schedInstructions.trim()) {
+      text += `\n-----------------------------------\n`;
+      text += `📝 *ORIENTAÇÕES ADICIONAIS:*\n`;
+      text += `${schedInstructions.trim()}\n`;
+    }
+
+    text += `\nFicamos no aguardo das informações para elaboração do orçamento e confirmação do agendamento! 🗓️✨`;
+    return text;
+  };
+
+  const schedulingText = generateSchedulingText();
+
+  // Copy Scheduling Text
+  const handleCopySchedText = async () => {
+    try {
+      await navigator.clipboard.writeText(schedulingText);
+      setSchedCopied(true);
+      setTimeout(() => setSchedCopied(false), 2500);
+    } catch (err) {
+      console.error('Erro ao copiar texto:', err);
+    }
+  };
+
+  // Send Scheduling Text via WhatsApp
+  const handleSendSchedWhatsApp = () => {
+    const encodedText = encodeURIComponent(schedulingText);
+    window.open(`https://api.whatsapp.com/send?text=${encodedText}`, '_blank');
+  };
+
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', paddingBottom: '2rem' }}>
       
       {/* Header */}
-      <header className="header-responsive" style={{ marginBottom: '1.5rem', alignItems: 'flex-start' }}>
+      <header className="header-responsive" style={{ marginBottom: '1rem', alignItems: 'flex-start' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
             <span style={{ 
               backgroundColor: 'var(--primary-light)', color: 'var(--primary)', 
               padding: '0.25rem 0.625rem', borderRadius: '1rem', fontSize: '0.75rem', fontWeight: '600' 
             }}>
-              Tabela Oficial Ecoclinic ({ECOCLINIC_EXAMS.length} Exames)
+              Modelos de Mensagem WhatsApp
             </span>
           </div>
           <h1 className="text-h1" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <Stethoscope color="var(--primary)" size={28} />
-            Orçamento de Exames Ocupacionais
+            <MessageSquare color="var(--primary)" size={28} />
+            Modelos de Mensagem & Orçamentos
           </h1>
           <p className="text-subtitle">
-            Selecione os exames da tabela oficial Ecoclinic, ajuste quantidades e valores para gerar o orçamento de envio.
+            Gere mensagens padronizadas para WhatsApp: orçamentos de exames e solicitação de dados/PCMSO para agendamento.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button 
-            className="btn btn-secondary"
-            onClick={handleClearSelection}
-            disabled={selectedExams.length === 0}
-            style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-          >
-            <RefreshCw size={15} /> Limpar
-          </button>
-          <button 
-            className="btn btn-primary"
-            onClick={() => setShowCustomModal(true)}
-            style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-          >
-            <Plus size={16} /> Exame Avulso
-          </button>
-        </div>
+        {activeTab === 'budget' && (
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              className="btn btn-secondary"
+              onClick={handleClearSelection}
+              disabled={selectedExams.length === 0}
+              style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+            >
+              <RefreshCw size={15} /> Limpar
+            </button>
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowCustomModal(true)}
+              style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+            >
+              <Plus size={16} /> Exame Avulso
+            </button>
+          </div>
+        )}
       </header>
 
-      {/* Main Grid: Catalog (Left) + Selected & Budget Preview (Right) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(340px, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
+      {/* Tabs Switcher */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '0.75rem', 
+        marginBottom: '1.5rem', 
+        borderBottom: '1px solid var(--border)',
+        paddingBottom: '0.75rem'
+      }}>
+        <button
+          onClick={() => setActiveTab('budget')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.625rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            fontWeight: '600',
+            fontSize: '0.9375rem',
+            cursor: 'pointer',
+            border: activeTab === 'budget' ? '1px solid var(--primary)' : '1px solid transparent',
+            backgroundColor: activeTab === 'budget' ? 'var(--primary-light)' : 'var(--surface)',
+            color: activeTab === 'budget' ? 'var(--primary)' : 'var(--text-secondary)',
+            boxShadow: activeTab === 'budget' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Stethoscope size={18} />
+          💰 Orçamento de Exames
+        </button>
+
+        <button
+          onClick={() => setActiveTab('scheduling')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.625rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            fontWeight: '600',
+            fontSize: '0.9375rem',
+            cursor: 'pointer',
+            border: activeTab === 'scheduling' ? '1px solid var(--primary)' : '1px solid transparent',
+            backgroundColor: activeTab === 'scheduling' ? 'var(--primary-light)' : 'var(--surface)',
+            color: activeTab === 'scheduling' ? 'var(--primary)' : 'var(--text-secondary)',
+            boxShadow: activeTab === 'scheduling' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <UserCheck size={18} />
+          📋 Solicitação de Dados e PCMSO (Agendamento & Orçamento)
+        </button>
+      </div>
+
+      {/* TAB 1: BUDGET TOOL */}
+      {activeTab === 'budget' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(340px, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
         
         {/* LEFT COLUMN: Exam Catalog */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -697,8 +835,217 @@ const ExamsBudgetPage = () => {
           </div>
 
         </div>
-
       </div>
+      )}
+
+      {/* TAB 2: SCHEDULING DATA & PCMSO REQUEST TEMPLATE */}
+      {activeTab === 'scheduling' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(340px, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
+          
+          {/* LEFT COLUMN: Controls & Field Selection */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            <div className="card" style={{ padding: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ClipboardList size={18} color="var(--primary)" /> Configuração do Modelo
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.125rem' }}>
+                <div>
+                  <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.875rem' }}>Tipo de Atendimento / Exame</label>
+                  <input 
+                    type="text" 
+                    className="modal-input" 
+                    value={schedExamType} 
+                    onChange={(e) => {
+                      setSchedExamType(e.target.value);
+                      setIsEditingSchedText(false);
+                    }}
+                    placeholder="Ex: ASO Admissional, Periódico, Demissional..."
+                  />
+                </div>
+
+                <div>
+                  <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.875rem', marginBottom: '0.5rem', display: 'block' }}>
+                    Campos Solicitados na Mensagem:
+                  </label>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr', 
+                    gap: '0.625rem',
+                    backgroundColor: 'var(--background)',
+                    padding: '0.875rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)'
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.cnpj} onChange={() => { toggleRequiredField('cnpj'); setIsEditingSchedText(false); }} />
+                      CNPJ da Empresa
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.pcmso} onChange={() => { toggleRequiredField('pcmso'); setIsEditingSchedText(false); }} />
+                      Cópia do PCMSO / PGR
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.employeeName} onChange={() => { toggleRequiredField('employeeName'); setIsEditingSchedText(false); }} />
+                      Nome do Funcionário
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.cpf} onChange={() => { toggleRequiredField('cpf'); setIsEditingSchedText(false); }} />
+                      CPF
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.birthDate} onChange={() => { toggleRequiredField('birthDate'); setIsEditingSchedText(false); }} />
+                      Data de Nascimento
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.role} onChange={() => { toggleRequiredField('role'); setIsEditingSchedText(false); }} />
+                      Função / Cargo
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.sector} onChange={() => { toggleRequiredField('sector'); setIsEditingSchedText(false); }} />
+                      Setor / Depto
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500' }}>
+                      <input type="checkbox" checked={requiredFields.admissionDate} onChange={() => { toggleRequiredField('admissionDate'); setIsEditingSchedText(false); }} />
+                      Data de Admissão
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={schedIncludeExplanation} 
+                      onChange={(e) => {
+                        setSchedIncludeExplanation(e.target.checked);
+                        setIsEditingSchedText(false);
+                      }} 
+                    />
+                    Incluir explicação do motivo dos dados
+                  </label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem', paddingLeft: '1.5rem', lineHeight: '1.4' }}>
+                    Esclarece à empresa que os dados e a cópia do PCMSO são necessários para identificação dos riscos ocupacionais por função, orçamento e emissão do ASO.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.875rem' }}>Orientações Adicionais (Opcional)</label>
+                  <textarea 
+                    className="modal-input" 
+                    rows={3} 
+                    value={schedInstructions} 
+                    onChange={(e) => {
+                      setSchedInstructions(e.target.value);
+                      setIsEditingSchedText(false);
+                    }}
+                    placeholder="Ex: Documentos necessários no dia, horários de atendimento..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--primary-light)', padding: '1rem', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--primary)', display: 'flex', gap: '0.75rem' }}>
+              <Info size={20} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                <strong>Dica:</strong> Você pode ajustar as opções ao lado ou clicar e editar livremente a caixa de texto à direita antes de enviar pelo WhatsApp.
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN: WhatsApp Live Preview & Actions */}
+          <div style={{ position: 'sticky', top: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            
+            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#efeae2', borderColor: '#d1c7bd' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: '#075e54', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                  <MessageSquare size={16} /> PRÉ-VISUALIZAÇÃO (WHATSAPP)
+                </span>
+                {schedCopied && (
+                  <span style={{ fontSize: '0.75rem', backgroundColor: '#25d366', color: '#fff', padding: '0.125rem 0.5rem', borderRadius: '1rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Check size={12} /> Copiado!
+                  </span>
+                )}
+              </div>
+
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.15)', marginBottom: '1rem' }}>
+                <textarea
+                  value={schedulingText}
+                  onChange={(e) => {
+                    setCustomSchedText(e.target.value);
+                    setIsEditingSchedText(true);
+                  }}
+                  rows={15}
+                  style={{
+                    width: '100%',
+                    fontFamily: 'inherit',
+                    fontSize: '0.875rem',
+                    lineHeight: '1.5',
+                    color: '#111b21',
+                    border: 'none',
+                    outline: 'none',
+                    resize: 'vertical',
+                    backgroundColor: 'transparent'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <button
+                  onClick={handleCopySchedText}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem',
+                    backgroundColor: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: '600',
+                    fontSize: '0.875rem',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
+                  }}
+                >
+                  {schedCopied ? <Check size={18} color="green" /> : <Copy size={18} />}
+                  {schedCopied ? 'Copiado!' : 'Copiar Texto'}
+                </button>
+
+                <button
+                  onClick={handleSendSchedWhatsApp}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem',
+                    backgroundColor: '#25d366',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: '700',
+                    fontSize: '0.875rem',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(37,211,102,0.3)',
+                    transition: 'var(--transition)'
+                  }}
+                >
+                  <Send size={18} />
+                  Enviar WhatsApp
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
       {/* MODAL: ADD CUSTOM EXAM */}
       {showCustomModal && (

@@ -42,7 +42,7 @@ const PublicCATPage = () => {
     l_especifico: '',
     
     p_parte: '',
-    lateral: 'Não aplicável',
+    p_lateral: 'Não aplicável',
     p_outras: '',
     
     m_data: '',
@@ -107,7 +107,7 @@ const PublicCATPage = () => {
 
     t += '\n03. LESÃO\n';
     t += `Parte do corpo atingida: ${formData.p_parte}\n`;
-    t += `Lateralidade: ${formData.lateral}\n`;
+    t += `Lateralidade: ${formData.p_lateral}\n`;
     if(formData.p_outras) t += `Outras partes/observações: ${formData.p_outras}\n`;
 
     t += '\n04. ATENDIMENTO MÉDICO\n';
@@ -441,7 +441,7 @@ const PublicCATPage = () => {
               </div>
               <div>
                 <label className="modal-label">Lateralidade <span style={{color: 'var(--error)'}}>*</span></label>
-                <select className="modal-input" name="lateral" value={formData.lateral} onChange={handleChange} required>
+                <select className="modal-input" name="p_lateral" value={formData.p_lateral} onChange={handleChange} required>
                   <option>Esquerdo</option>
                   <option>Direito</option>
                   <option>Ambos</option>

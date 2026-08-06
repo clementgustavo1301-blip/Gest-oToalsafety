@@ -241,8 +241,8 @@ export async function sendDailyReport(replyChatId = null) {
       const quem = respName || instructorName || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
       const horario = t.time || 'Sem horário';
-      return `📌 *${t.title || 'Treinamento'}* na ${nomeEmpresa} (📅 ${dataFormatada} às ${horario} | 👤 Responsável: ${quem})`;
-    }).join('\n');
+      return `📌 *${t.title || 'Treinamento'}*\n   🏢 Empresa: ${nomeEmpresa}\n   📅 Data: ${dataFormatada} às ${horario}\n   👤 Responsável: ${quem}`;
+    }).join('\n\n');
     if (!detalhesProximos) detalhesProximos = "_Nenhum agendamento previsto para os próximos 9 dias._";
 
     // Formatar detalhes dos atrasados
@@ -252,8 +252,8 @@ export async function sendDailyReport(replyChatId = null) {
       const instructorName = (t.instructor && typeof t.instructor === 'string' && t.instructor.trim()) ? t.instructor.trim() : null;
       const quem = respName || instructorName || 'Não informado';
       const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
-      return `⚠️ *${t.title || 'Treinamento'}* na ${nomeEmpresa} (Era 📅 ${dataFormatada} | 👤 Responsável: ${quem})`;
-    }).join('\n');
+      return `⚠️ *${t.title || 'Treinamento'}*\n   🏢 Empresa: ${nomeEmpresa}\n   📅 Data Original: ${dataFormatada}\n   👤 Responsável: ${quem}`;
+    }).join('\n\n');
     if (!detalhesAtrasados) detalhesAtrasados = "_Nenhum agendamento atrasado sem resposta._";
 
     let reportMessage = `📊 *Relatório Diário de Agendamentos*\n\n`;
@@ -285,8 +285,9 @@ ${detalhesProximos}
 
 Crie uma mensagem muito profissional, amigável e direta (com emojis). 
 Comece direto com um título legal, sem "Olá". Formate em Markdown (*negrito*). 
-Deixe claro o panorama geral (Total e Executados) de forma resumida, mas FOQUE BASTANTE em listar os itens Atrasados (dando destaque de alerta) e os itens para os Próximos 9 dias em tópicos (bullet points) para fácil leitura.
-OBRIGATÓRIO: Para cada treinamento ou agendamento listado nos tópicos, VOCÊ DEVE MANTER VISÍVEL o nome do Responsável (👤 Responsável: [Nome]). Não omitir o nome do responsável em nenhuma hipótese.
+Deixe claro o panorama geral (Total e Executados) de forma resumida, mas FOQUE BASTANTE em listar os itens Atrasados (dando destaque de alerta) e os itens para os Próximos 9 dias.
+OBRIGATÓRIO: Para cada treinamento ou agendamento listado, VOCÊ DEVE MANTER VISÍVEL AS 3 LINHAS SEPARADAS (uma linha para 🏢 Empresa, uma para 📅 Data, e uma para 👤 Responsável). 
+NÃO junte essas informações na mesma linha, para que a leitura fique limpa e as informações não fiquem "muito juntas".
 Retorne apenas a mensagem final do Telegram.`;
         
         const aiPromise = model.generateContent(prompt);
@@ -303,6 +304,116 @@ Retorne apenas a mensagem final do Telegram.`;
 
   } catch (err) {
     console.error('Erro geral ao gerar relatório de agendamentos:', err.message);
+  }
+}
+
+export async function sendDailyReportByResponsible(replyChatId = null) {
+  console.log('\n📊 Iniciando geração do relatório de agendamentos por responsável...');
+  
+  try {
+    if (!supabase) throw new Error("Supabase cliente não inicializado");
+    const { data: trainings, error } = await supabase.from('trainings').select('*');
+    if (error) {
+      console.error('Erro ao buscar treinamentos para o relatório:', error.message);
+      return;
+    }
+
+    const { data: companiesData } = await supabase.from('companies').select('id, name');
+    const { data: profilesData } = await supabase.from('profiles').select('id, name');
+    const compMap = {};
+    if (companiesData) companiesData.forEach(c => compMap[c.id] = c.name);
+    const profMap = {};
+    if (profilesData) profilesData.forEach(p => profMap[p.id] = p.name);
+
+    const now = new Date();
+    const startOfToday = startOfDay(now);
+    const endOfNext9Days = endOfDay(addDays(now, 9));
+
+    // Filtrar apenas agendamentos relevantes (atrasados e próximos 9 dias)
+    const pendentesAtrasadosOuProximos = trainings.filter(t => {
+      if (t.status !== 'agendado' && t.status !== 'pendente') return false;
+      const tDate = t.date ? parseISO(t.date) : null;
+      if (!tDate) return false;
+      
+      const isAtrasado = tDate < startOfToday;
+      const isProximo = isWithinInterval(tDate, { start: startOfToday, end: endOfNext9Days });
+      
+      return isAtrasado || isProximo;
+    });
+    pendentesAtrasadosOuProximos.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Agrupar por responsável
+    const agrupadoPorResponsavel = {};
+    
+    pendentesAtrasadosOuProximos.forEach(t => {
+      const respName = t.responsible_id ? profMap[t.responsible_id] : null;
+      const instructorName = (t.instructor && typeof t.instructor === 'string' && t.instructor.trim()) ? t.instructor.trim() : null;
+      const quem = respName || instructorName || 'Não informado';
+      
+      if (!agrupadoPorResponsavel[quem]) {
+        agrupadoPorResponsavel[quem] = [];
+      }
+      agrupadoPorResponsavel[quem].push(t);
+    });
+
+    // Formatar detalhes por responsável
+    let detalhesFormatados = Object.keys(agrupadoPorResponsavel).sort().map(responsavel => {
+      let blocoResponsavel = `👤 *Responsável: ${responsavel}*\n`;
+      
+      const itensResponsavel = agrupadoPorResponsavel[responsavel].map(t => {
+        const nomeEmpresa = compMap[t.company_id] || 'Empresa Desconhecida';
+        const tDate = parseISO(t.date);
+        const isAtrasado = tDate < startOfToday;
+        const icon = isAtrasado ? '⚠️' : '📌';
+        const dataFormatada = t.date ? t.date.split('-').reverse().join('/') : 'S/D';
+        const horario = t.time || 'Sem horário';
+        const extraHorario = isAtrasado ? '' : ` às ${horario}`;
+        const lblData = isAtrasado ? 'Data Original' : 'Data';
+        
+        return `   ${icon} *${t.title || 'Treinamento'}*\n      🏢 Empresa: ${nomeEmpresa}\n      📅 ${lblData}: ${dataFormatada}${extraHorario}`;
+      }).join('\n\n');
+      
+      return blocoResponsavel + itensResponsavel;
+    }).join('\n\n------------------------\n\n');
+
+    if (!detalhesFormatados) detalhesFormatados = "_Nenhum agendamento pendente/atrasado ou para os próximos 9 dias encontrado._";
+
+    let reportMessage = `📊 *Relatório de Agendamentos por Responsável*\n\n`;
+    reportMessage += `${detalhesFormatados}\n`;
+
+    console.log('✈️ Enviando relatório de agendamentos por responsável...');
+
+    if (genAI) {
+      console.log('🧠 Tentando melhorar relatório por responsável com IA...');
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const prompt = `Você é o assistente virtual do TotalSafety (software de gestão de segurança do trabalho). 
+Gere o relatório de agendamentos agrupados por Responsável.
+
+DADOS AGRUPADOS:
+${detalhesFormatados}
+
+Crie uma mensagem muito profissional e amigável (com emojis). 
+Comece direto com um título legal, sem "Olá". Formate em Markdown (*negrito*). 
+OBRIGATÓRIO: Mantenha o agrupamento por responsável intacto. 
+Abaixo do nome de cada responsável, liste seus treinamentos mantendo as linhas separadas (uma linha para o nome do treinamento, uma para 🏢 Empresa, uma para 📅 Data) para não ficar "muito junto".
+Dê destaque de urgência aos que tiverem ícone ⚠️ (Atrasados).
+Retorne apenas a mensagem final do Telegram.`;
+        
+        const aiPromise = model.generateContent(prompt);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 7000));
+        const result = await Promise.race([aiPromise, timeoutPromise]);
+        const response = await result.response;
+        reportMessage = response.text();
+      } catch (aiError) {
+        console.warn('⏱️ IA falhou, usando relatório padrão:', aiError.message);
+      }
+    }
+
+    await sendTelegramMessage(reportMessage, { replyChatId });
+
+  } catch (err) {
+    console.error('Erro geral ao gerar relatório por responsável:', err.message);
   }
 }
 
