@@ -84,7 +84,7 @@ const CompaniesPage = () => {
       c.cnpj.includes(searchTerm)
     );
     return matchGroup || matchCompany;
-  });
+  }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
