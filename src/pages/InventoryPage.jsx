@@ -10,6 +10,7 @@ const InventoryPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [quickMove, setQuickMove] = useState({});
+  const [activeTab, setActiveTab] = useState('Clínica');
 
   const handleQuickMove = async (item, amount) => {
     if (!amount || isNaN(amount) || amount === 0) return;
@@ -55,22 +56,60 @@ const InventoryPage = () => {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Carregando estoque...</div>;
   }
 
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredItems = items.filter(item => {
+    const matchesTab = (item.sector === activeTab) || (!item.sector && activeTab === 'Clínica');
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesTab && matchesSearch;
+  });
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <header className="header-responsive">
         <div>
           <h1 className="text-h1">Controle de Estoque</h1>
-          <p className="text-subtitle">Gerencie os insumos da clínica.</p>
+          <p className="text-subtitle">Gerencie os insumos da {activeTab.toLowerCase()}.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={18} /> Novo Insumo
         </button>
       </header>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+        <button
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'Clínica' ? '2px solid var(--primary)' : '2px solid transparent',
+            color: activeTab === 'Clínica' ? 'var(--primary)' : 'var(--text-secondary)',
+            fontWeight: activeTab === 'Clínica' ? '600' : '500',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            transition: 'var(--transition)'
+          }}
+          onClick={() => setActiveTab('Clínica')}
+        >
+          Clínica
+        </button>
+        <button
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'SST' ? '2px solid var(--primary)' : '2px solid transparent',
+            color: activeTab === 'SST' ? 'var(--primary)' : 'var(--text-secondary)',
+            fontWeight: activeTab === 'SST' ? '600' : '500',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            transition: 'var(--transition)'
+          }}
+          onClick={() => setActiveTab('SST')}
+        >
+          SST
+        </button>
+      </div>
 
       {/* Search */}
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
@@ -228,6 +267,7 @@ const InventoryPage = () => {
         <AddInventoryModal 
           onClose={handleCloseModal} 
           item={editingItem} 
+          sector={activeTab}
         />
       )}
     </div>

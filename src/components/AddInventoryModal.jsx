@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Package, Hash, AlertTriangle, Layers, Plus, Minus } from 'lucide-react';
 import { addInventoryItem, updateInventoryItem } from '../services/storageService';
 
-const AddInventoryModal = ({ onClose, item }) => {
+const AddInventoryModal = ({ onClose, item, sector }) => {
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -67,7 +67,7 @@ const AddInventoryModal = ({ onClose, item }) => {
     e.preventDefault();
     setLoading(true);
     
-    const payload = { ...formData };
+    const payload = { ...formData, sector: sector || 'Clínica' };
     delete payload.entrada;
     delete payload.saida;
     

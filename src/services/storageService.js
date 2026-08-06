@@ -490,17 +490,43 @@ export function getDocumentUrl(filePath) {
 export async function getInventory() {
   const { data, error } = await supabase.from('inventory').select('*').order('name', { ascending: true });
   if (error) { console.error('Error fetching inventory:', error); return []; }
-  return data;
+  
+  return data.map(item => {
+    let sector = 'Clínica';
+    let cleanCategory = item.category || '';
+    
+    if (cleanCategory.startsWith('[SST]')) {
+      sector = 'SST';
+      cleanCategory = cleanCategory.replace('[SST]', '').trim();
+    } else if (cleanCategory.startsWith('[Clínica]')) {
+      sector = 'Clínica';
+      cleanCategory = cleanCategory.replace('[Clínica]', '').trim();
+    }
+    
+    return { ...item, sector, category: cleanCategory };
+  });
 }
 
 export async function addInventoryItem(item) {
-  const { data, error } = await supabase.from('inventory').insert([item]).select().single();
+  const payload = { ...item };
+  if (payload.sector) {
+    payload.category = `[${payload.sector}] ${payload.category || ''}`.trim();
+    delete payload.sector;
+  } else {
+    payload.category = `[Clínica] ${payload.category || ''}`.trim();
+  }
+  const { data, error } = await supabase.from('inventory').insert([payload]).select().single();
   if (error) { console.error('Error adding inventory item:', error); return null; }
   return data;
 }
 
 export async function updateInventoryItem(itemId, updates) {
-  const { data, error } = await supabase.from('inventory').update(updates).eq('id', itemId).select().single();
+  const payload = { ...updates };
+  if (payload.sector) {
+    payload.category = `[${payload.sector}] ${payload.category || ''}`.trim();
+    delete payload.sector;
+  }
+  const { data, error } = await supabase.from('inventory').update(payload).eq('id', itemId).select().single();
   if (error) { console.error('Error updating inventory item:', error); return null; }
   return data;
 }

@@ -56,8 +56,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: <Wrench size={20} />, 
       subItems: [
         ...(isAdminDiretoria ? [
-          { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={18} /> },
-          { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> }
+          { name: 'Convocações', path: '/convocations', icon: <ClipboardCheck size={18} /> }
         ] : []),
         { name: 'Contatos', path: '/contacts', icon: <Users size={18} /> },
         { name: 'Cronograma', path: '/schedule-generator', icon: <Wand2 size={18} /> },
@@ -65,7 +64,8 @@ const Sidebar = ({ isOpen, onClose }) => {
           { name: 'Modelos de Mensagem', path: '/exams-budget', icon: <MessageSquare size={18} /> }
         ] : []),
         ...(isSSTOrAdmin ? [
-          { name: 'Gestão de CATs', path: '/cat', icon: <ClipboardList size={18} /> }
+          { name: 'Gestão de CATs', path: '/cat', icon: <ClipboardList size={18} /> },
+          { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> }
         ] : []),
         ...(isAdminDiretoria ? [
           { name: 'Relatórios', path: '/reports', icon: <BarChart3 size={18} /> },
