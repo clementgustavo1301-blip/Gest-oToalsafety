@@ -158,20 +158,31 @@ const PublicCATPage = () => {
     const generatedProtocol = `CAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     try {
+      const payload = { ...formData };
+      
+      // Parse integers
+      payload.a_diasafast = payload.a_diasafast ? parseInt(payload.a_diasafast) : null;
+      payload.m_durtrat = payload.m_durtrat ? parseInt(payload.m_durtrat) : null;
+      
+      // Parse dates (empty string must be null for Postgres)
+      const dateFields = ['a_data', 'a_ultimodia', 'a_retorno', 'a_dtobito', 'm_data'];
+      dateFields.forEach(field => {
+        if (!payload[field]) {
+          payload[field] = null;
+        }
+      });
+      
+      payload.protocol = generatedProtocol;
+
       const { error: dbError } = await supabase
         .from('cat_records')
-        .insert({
-          ...formData,
-          a_diasafast: formData.a_diasafast ? parseInt(formData.a_diasafast) : null,
-          m_durtrat: formData.m_durtrat ? parseInt(formData.m_durtrat) : null,
-          protocol: generatedProtocol
-        });
+        .insert(payload);
 
-      // Se a tabela cat_records não existir ainda ou falhar a conexão,
-      // não vamos bloquear o usuário cliente, vamos mostrar sucesso simulado
-      // pois o frontend precisa funcionar independentemente.
       if (dbError) {
-        console.warn('Erro ao inserir no banco Supabase. Fallback ativado.', dbError);
+        console.error('Erro ao inserir no Supabase:', dbError);
+        setError('Erro ao salvar no banco: ' + dbError.message);
+        setLoading(false);
+        return;
       }
       
       setProtocol(generatedProtocol);
