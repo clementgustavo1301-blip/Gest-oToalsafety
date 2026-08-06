@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { 
   AlertTriangle, FileText, Search, Filter, 
-  CheckCircle, Clock, X, Eye, Copy, Download, RefreshCw, Send, CheckCircle2 
+  CheckCircle, Clock, X, Eye, Copy, Download, RefreshCw, Send, CheckCircle2, Printer 
 } from 'lucide-react';
 
 const CATPage = () => {
