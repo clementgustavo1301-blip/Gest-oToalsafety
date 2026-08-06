@@ -126,7 +126,6 @@ const PublicCATPage = () => {
 
     t += '\n------------------------------------------------------\n';
     t += `Formulário enviado em: ${new Date().toLocaleString('pt-BR')}\n`;
-    if(protocol) t += `Protocolo de envio: ${protocol}\n`;
     t += 'Ecosafety Consultoria — Saúde e Segurança do Trabalho\n';
     return t;
   };
@@ -142,7 +141,7 @@ const PublicCATPage = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `CAT_${protocol || 'Formulario'}.txt`;
+    a.download = `CAT_Formulario.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -153,9 +152,6 @@ const PublicCATPage = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
-    // Generate a simple protocol
-    const generatedProtocol = `CAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     try {
       const payload = { ...formData };
@@ -171,8 +167,6 @@ const PublicCATPage = () => {
           payload[field] = null;
         }
       });
-      
-      payload.protocol = generatedProtocol;
 
       const { error: dbError } = await supabase
         .from('cat_records')
@@ -185,7 +179,6 @@ const PublicCATPage = () => {
         return;
       }
       
-      setProtocol(generatedProtocol);
       setSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -210,11 +203,6 @@ const PublicCATPage = () => {
             A equipe de SST da Ecosafety Consultoria recebeu os dados da CAT. 
             Em breve daremos andamento à transmissão.
           </p>
-          
-          <div style={{ backgroundColor: 'var(--background)', padding: '1.5rem', borderRadius: '8px', border: '1px dashed var(--border)', marginBottom: '2rem' }}>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Número do Protocolo</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)', letterSpacing: '0.1em' }}>{protocol}</p>
-          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             <button className="btn btn-secondary" onClick={handleCopy} style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>

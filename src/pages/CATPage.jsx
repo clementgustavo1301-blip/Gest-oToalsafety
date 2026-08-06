@@ -79,7 +79,6 @@ const CATPage = () => {
 
   const copyCatDataForEsocial = (cat) => {
     let t = `--- DADOS S-2210 PARA ESOCIAL ---\n`;
-    t += `Protocolo: ${cat.protocol}\n`;
     t += `Empresa: ${cat.company_name} (CNPJ: ${cat.company_cnpj})\n`;
     t += `Trabalhador: ${cat.employee_name} (CPF: ${cat.employee_cpf})\n\n`;
     
@@ -120,8 +119,7 @@ const CATPage = () => {
 
   const filteredCats = cats.filter(c => 
     c.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.protocol?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -191,7 +189,7 @@ const CATPage = () => {
             <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ backgroundColor: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Protocolo / Data</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Data de Envio</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Trabalhador</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Empresa</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Status</th>
@@ -204,9 +202,11 @@ const CATPage = () => {
                   return (
                     <tr key={cat.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '1rem' }}>
-                        <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.875rem' }}>{cat.protocol || 'CAT-S/N'}</div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                          {new Date(cat.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {new Date(cat.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit' })}
+                          {new Date(cat.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute:'2-digit' })}
                         </div>
                       </td>
                       <td style={{ padding: '1rem' }}>
@@ -259,7 +259,7 @@ const CATPage = () => {
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: 'var(--card)', zIndex: 10 }}>
               <div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  Detalhes da CAT - {selectedCat.protocol}
+                  Detalhes da Ocorrência
                 </h2>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Enviada em {new Date(selectedCat.created_at).toLocaleString('pt-BR')}</p>
               </div>
