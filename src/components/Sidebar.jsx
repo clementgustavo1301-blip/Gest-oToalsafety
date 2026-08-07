@@ -65,6 +65,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         ] : []),
         ...(isSSTOrAdmin ? [
           { name: 'Gestão de CATs', path: '/cat', icon: <ClipboardList size={18} /> },
+          { name: 'Certificados', path: '/certificates', icon: <FileText size={18} /> },
           { name: 'Estoque', path: '/inventory', icon: <Package size={18} /> }
         ] : []),
         ...(isAdminDiretoria ? [

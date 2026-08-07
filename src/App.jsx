@@ -20,6 +20,7 @@ import StorageManagementPage from './pages/StorageManagementPage';
 import ExamsBudgetPage from './pages/ExamsBudgetPage';
 import PublicCATPage from './pages/PublicCATPage';
 import CATPage from './pages/CATPage';
+import CertificatesPage from './pages/CertificatesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -79,6 +80,11 @@ const AppLayout = () => {
             <Route path="/cat" element={
               <ProtectedRoute allowedSectors={['SST', 'Diretoria', 'Admin']}>
                 <CATPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/certificates" element={
+              <ProtectedRoute allowedSectors={['SST', 'Diretoria', 'Admin']}>
+                <CertificatesPage />
               </ProtectedRoute>
             } />
           </Routes>
