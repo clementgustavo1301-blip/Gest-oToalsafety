@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Award, Printer, Download } from 'lucide-react';
-import TopBar from '../components/TopBar';
+import { Award, Printer, Download, FileText } from 'lucide-react';
 
 const CertificatesPage = () => {
   const [formData, setFormData] = useState({
@@ -40,9 +39,15 @@ const CertificatesPage = () => {
   ];
 
   return (
-    <div className="page-container">
-      <div className="hide-on-print">
-        <TopBar title="Gerador de Certificados SST" />
+    <div className="page-container" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="hide-on-print" style={{ marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <FileText size={28} color="var(--primary)" />
+          Gerador de Certificados SST
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+          Preencha os dados abaixo para gerar e imprimir os certificados de treinamento.
+        </p>
       </div>
 
       <div className="content-area" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
