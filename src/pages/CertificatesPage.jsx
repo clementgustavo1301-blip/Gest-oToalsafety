@@ -267,7 +267,7 @@ const CertificatesPage = () => {
           {generating ? (
             <><Loader size={18} className="spin" /> Gerando...</>
           ) : (
-            <><Download size={18} /> Baixar PPTX Timbrado</>
+            <><Download size={18} /> Baixar PPTX</>
           )}
         </button>
       </div>
