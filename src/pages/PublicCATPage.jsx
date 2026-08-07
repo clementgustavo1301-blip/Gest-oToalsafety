@@ -72,27 +72,16 @@ const PublicCATPage = () => {
     let t = 'COMUNICAÇÃO DE ACIDENTE DE TRABALHO — COLETA DE DADOS\n';
     t += '======================================================\n\n';
     
-    t += 'EMPRESA E COLABORADOR\n';
-    t += `Empresa: ${formData.company_name}\n`;
-    t += `CNPJ: ${formData.company_cnpj}\n`;
-    t += `Colaborador: ${formData.employee_name}\n`;
-    t += `CPF: ${formData.employee_cpf}\n\n`;
-
     t += '01. DADOS DO ACIDENTE\n';
-    t += `Tipo de CAT: ${formData.tp_cat}\n`;
     t += `Tipo do acidente: ${formData.tp_acid}\n`;
     t += `Data: ${formData.a_data}\n`;
     t += `Hora: ${formData.a_hora}\n`;
-    t += `Horas trabalhadas antes do acidente: ${formData.a_hrstrab}\n`;
-    t += `Último dia trabalhado: ${formData.a_ultimodia}\n`;
     t += `Houve afastamento: ${formData.afast}\n`;
     if(formData.a_diasafast) t += `Dias de afastamento: ${formData.a_diasafast}\n`;
     if(formData.a_retorno) t += `Previsão de retorno: ${formData.a_retorno}\n`;
     t += `Houve óbito: ${formData.obito}\n`;
     if(formData.a_dtobito) t += `Data do óbito: ${formData.a_dtobito}\n`;
     t += `Registro policial: ${formData.policia}\n`;
-    t += `Agente causador: ${formData.a_agente}\n`;
-    t += `Natureza da lesão: ${formData.a_natureza}\n`;
     if(formData.a_descricao) t += `Situação geradora:\n${formData.a_descricao}\n`;
 
     t += '\n02. LOCAL DO ACIDENTE\n';
@@ -113,12 +102,8 @@ const PublicCATPage = () => {
     t += '\n04. ATENDIMENTO MÉDICO\n';
     t += `Data do atendimento: ${formData.m_data}\n`;
     t += `Hora do atendimento: ${formData.m_hora}\n`;
-    t += `Unidade: ${formData.m_unidade}\n`;
-    t += `Endereço da unidade: ${formData.m_unid_end}\n`;
-    t += `CNES: ${formData.m_cnes}\n`;
     t += `Internação: ${formData.intern}\n`;
     t += `CID-10: ${formData.m_cid}\n`;
-    t += `Diagnóstico provável: ${formData.m_diag}\n`;
     t += `Duração provável do tratamento (dias): ${formData.m_durtrat}\n`;
     if(formData.m_desclesao) t += `Descrição da lesão: ${formData.m_desclesao}\n`;
     t += `Médico emitente: ${formData.m_medico}\n`;
@@ -263,32 +248,6 @@ const PublicCATPage = () => {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          {/* BLOCO 0: Empresa e Funcionario */}
-          <section className="card" style={{ padding: '2rem', overflow: 'visible' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-              <span style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700' }}>00</span>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>Identificação</h2>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
-              <div>
-                <label className="modal-label">Empresa Cliente <span style={{color: 'var(--error)'}}>*</span></label>
-                <input required type="text" className="modal-input" name="company_name" value={formData.company_name} onChange={handleChange} placeholder="Razão Social" />
-              </div>
-              <div>
-                <label className="modal-label">CNPJ da Empresa <span style={{color: 'var(--error)'}}>*</span></label>
-                <input required type="text" className="modal-input" name="company_cnpj" value={formData.company_cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" />
-              </div>
-              <div>
-                <label className="modal-label">Nome do Colaborador Acidentado <span style={{color: 'var(--error)'}}>*</span></label>
-                <input required type="text" className="modal-input" name="employee_name" value={formData.employee_name} onChange={handleChange} placeholder="Nome completo" />
-              </div>
-              <div>
-                <label className="modal-label">CPF do Colaborador <span style={{color: 'var(--error)'}}>*</span></label>
-                <input required type="text" className="modal-input" name="employee_cpf" value={formData.employee_cpf} onChange={handleChange} placeholder="000.000.000-00" />
-              </div>
-            </div>
-          </section>
-
           {/* BLOCO 01: Dados do acidente */}
           <section className="card" style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
@@ -297,14 +256,6 @@ const PublicCATPage = () => {
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
-              <div>
-                <label className="modal-label">Tipo de CAT <span style={{color: 'var(--error)'}}>*</span></label>
-                <select className="modal-input" name="tp_cat" value={formData.tp_cat} onChange={handleChange} required>
-                  <option>Inicial</option>
-                  <option>Reabertura</option>
-                  <option>Comunicação de óbito</option>
-                </select>
-              </div>
               <div>
                 <label className="modal-label">Tipo do Acidente <span style={{color: 'var(--error)'}}>*</span></label>
                 <select className="modal-input" name="tp_acid" value={formData.tp_acid} onChange={handleChange} required>
@@ -320,14 +271,6 @@ const PublicCATPage = () => {
               <div>
                 <label className="modal-label">Hora do Acidente <span style={{color: 'var(--error)'}}>*</span></label>
                 <input type="time" className="modal-input" name="a_hora" value={formData.a_hora} onChange={handleChange} required />
-              </div>
-              <div>
-                <label className="modal-label">Horas Trab. Antes (HH:MM)</label>
-                <input type="text" className="modal-input" name="a_hrstrab" value={formData.a_hrstrab} onChange={handleChange} placeholder="Ex: 04:30" />
-              </div>
-              <div>
-                <label className="modal-label">Último Dia Trabalhado</label>
-                <input type="date" className="modal-input" name="a_ultimodia" value={formData.a_ultimodia} onChange={handleChange} />
               </div>
               <div>
                 <label className="modal-label">Houve Afastamento? <span style={{color: 'var(--error)'}}>*</span></label>
@@ -350,14 +293,6 @@ const PublicCATPage = () => {
               <div>
                 <label className="modal-label">Data Óbito</label>
                 <input type="date" className="modal-input" name="a_dtobito" value={formData.a_dtobito} onChange={handleChange} />
-              </div>
-              <div>
-                <label className="modal-label">Agente Causador</label>
-                <input type="text" className="modal-input" name="a_agente" value={formData.a_agente} onChange={handleChange} placeholder="Ex: Máquina, Ferramenta, Queda..." />
-              </div>
-              <div>
-                <label className="modal-label">Natureza da Lesão</label>
-                <input type="text" className="modal-input" name="a_natureza" value={formData.a_natureza} onChange={handleChange} placeholder="Ex: Corte, Contusão, Fratura..." />
               </div>
             </div>
 
@@ -470,18 +405,6 @@ const PublicCATPage = () => {
                 <label className="modal-label">Hora do Atendimento</label>
                 <input type="time" className="modal-input" name="m_hora" value={formData.m_hora} onChange={handleChange} />
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="modal-label">Unidade de Atendimento <span style={{color: 'var(--error)'}}>*</span></label>
-                <input type="text" className="modal-input" name="m_unidade" value={formData.m_unidade} onChange={handleChange} required placeholder="Nome do hospital, UPA, clínica..." />
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="modal-label">Endereço da Unidade</label>
-                <input type="text" className="modal-input" name="m_unid_end" value={formData.m_unid_end} onChange={handleChange} />
-              </div>
-              <div>
-                <label className="modal-label">CNES</label>
-                <input type="text" className="modal-input" name="m_cnes" value={formData.m_cnes} onChange={handleChange} />
-              </div>
               <div>
                 <label className="modal-label">Houve Internação? <span style={{color: 'var(--error)'}}>*</span></label>
                 <select className="modal-input" name="intern" value={formData.intern} onChange={handleChange} required>
@@ -492,10 +415,6 @@ const PublicCATPage = () => {
               <div>
                 <label className="modal-label">CID-10 <span style={{color: 'var(--error)'}}>*</span></label>
                 <input type="text" className="modal-input" name="m_cid" value={formData.m_cid} onChange={handleChange} required placeholder="Ex: S62.6" />
-              </div>
-              <div>
-                <label className="modal-label">Diagnóstico Provável</label>
-                <input type="text" className="modal-input" name="m_diag" value={formData.m_diag} onChange={handleChange} />
               </div>
               <div>
                 <label className="modal-label">Duração Tratamento (dias)</label>

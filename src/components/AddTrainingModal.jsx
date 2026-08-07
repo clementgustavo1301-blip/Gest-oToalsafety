@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
-import { getDeliverablesByCompany, getCompanies, getProfiles } from '../services/storageService';
+import { getDeliverablesByCompany, getCompanies, getProfiles, getGroups } from '../services/storageService';
 
 const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyId || '');
@@ -13,6 +13,9 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [participants, setParticipants] = useState('');
   const [description, setDescription] = useState('');
   const [responsibleId, setResponsibleId] = useState('');
+
+  const [groups, setGroups] = useState([]);
+  const [selectedGroupId, setSelectedGroupId] = useState('');
 
   const [recurrence, setRecurrence] = useState('none');
   const [customDays, setCustomDays] = useState(7);
@@ -29,11 +32,15 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   useEffect(() => {
     async function load() {
       setLoadingData(true);
-      const [comps, profs] = await Promise.all([
+      const [comps, profs, grps] = await Promise.all([
         !companyId ? getCompanies() : Promise.resolve([]),
-        getProfiles()
+        getProfiles(),
+        !companyId ? getGroups() : Promise.resolve([])
       ]);
-      if (!companyId) setCompanies(comps);
+      if (!companyId) {
+        setCompanies(comps);
+        setGroups(grps);
+      }
       setProfiles(profs);
       
       if (selectedCompanyId) {
@@ -148,6 +155,28 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
           <form onSubmit={handleSubmit}>
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
+              {/* Group Selection if global */}
+              {!companyId && (
+                <div>
+                  <label className="modal-label" htmlFor="training-group">Grupo Econômico</label>
+                  <select
+                    id="training-group"
+                    value={selectedGroupId}
+                    onChange={(e) => {
+                      setSelectedGroupId(e.target.value);
+                      setSelectedCompanyId(''); // reset company when group changes
+                    }}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Todos os Grupos</option>
+                    {groups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Company Selection if global */}
               {!companyId && (
                 <div>
@@ -161,7 +190,9 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                     disabled={saving}
                   >
                     <option value="" disabled>Selecione a empresa...</option>
-                    {companies.map(c => (
+                    {companies
+                      .filter(c => !selectedGroupId || c.groupId === selectedGroupId)
+                      .map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
