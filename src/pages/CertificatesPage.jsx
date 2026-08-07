@@ -59,12 +59,12 @@ const CertificatesPage = () => {
 
   const conteudoSugestoes = {
     'NR - 01': 'a) direitos e deveres do empregado e empregador;\nb) riscos ocupacionais e medidas de prevenção;\nc) classificação dos fatores de risco;\nd) noções sobre acidentes e doenças do trabalho;\ne) procedimentos em situações de emergência.',
-    'NR - 05': 'a) estudo do ambiente e condições de trabalho;\nb) metodologia de investigação de acidentes;\nc) noções sobre as legislações trabalhistas e previdenciárias;\nd) princípios gerais de higiene do trabalho;\ne) organização da CIPA e atribuições.',
-    'NR - 06': 'a) descrição do equipamento e seus componentes;\nb) risco ocupacional contra o qual o EPI oferece proteção;\nc) restrições e limitações de proteção;\nd) forma adequada de uso e ajuste;\ne) manutenção e substituição; e\nf) cuidados de limpeza, higienização, guarda e conservação.',
+    'NR - 05': '1. Riscos do ambiente e condições de trabalho / acidentes e doenças ocupacionais / medidas de prevenção / metodologia de análise de acidentes e doenças / higiene do trabalho\n2. Noções de legislações trabalhista e previdenciária de SST / inclusão de pessoas com deficiência e reabilitados\n3. Organização e funcionamento da CIPA\n4. Prevenção e combate ao assédio sexual e a outras formas de violência no trabalho',
+    'NR - 06': '1. O que é EPI\n2. Responsabilidades do empregador, trabalhador e fornecedor\n3. Riscos ambientais / Tipos de EPIs\n4. Ficha de controle / Uso correto\n5. Higienização e manutenção',
     'NR - 10': 'a) introdução à segurança com eletricidade;\nb) riscos em instalações e serviços com eletricidade;\nc) técnicas de análise de risco;\nd) medidas de controle do risco elétrico;\ne) equipamentos de proteção coletiva e individual;\nf) rotinas de trabalho e procedimentos.',
     'NR - 11': 'a) tipos de equipamentos de transporte;\nb) procedimentos de segurança na movimentação de materiais;\nc) operação segura de equipamentos;\nd) sinalização;\ne) manutenção preventiva.',
-    'NR - 12': 'a) descrição e identificação dos riscos associados;\nb) proteções – Loss Prevention e seus princípios;\nc) método de trabalho seguro;\nd) permissão de trabalho;\ne) sistema de bloqueio de fontes de energia.',
-    'NR - 18': 'a) informações sobre as condições do ambiente de trabalho;\nb) riscos inerentes à função;\nc) uso adequado dos EPI;\nd) informações sobre os EPC existentes no canteiro;\ne) procedimentos adequados em caso de emergência.',
+    'NR - 12': '1. Riscos e proteções\n2. Funcionamento das proteções\n3. Como e em que circunstâncias uma proteção pode ser removida, e por quem\n4. O que fazer se uma proteção foi danificada ou perdeu sua função\n5. Princípios de segurança\n6. Segurança para riscos mecânicos, elétricos e outros relevantes\n7. Método de trabalho seguro\n8. Permissão de trabalho\n9. Sistema de bloqueio',
+    'NR - 18': '1. Condições e meio ambiente de trabalho / riscos inerentes às atividades desenvolvidas\n2. Equipamentos e proteção coletiva existentes\n3. Uso adequado dos EPI / PGR da obra',
     'NR - 20': 'a) inflamáveis: características e propriedades;\nb) controle coletivo e individual;\nc) fontes de ignição e seu controle;\nd) proteção contra incêndio;\ne) procedimentos em situações de emergência.',
     'NR - 33': 'a) definição de espaço confinado;\nb) reconhecimento, avaliação e controle de riscos;\nc) funcionamento de equipamentos de medição;\nd) procedimentos e utilização da PET;\ne) noções de resgate e primeiros socorros.',
     'NR - 35': 'a) normas e regulamentos aplicáveis;\nb) análise de risco e condições impeditivas;\nc) riscos potenciais inerentes e medidas de prevenção;\nd) sistemas, equipamentos e procedimentos de proteção coletiva;\ne) EPI – seleção, inspeção, conservação e limitação de uso;\nf) acidentes típicos em trabalhos em altura.',
@@ -83,13 +83,27 @@ const CertificatesPage = () => {
     'NR - 35': 'Sobre Trabalho em Altura conforme exigências da Norma Regulamentadora - NR 35',
   };
 
+  const duracoes = {
+    'NR - 01': 'A critério da empresa',
+    'NR - 05': '8 horas (GR 1) / 12 horas (GR 2) / 16 horas (GR 3) / 20 horas (GR 4)',
+    'NR - 06': 'A critério da empresa',
+    'NR - 10': '40 horas',
+    'NR - 11': 'A critério da empresa',
+    'NR - 12': 'A critério da empresa (8h para injetoras)',
+    'NR - 18': '4 horas',
+    'NR - 20': '4 a 32 horas (depende da classe da instalação)',
+    'NR - 33': '16 horas',
+    'NR - 35': '8 horas',
+  };
+
   const handleNrChange = (e) => {
     const nr = e.target.value;
     setFormData(prev => ({
       ...prev,
       nr,
       descricao: descricoes[nr] || prev.descricao,
-      conteudo: conteudoSugestoes[nr] || prev.conteudo
+      conteudo: conteudoSugestoes[nr] || prev.conteudo,
+      duracao: duracoes[nr] || prev.duracao
     }));
   };
 

@@ -2,13 +2,12 @@ const fs = require('fs');
 const JSZip = require('jszip');
 
 async function testGenerate() {
-  const data = fs.readFileSync('NR- 06  - MODELO.pptx');
+  const data = fs.readFileSync('public/template-certificado.pptx');
   const templateZip = await JSZip.loadAsync(data);
   
-  // Read templates
   const templates = {};
   const templateRels = {};
-  const slideNums = { cert_front: 2, cert_back: 6, list_front: 3, list_back: 4 };
+  const slideNums = { cert: 1, list: 2 };
   
   for (const [key, num] of Object.entries(slideNums)) {
     templates[key] = await templateZip.file(`ppt/slides/slide${num}.xml`).async('string');
@@ -16,20 +15,18 @@ async function testGenerate() {
     if (relsFile) templateRels[key] = await relsFile.async('string');
   }
   
-  // Clone zip
   const newZip = await JSZip.loadAsync(await templateZip.generateAsync({ type: 'arraybuffer' }));
   
-  // Remove all existing slides
   const allFiles = Object.keys(newZip.files);
   allFiles.filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f)).forEach(f => newZip.remove(f));
   allFiles.filter(f => /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/.test(f)).forEach(f => newZip.remove(f));
   allFiles.filter(f => /^ppt\/notesSlides\//.test(f)).forEach(f => newZip.remove(f));
   
   function buildRels(originalRels) {
+    if (!originalRels) return '';
     return originalRels.replace(/<Relationship[^>]*notesSlide[^>]*\/>/g, '');
   }
   
-  // Generate for 1 test collaborator
   const colab = { nome: 'João da Silva Santos', cpf: '123.456.789-00' };
   const formattedDate = '07/08/2026';
   const local = 'Canteiro De Obras';
@@ -38,95 +35,74 @@ async function testGenerate() {
   const descricao = 'Sobre uso e guarda de EPI conforme exigências da Norma Regulamentadora - NR 06';
   const duracao = '1 hora';
   const instrutorNome = 'Adeylton da Silva Araújo';
+  const instrutorCargo = 'Técnico em Segurança do Trabalho';
+  const instrutorRegistro = 'SRTE N° 0009823/RN';
+  const conteudo = "Linha 1\nLinha 2\nLinha 3\nLinha 4\nLinha 5\nLinha 6";
   
   let slideCounter = 1;
   const slideList = [];
   let nextSlideId = 400;
   let nextRId = 100;
   
-  // CERT FRONT
+  // CERT 
   {
-    let xml = templates.cert_front;
-    xml = xml.replaceAll('>Douglas Ramos Da silva<', `>${colab.nome}<`);
-    xml = xml.replaceAll('>Douglas Ramos Da Silva<', `>${colab.nome}<`);
-    xml = xml.replaceAll('>702. 135.874-16<', `>${colab.cpf}<`);
-    xml = xml.replaceAll('>30/07/2026<', `>${formattedDate}<`);
-    xml = xml.replaceAll('>Canteiro De Obras<', `>${local}<`);
-    xml = xml.replaceAll('>MVP Engenharia E Construção LTDA<', `>${empresa}<`);
-    xml = xml.replaceAll('>Sobre uso e guarda de EPI conforme exigências da <', `>${descricao.split('Norma')[0]}<`);
-    xml = xml.replaceAll('>Norma Regulamentadora - NR 06<', `>Norma${descricao.split('Norma')[1]}<`);
+    let xml = templates.cert;
+    xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`);
+    xml = xml.replaceAll('>Sobre <', `>${descricao}<`);
+    xml = xml.replaceAll('>07/08/2026<', `>${formattedDate}<`);
+    xml = xml.replaceAll('>Mossoró<', `>${local}<`);
+    xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
+    xml = xml.replaceAll('>11415174423<', `>${colab.cpf}<`);
+    xml = xml.replaceAll('>Nome do Instrutor<', `>${instrutorNome}<`);
     
     const sNum = slideCounter++;
     newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
-    newZip.file(`ppt/slides/_rels/slide${sNum}.xml.rels`, buildRels(templateRels.cert_front));
+    if(templateRels.cert) newZip.file(`ppt/slides/_rels/slide${sNum}.xml.rels`, buildRels(templateRels.cert));
     slideList.push({ slideNum: sNum, id: nextSlideId++, rId: `rId${nextRId++}` });
   }
   
-  // CERT BACK 
+  // LIST 
   {
-    let xml = templates.cert_back;
-    xml = xml.replaceAll('>Henrique <', `>${colab.nome} <`);
-    xml = xml.replaceAll('>Trajano<', `><`);
-    xml = xml.replaceAll('> Da Silva Neto<', `><`);
-    xml = xml.replaceAll('> Da <', `> <`);
-    xml = xml.replaceAll('>sIlva<', `><`);
-    xml = xml.replaceAll('> Neto<', `><`);
-    xml = xml.replaceAll('> 133.016.124-66<', `>${colab.cpf}<`);
-    xml = xml.replaceAll('>30/07/2026<', `>${formattedDate}<`);
-    xml = xml.replaceAll('>Canteiro De Obras<', `>${local}<`);
-    xml = xml.replaceAll('>M A Construções E Serviços LTDA<', `>${empresa}<`);
-    xml = xml.replaceAll('>Sobre uso e guarda de EPI conforme exigências da <', `>${descricao.split('Norma')[0]}<`);
-    xml = xml.replaceAll('>Norma Regulamentadora - NR 06<', `>Norma${descricao.split('Norma')[1]}<`);
-    
-    const sNum = slideCounter++;
-    newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
-    newZip.file(`ppt/slides/_rels/slide${sNum}.xml.rels`, buildRels(templateRels.cert_back));
-    slideList.push({ slideNum: sNum, id: nextSlideId++, rId: `rId${nextRId++}` });
-  }
-  
-  // LIST FRONT
-  {
-    let xml = templates.list_front;
+    let xml = templates.list;
+    xml = xml.replaceAll('>Adeylton<', `>${instrutorNome.split(' ')[0]}<`);
+    xml = xml.replaceAll('> da Silva <', `> ${instrutorNome.split(' ').slice(1, -1).join(' ')} <`);
+    xml = xml.replaceAll('>Araújo<', `>${instrutorNome.split(' ').slice(-1)[0]}<`);
+    xml = xml.replaceAll('>Técnico em Segurança do Trabalho<', `>${instrutorCargo}<`);
+    xml = xml.replaceAll('>SRTE N° 0009823/RN<', `>${instrutorRegistro}<`);
     xml = xml.replaceAll('>Treinamento de NR - 06<', `>Treinamento de ${nr}<`);
-    xml = xml.replaceAll('>MVP Engenharia E Construção LTDA<', `>${empresa}<`);
-    xml = xml.replaceAll('>Canteiro De Obras<', `>${local}<`);
-    xml = xml.replace('>30<', `>${formattedDate.substring(0, 2)}<`);
-    xml = xml.replace('>/07/2026<', `>${formattedDate.substring(2)}<`);
+    xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
+    xml = xml.replaceAll('>Mossoró<', `>${local}<`);
+    xml = xml.replace('>07<', `>${formattedDate.substring(0, 2)}<`);
+    xml = xml.replace('>/08/2026<', `>${formattedDate.substring(2)}<`);
     xml = xml.replaceAll('>1 hora<', `>${duracao}<`);
-    xml = xml.replaceAll('>Douglas Ramos Da Silva<', `>${colab.nome}<`);
-    xml = xml.replaceAll('>702. 135.874-16<', `>${colab.cpf}<`);
+    xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`);
+    xml = xml.replaceAll('>11415174423<', `>${colab.cpf}<`);
+    const conteudoLines = conteudo.split('\n');
+    const defaultLines = [
+      'a) descrição do equipamento e seus componentes;',
+      'b) risco ocupacional contra o qual o EPI oferece proteção;',
+      'c) restrições e limitações de proteção;',
+      'd) forma adequada de uso e ajuste;',
+      'e) manutenção e substituição; e',
+      'f) cuidados de limpeza, higienização, guarda e conservação.'
+    ];
+    for (let idx = 0; idx < defaultLines.length; idx++) {
+      if(xml.includes(`>${defaultLines[idx]}<`)) {
+         xml = xml.replace(`>${defaultLines[idx]}<`, `>${conteudoLines[idx] || ''}<`);
+      }
+    }
     
     const sNum = slideCounter++;
     newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
-    newZip.file(`ppt/slides/_rels/slide${sNum}.xml.rels`, buildRels(templateRels.list_front));
+    if(templateRels.list) newZip.file(`ppt/slides/_rels/slide${sNum}.xml.rels`, buildRels(templateRels.list));
     slideList.push({ slideNum: sNum, id: nextSlideId++, rId: `rId${nextRId++}` });
   }
   
-  // LIST BACK
-  {
-    let xml = templates.list_back;
-    xml = xml.replaceAll('>Treinamento de NR - 06<', `>Treinamento de ${nr}<`);
-    xml = xml.replaceAll('>MVP Engenharia E Construção LTDA<', `>${empresa}<`);
-    xml = xml.replaceAll('>Canteiro  De Obras<', `>${local}<`);
-    xml = xml.replace('>30<', `>${formattedDate.substring(0, 2)}<`);
-    xml = xml.replace('>/07/2026<', `>${formattedDate.substring(2)}<`);
-    xml = xml.replaceAll('>1 hora<', `>${duracao}<`);
-    xml = xml.replaceAll('>Douglas Ramos Da Silva<', `>${colab.nome}<`);
-    xml = xml.replaceAll('>1702. 135.874-16<', `>${colab.cpf}<`);
-    
-    const sNum = slideCounter++;
-    newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
-    newZip.file(`ppt/slides/_rels/slide${sNum}.xml.rels`, buildRels(templateRels.list_back));
-    slideList.push({ slideNum: sNum, id: nextSlideId++, rId: `rId${nextRId++}` });
-  }
-  
-  // Update presentation.xml
   let presentationXml = await newZip.file('ppt/presentation.xml').async('string');
   const newSlideListXml = slideList.map(s => `<p:sldId id="${s.id}" r:id="${s.rId}"/>`).join('');
   presentationXml = presentationXml.replace(/<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/, `<p:sldIdLst>${newSlideListXml}</p:sldIdLst>`);
   newZip.file('ppt/presentation.xml', presentationXml);
   
-  // Update presentation.xml.rels
   let presRels = await newZip.file('ppt/_rels/presentation.xml.rels').async('string');
   presRels = presRels.replace(/<Relationship[^>]*Target="slides\/slide\d+\.xml"[^>]*\/>/g, '');
   const newSlideRels = slideList.map(s =>
@@ -135,7 +111,6 @@ async function testGenerate() {
   presRels = presRels.replace('</Relationships>', newSlideRels + '</Relationships>');
   newZip.file('ppt/_rels/presentation.xml.rels', presRels);
   
-  // Update [Content_Types].xml
   let contentTypes = await newZip.file('[Content_Types].xml').async('string');
   contentTypes = contentTypes.replace(/<Override[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g, '');
   contentTypes = contentTypes.replace(/<Override[^>]*PartName="\/ppt\/notesSlides\/[^"]*"[^>]*\/>/g, '');
@@ -145,20 +120,9 @@ async function testGenerate() {
   contentTypes = contentTypes.replace('</Types>', newOverrides + '</Types>');
   newZip.file('[Content_Types].xml', contentTypes);
   
-  // Generate
   const buffer = await newZip.generateAsync({ type: 'nodebuffer' });
   fs.writeFileSync('test_output.pptx', buffer);
   console.log('Generated test_output.pptx with ' + slideList.length + ' slides');
-  
-  // Verify - read back and check slides
-  const verifyZip = await JSZip.loadAsync(buffer);
-  const verifySlides = Object.keys(verifyZip.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f));
-  console.log('Slides in output:', verifySlides);
-  
-  // Check first slide text
-  const s1 = await verifyZip.file('ppt/slides/slide1.xml').async('string');
-  const texts = s1.match(/<a:t>[^<]+<\/a:t>/g);
-  console.log('Slide 1 texts:', texts?.slice(0, 5));
 }
 
 testGenerate().catch(console.error);
