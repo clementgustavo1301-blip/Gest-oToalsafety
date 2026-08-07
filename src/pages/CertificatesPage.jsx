@@ -10,6 +10,9 @@ const CertificatesPage = () => {
     local: '',
     empresa: '',
     nr: '',
+    duracao: '1 hora',
+    instrutorNome: 'Adeylton da Silva Araújo',
+    instrutorRegistro: 'Técnico em Seg. do Trabalho - SRTE N° 0009823/RN',
     conteudo: ''
   });
 
@@ -70,14 +73,23 @@ const CertificatesPage = () => {
             </div>
             <div>
               <label className="modal-label">Local do Treinamento</label>
-              <input type="text" name="local" value={formData.local} onChange={handleChange} className="modal-input" placeholder="Ex: Sede da Empresa" />
+              <input type="text" name="local" value={formData.local} onChange={handleChange} className="modal-input" placeholder="Ex: Canteiro de Obras" />
             </div>
             <div>
-              <label className="modal-label">Treinamento (NR)</label>
-              <select name="nr" value={formData.nr} onChange={handleChange} className="modal-input">
-                <option value="">Selecione...</option>
-                {nrs.map(nr => <option key={nr} value={nr}>{nr}</option>)}
-              </select>
+              <label className="modal-label">Treinamento (NR e Descrição)</label>
+              <input type="text" name="nr" value={formData.nr} onChange={handleChange} className="modal-input" placeholder="Ex: NR 06 - Uso e guarda de EPI" />
+            </div>
+            <div>
+              <label className="modal-label">Carga Horária</label>
+              <input type="text" name="duracao" value={formData.duracao} onChange={handleChange} className="modal-input" placeholder="Ex: 1 hora" />
+            </div>
+            <div>
+              <label className="modal-label">Nome do Instrutor</label>
+              <input type="text" name="instrutorNome" value={formData.instrutorNome} onChange={handleChange} className="modal-input" placeholder="Nome do Instrutor" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label className="modal-label">Cargo / Registro do Instrutor</label>
+              <input type="text" name="instrutorRegistro" value={formData.instrutorRegistro} onChange={handleChange} className="modal-input" placeholder="Ex: Técnico em Segurança do Trabalho - SRTE N°..." />
             </div>
           </div>
 
@@ -186,17 +198,17 @@ const CertificatesPage = () => {
               </p>
               
               <div style={{ fontSize: '1.25rem', lineHeight: '1.8', marginTop: '1rem' }}>
-                Concluiu com êxito o treinamento de <strong>{formData.nr || 'NR Específica'}</strong>,<br/>
-                realizado na empresa <strong>{formData.empresa || 'Nome da Empresa'}</strong>,<br/>
+                Participou com êxito do treinamento de <strong>{formData.nr || 'NR Específica'}</strong>,<br/>
+                com carga horária de <strong>{formData.duracao || 'X horas'}</strong>, realizado na empresa <strong>{formData.empresa || 'Nome da Empresa'}</strong>,<br/>
                 na data de <strong>{formData.data ? new Date(formData.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'DD/MM/AAAA'}</strong>, 
                 no local: <strong>{formData.local || 'Localidade'}</strong>.
               </div>
 
-              <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-around', width: '100%', gap: '4rem' }}>
+              <div style={{ marginTop: '3rem', display: 'flex', justifyContent: 'space-around', width: '100%', gap: '4rem' }}>
                 <div style={{ flex: 1, textAlign: 'center' }}>
                   <div style={{ borderBottom: '1px solid #333', marginBottom: '0.5rem', height: '2rem' }}></div>
-                  <p style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}>Instrutor Responsável</p>
-                  <p style={{ margin: 0, fontSize: '0.9rem' }}>TotalSafety</p>
+                  <p style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}>{formData.instrutorNome || 'Instrutor Responsável'}</p>
+                  <p style={{ margin: 0, fontSize: '0.9rem' }}>{formData.instrutorRegistro || 'TotalSafety'}</p>
                 </div>
                 <div style={{ flex: 1, textAlign: 'center' }}>
                   <div style={{ borderBottom: '1px solid #333', marginBottom: '0.5rem', height: '2rem' }}></div>
