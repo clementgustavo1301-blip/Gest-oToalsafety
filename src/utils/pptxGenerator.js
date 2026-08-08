@@ -50,13 +50,20 @@ export async function generateCertificatePPTX({
   allFiles.filter(f => /^ppt\/notesSlides\//.test(f)).forEach(f => newZip.remove(f));
   allFiles.filter(f => /^ppt\/notesSlides\/_rels\//.test(f)).forEach(f => newZip.remove(f));
 
-  // 5. Format date
+  // 5. Format date and CPF
   const formatDate = (dateStr) => {
     if (!dateStr) return 'DD/MM/AAAA';
     const [y, m, d] = dateStr.split('-');
     return `${d}/${m}/${y}`;
   };
   const formattedDate = formatDate(data);
+
+  const formatCPF = (cpfStr) => {
+    if (!cpfStr) return '';
+    const digits = cpfStr.replace(/\D/g, '');
+    if (digits.length !== 11) return cpfStr;
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
 
   // 6. For each collaborator, create 2 slides
   let slideCounter = 1;
@@ -80,8 +87,12 @@ export async function generateCertificatePPTX({
       xml = xml.replaceAll('>07/08/2026<', `>${formattedDate}<`);
       xml = xml.replaceAll('>Mossoró<', `>${local}<`);
       xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
-      xml = xml.replaceAll('>11415174423<', `>${colab.cpf}<`);
+      xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
       xml = xml.replaceAll('>Nome do Instrutor<', `>${instrutorNome}<`);
+      
+      // Novos placeholders para a página 1 (Certificado)
+      xml = xml.replaceAll('>Cargo do Instrutor<', `>${instrutorCargo}<`);
+      xml = xml.replaceAll('>Registro do Instrutor<', `>${instrutorRegistro}<`);
 
       const sNum = slideCounter++;
       newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
@@ -108,7 +119,7 @@ export async function generateCertificatePPTX({
       
       xml = xml.replaceAll('>1 hora<', `>${duracao}<`);
       xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`);
-      xml = xml.replaceAll('>11415174423<', `>${colab.cpf}<`);
+      xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
 
       const conteudoLines = conteudo.split('\n');
       const defaultLines = [
