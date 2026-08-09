@@ -117,8 +117,11 @@ export async function generateCertificatePPTX({
       // Nome do colaborador
       xml = replaceText(xml, ['Gustavo Clement Onraed Vieira', 'Gustavo'], colab.nome);
 
-      // Descrição do treinamento (fonte reduzida de 40pt para 28pt)
-      xml = xml.replace(/(<a:rPr[^>]*?sz=")4000("[\s\S]*?<a:t>Sobre)/g, '$12800$2');
+      // Descrição do treinamento (ajuste de posição, margens internas e fonte sz=3300/33pt)
+      xml = xml.replace(/<a:off x="5802818" y="11282255"\/>/g, '<a:off x="6400000" y="10900000"/>');
+      xml = xml.replace(/<a:ext cx="21975097" cy="1163395"\/>/g, '<a:ext cx="20800000" cy="1400000"/>');
+      xml = xml.replace(/lIns="0" tIns="0" rIns="0" bIns="0"/g, 'lIns="200000" tIns="0" rIns="200000" bIns="0"');
+      xml = xml.replace(/(<a:rPr[^>]*?sz=")4000("[\s\S]*?<a:t>Sobre)/g, '$13300$2');
       xml = replaceText(xml, ['Sobre uso e guarda de EPI conzxzxzxforme exigências da Norma Regulamentadora - NR 06', 'Sobre'], descricao);
 
       // Data
