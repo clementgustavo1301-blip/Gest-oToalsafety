@@ -176,28 +176,21 @@ export async function generateCertificatePPTX({
       xml = replaceText(xml, ['Técnico em Segurança do Trabalho'], instrutorCargo);
       xml = replaceText(xml, ['SRTE N° 0009823/RN'], instrutorRegistro);
 
-      // Treinamento NR
-      xml = replaceText(xml, ['Treinamento de NR - 06', 'Treinamento de NR-06'], `Treinamento de ${nr}`);
+      // Rótulos verdes + dados alinhados como texto no mesmo parágrafo
+      const createLabeledBox = (id, name, label, value, x, y, cx = "12000000", cy = "493648") => {
+        const safeLabel = escapeXml(label);
+        const safeValue = escapeXml(value);
+        return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr spcFirstLastPara="1" wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr" anchorCtr="0"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0"><a:lnSpc><a:spcPct val="140039"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="3200" b="1"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeLabel} </a:t></a:r><a:r><a:rPr lang="pt-BR" sz="3200" b="1"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeValue}</a:t></a:r></a:p></p:txBody></p:sp>`;
+      };
 
-      // Empresa
-      xml = replaceText(xml, ['Ecoclinic', 'ecoclinic'], empresa);
-
-      // Local
-      xml = replaceText(xml, ['Mossoró', 'mossoro'], local);
-
-      // Data
-      xml = replaceText(xml, ['07/08/2026', '09/08/2026'], formattedDate);
-      xml = replaceText(xml, ['07'], formattedDate);
-      xml = replaceText(xml, ['/08/2026'], '');
-
-      // Duração
-      xml = replaceText(xml, ['1 hora'], duracao);
-
-      // Nome do colaborador
-      xml = replaceText(xml, ['Gustavo Clement Onraed Vieira', 'Gustavo'], colab.nome);
-
-      // CPF (formatado)
-      xml = replaceText(xml, ['114.151.744-23', '11415174423'], formatCPF(colab.cpf));
+      const startX = "2850000";
+      xml = xml.replace(/<p:sp>[^]*?id="99"[^]*?<\/p:sp>/, createLabeledBox("99", "Google Shape;99;p14", "Curso:", `Treinamento de ${nr}`, startX, "7850479"));
+      xml = xml.replace(/<p:sp>[^]*?id="100"[^]*?<\/p:sp>/, createLabeledBox("100", "Google Shape;100;p14", "Empresa:", empresa, startX, "8859736"));
+      xml = xml.replace(/<p:sp>[^]*?id="101"[^]*?<\/p:sp>/, createLabeledBox("101", "Google Shape;101;p14", "Local:", local, startX, "9652955"));
+      xml = xml.replace(/<p:sp>[^]*?id="102"[^]*?<\/p:sp>/, createLabeledBox("102", "Google Shape;102;p14", "Período:", formattedDate, startX, "10351431"));
+      xml = xml.replace(/<p:sp>[^]*?id="103"[^]*?<\/p:sp>/, createLabeledBox("103", "Google Shape;103;p14", "Carga Horária:", duracao, startX, "11339337"));
+      xml = xml.replace(/<p:sp>[^]*?id="104"[^]*?<\/p:sp>/, createLabeledBox("104", "Google Shape;104;p14", "Participante:", colab.nome, startX, "12017266"));
+      xml = xml.replace(/<p:sp>[^]*?id="105"[^]*?<\/p:sp>/, createLabeledBox("105", "Google Shape;105;p14", "CPF:", formatCPF(colab.cpf), startX, "12988690"));
 
       // Conteúdo programático dinâmico (TextBox 8)
       if (conteudo) {
