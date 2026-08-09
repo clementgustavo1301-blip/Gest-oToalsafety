@@ -117,7 +117,8 @@ export async function generateCertificatePPTX({
       // Nome do colaborador
       xml = replaceText(xml, ['Gustavo Clement Onraed Vieira', 'Gustavo'], colab.nome);
 
-      // Descrição do treinamento
+      // Descrição do treinamento (fonte reduzida de 40pt para 28pt)
+      xml = xml.replace(/(<a:rPr[^>]*?sz=")4000("[\s\S]*?<a:t>Sobre)/g, '$12800$2');
       xml = replaceText(xml, ['Sobre uso e guarda de EPI conzxzxzxforme exigências da Norma Regulamentadora - NR 06', 'Sobre'], descricao);
 
       // Data
