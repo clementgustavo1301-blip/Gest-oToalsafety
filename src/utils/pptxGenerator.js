@@ -100,19 +100,8 @@ export async function generateCertificatePPTX({
       
       // CPF (formatado)
       xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
-      
-      // --- Alinhamento da caixa do colaborador (id=91) ---
-      // Mover de y=19348444 para y=19672909 para alinhar com o instrutor
-      xml = xml.replace(
-        '<a:off x="6676291" y="19348444"/>',
-        '<a:off x="6676291" y="19672909"/>'
-      );
-      
-      // --- Instrutor: substituir o bloco inteiro para incluir Nome + Cargo + Registro ---
-      // Usamos regex para encontrar o txBody que contém "Nome do Instrutor"
-      const newTxBody = `<p:txBody><a:bodyPr spcFirstLastPara="1" wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t" anchorCtr="0"><a:spAutoFit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0" algn="ctr"><a:lnSpc><a:spcPct val="139918"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="3200" b="1" dirty="0"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/></a:rPr><a:t>${instrutorNome}</a:t></a:r><a:br><a:rPr lang="pt-BR" sz="2600" dirty="0"/></a:br><a:r><a:rPr lang="pt-BR" sz="2600" dirty="0"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/></a:rPr><a:t>${instrutorCargo}</a:t></a:r><a:br><a:rPr lang="pt-BR" sz="2600" dirty="0"/></a:br><a:r><a:rPr lang="pt-BR" sz="2600" dirty="0"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/></a:rPr><a:t>${instrutorRegistro}</a:t></a:r><a:endParaRPr sz="2600" dirty="0"/></a:p></p:txBody>`;
-      
-      xml = xml.replace(/<p:txBody>[^<]*?(?:<[^>]+>[^<]*?)*?Nome do Instrutor.*?<\/p:txBody>/s, newTxBody);
+      // Instrutor
+      xml = xml.replaceAll('>Nome do Instrutor<', `>${instrutorNome}<`);
 
       const sNum = slideCounter++;
       newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
@@ -165,16 +154,8 @@ export async function generateCertificatePPTX({
       xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
 
       // --- AJUSTE FINO DE ALINHAMENTO (PÁGINA 2) ---
-      // Subir o texto em 80000 EMUs (aprox. 2.2mm) para alinhar perfeitamente com os rótulos verdes
-      xml = xml.replace('y="8859736"', 'y="8779736"'); // Empresa
-      xml = xml.replace('y="9652955"', 'y="9572955"'); // Local
-      xml = xml.replace('y="10351431"', 'y="10271431"'); // Data
-      xml = xml.replace('y="11339337"', 'y="11259337"'); // Duracao
-      xml = xml.replace('y="12017266"', 'y="11937266"'); // Colab Nome
-      xml = xml.replace('y="12988690"', 'y="12908690"'); // CPF
-      
-      // Ajuste extra para a caixa de Carga Horária, Local e Empresa irem um pouco pra direita se necessário
-      // (Mantido igual por enquanto, mas pode ser ajustado no <a:off x="...">)
+      // Ajusta apenas o alinhamento do nome da empresa para subir um pouco
+      xml = xml.replace('y="8859736"', 'y="8720000"'); // Empresa
 
       // Conteúdo programático
       const conteudoLines = conteudo.split('\n');
