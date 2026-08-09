@@ -188,17 +188,22 @@ export async function generateCertificatePPTX({
       const createLabeledBox = (id, name, label, value, x, y, cx = "12000000", cy = "493648") => {
         const safeLabel = escapeXml(label);
         const safeValue = escapeXml(value);
-        return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr spcFirstLastPara="1" wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr" anchorCtr="0"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0"><a:lnSpc><a:spcPct val="140039"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="3200" b="1"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeLabel} </a:t></a:r><a:r><a:rPr lang="pt-BR" sz="3200" b="1"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeValue}</a:t></a:r></a:p></p:txBody></p:sp>`;
+        return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr spcFirstLastPara="1" wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr" anchorCtr="0"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0"><a:lnSpc><a:spcPct val="140039"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="3200" b="1"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeLabel} </a:t></a:r><a:r><a:rPr lang="pt-BR" sz="3200" b="1"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeValue}</a:t></a:r></a:p></p:txBody></p:sp>`;
       };
 
-      const startX = "2850000";
-      xml = xml.replace(/<p:sp>[^]*?id="99"[^]*?<\/p:sp>/, createLabeledBox("99", "Google Shape;99;p14", "Curso:", `Treinamento de ${nr}`, startX, "7850479"));
-      xml = xml.replace(/<p:sp>[^]*?id="100"[^]*?<\/p:sp>/, createLabeledBox("100", "Google Shape;100;p14", "Empresa:", empresa, startX, "8859736"));
-      xml = xml.replace(/<p:sp>[^]*?id="101"[^]*?<\/p:sp>/, createLabeledBox("101", "Google Shape;101;p14", "Local:", local, startX, "9652955"));
-      xml = xml.replace(/<p:sp>[^]*?id="102"[^]*?<\/p:sp>/, createLabeledBox("102", "Google Shape;102;p14", "Período:", formattedDate, startX, "10351431"));
-      xml = xml.replace(/<p:sp>[^]*?id="103"[^]*?<\/p:sp>/, createLabeledBox("103", "Google Shape;103;p14", "Carga Horária:", duracao, startX, "11339337"));
-      xml = xml.replace(/<p:sp>[^]*?id="104"[^]*?<\/p:sp>/, createLabeledBox("104", "Google Shape;104;p14", "Participante:", colab.nome, startX, "12017266"));
-      xml = xml.replace(/<p:sp>[^]*?id="105"[^]*?<\/p:sp>/, createLabeledBox("105", "Google Shape;105;p14", "CPF:", formatCPF(colab.cpf), startX, "12988690"));
+      const startX = "2600000"; // Moved slightly left to cover background baked-in images completely
+      const replaceShape = (xml, id, label, value, y) => {
+        const regex = new RegExp(`<p:sp>(?:(?!<\\/p:sp>)[\\s\\S])*?id="${id}"(?:(?!<\\/p:sp>)[\\s\\S])*?<\\/p:sp>`);
+        return xml.replace(regex, createLabeledBox(id, `Google Shape;${id};p14`, label, value, startX, y));
+      };
+
+      xml = replaceShape(xml, "99", "Curso:", `Treinamento de ${nr}`, "7850479");
+      xml = replaceShape(xml, "100", "Empresa:", empresa, "8859736");
+      xml = replaceShape(xml, "101", "Local:", local, "9652955");
+      xml = replaceShape(xml, "102", "Período:", formattedDate, "10351431");
+      xml = replaceShape(xml, "103", "Carga Horária:", duracao, "11339337");
+      xml = replaceShape(xml, "104", "Participante:", colab.nome, "12017266");
+      xml = replaceShape(xml, "105", "CPF:", formatCPF(colab.cpf), "12988690");
 
       // Conteúdo programático dinâmico (TextBox 8)
       if (conteudo) {
