@@ -197,13 +197,14 @@ export async function generateCertificatePPTX({
         return xml.replace(regex, createLabeledBox(id, `Google Shape;${id};p14`, label, value, startX, y));
       };
 
+      // Espaçamento vertical igual para todas as 7 linhas
       xml = replaceShape(xml, "99", "Curso:", `Treinamento de ${nr}`, "7850479");
-      xml = replaceShape(xml, "100", "Empresa:", empresa, "8859736");
-      xml = replaceShape(xml, "101", "Local:", local, "9652955");
-      xml = replaceShape(xml, "102", "Período:", formattedDate, "10351431");
-      xml = replaceShape(xml, "103", "Carga Horária:", duracao, "11339337");
-      xml = replaceShape(xml, "104", "Participante:", colab.nome, "12017266");
-      xml = replaceShape(xml, "105", "CPF:", formatCPF(colab.cpf), "12988690");
+      xml = replaceShape(xml, "100", "Empresa:", empresa, "8706847");
+      xml = replaceShape(xml, "101", "Local:", local, "9563215");
+      xml = replaceShape(xml, "102", "Período:", formattedDate, "10419583");
+      xml = replaceShape(xml, "103", "Carga Horária:", duracao, "11275951");
+      xml = replaceShape(xml, "104", "Participante:", colab.nome, "12132319");
+      xml = replaceShape(xml, "105", "CPF:", formatCPF(colab.cpf), "12988687");
 
       // Conteúdo programático dinâmico (TextBox 8)
       if (conteudo) {
