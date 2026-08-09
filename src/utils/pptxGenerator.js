@@ -65,7 +65,22 @@ export async function generateCertificatePPTX({
     return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
-  // 6. For each collaborator, create 2 slides
+  // 6. Helper for bulletproof text replacement
+  // This ignores any XML tags or whitespace that PowerPoint might insert in the middle of a word
+  const replaceText = (xmlStr, searchStrs, replaceStr) => {
+    let result = xmlStr;
+    const searchArray = Array.isArray(searchStrs) ? searchStrs : [searchStrs];
+    for (const searchStr of searchArray) {
+      const escapedSearch = searchStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      // Allow optional XML tags (<...>) between characters
+      const regexPattern = escapedSearch.split('').join('(?:<[^>]+>)*');
+      const regex = new RegExp('>' + regexPattern + '<', 'g');
+      result = result.replace(regex, () => '>' + replaceStr + '<');
+    }
+    return result;
+  };
+
+  // 7. For each collaborator, create 2 slides
   let slideCounter = 1;
   const slideList = [];
   let nextSlideId = 400;
@@ -84,27 +99,27 @@ export async function generateCertificatePPTX({
       let xml = templates.cert;
       
       // Nome do colaborador
-      xml = xml.replaceAll('>Gustavo Clement Onraed Vieira<', `>${colab.nome}<`);
+      xml = replaceText(xml, ['Gustavo Clement Onraed Vieira', 'Gustavo '], colab.nome);
       
       // Descrição do treinamento
-      xml = xml.replaceAll('>Sobre uso e guarda de EPI conzxzxzxforme exigências da Norma Regulamentadora - NR 06<', `>${descricao}<`);
+      xml = replaceText(xml, ['Sobre uso e guarda de EPI conzxzxzxforme exigências da Norma Regulamentadora - NR 06', 'Sobre '], descricao);
       
       // Data
-      xml = xml.replaceAll('>09/08/2026<', `>${formattedDate}<`);
+      xml = replaceText(xml, ['09/08/2026', '07/08/2026'], formattedDate);
       
       // Local
-      xml = xml.replaceAll('>mossoro<', `>${local}<`);
+      xml = replaceText(xml, ['mossoro', 'Mossoró'], local);
       
       // Empresa
-      xml = xml.replaceAll('>ecoclinic<', `>${empresa}<`);
+      xml = replaceText(xml, ['ecoclinic', 'Ecoclinic'], empresa);
       
       // CPF (formatado)
-      xml = xml.replaceAll('>114.151.744-23<', `>${formatCPF(colab.cpf)}<`);
+      xml = replaceText(xml, ['114.151.744-23', '11415174423'], formatCPF(colab.cpf));
       
       // Instrutor
-      xml = xml.replaceAll('>Adeylton da Silva Araújo<', `>${instrutorNome}<`);
-      xml = xml.replaceAll('>Técnico em Segurança do Trabalho<', `>${instrutorCargo}<`);
-      xml = xml.replaceAll('>SRTE N° 0009823/RN<', `>${instrutorRegistro}<`);
+      xml = replaceText(xml, ['Adeylton da Silva Araújo', 'Nome do Instrutor'], instrutorNome);
+      xml = replaceText(xml, ['Técnico em Segurança do Trabalho'], instrutorCargo);
+      xml = replaceText(xml, ['SRTE N° 0009823/RN'], instrutorRegistro);
 
       const sNum = slideCounter++;
       newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
@@ -117,30 +132,46 @@ export async function generateCertificatePPTX({
       let xml = templates.list;
       
       // Instrutor
-      xml = xml.replaceAll('>Adeylton da Silva Araújo<', `>${instrutorNome}<`);
-      xml = xml.replaceAll('>Técnico em Segurança do Trabalho<', `>${instrutorCargo}<`);
-      xml = xml.replaceAll('>SRTE N° 0009823/RN<', `>${instrutorRegistro}<`);
+      xml = replaceText(xml, ['Adeylton da Silva Araújo'], instrutorNome);
+      
+      // O template antigo tinha o nome do instrutor quebrado em 3 partes ("Adeylton", " da Silva ", "Araújo")
+      // Se for o template antigo, substituímos as partes separadamente
+      const nameParts = instrutorNome.split(' ');
+      const firstName = nameParts[0] || '';
+      const middleName = nameParts.length > 2 ? ' ' + nameParts.slice(1, -1).join(' ') + ' ' : nameParts.length === 2 ? ' ' : '';
+      const lastName = nameParts.length > 1 ? nameParts.slice(-1)[0] : '';
+      xml = replaceText(xml, ['Adeylton'], firstName);
+      xml = replaceText(xml, [' da Silva '], middleName);
+      xml = replaceText(xml, ['Araújo'], lastName);
+
+      xml = replaceText(xml, ['Técnico em Segurança do Trabalho'], instrutorCargo);
+      xml = replaceText(xml, ['SRTE N° 0009823/RN'], instrutorRegistro);
       
       // Treinamento NR
-      xml = xml.replaceAll('>Treinamento de NR - 06<', `>Treinamento de ${nr}<`);
+      xml = replaceText(xml, ['Treinamento de NR - 06'], `Treinamento de ${nr}`);
       
       // Empresa
-      xml = xml.replaceAll('>ecoclinic<', `>${empresa}<`);
+      xml = replaceText(xml, ['ecoclinic', 'Ecoclinic'], empresa);
       
       // Local
-      xml = xml.replaceAll('>mossoro<', `>${local}<`);
+      xml = replaceText(xml, ['mossoro', 'Mossoró'], local);
       
       // Data
-      xml = xml.replaceAll('>09/08/2026<', `>${formattedDate}<`);
+      xml = replaceText(xml, ['09/08/2026'], formattedDate);
+      // Fallback para o template antigo que quebrava a data
+      const dd = formattedDate.substring(0, 2);
+      const restOfDate = formattedDate.substring(2);
+      xml = replaceText(xml, ['07'], dd);
+      xml = replaceText(xml, ['/08/2026'], restOfDate);
       
       // Duração
-      xml = xml.replaceAll('>1 hora<', `>${duracao}<`);
+      xml = replaceText(xml, ['1 hora'], duracao);
       
       // Nome do colaborador
-      xml = xml.replaceAll('>Gustavo Clement Onraed Vieira<', `>${colab.nome}<`);
+      xml = replaceText(xml, ['Gustavo Clement Onraed Vieira', 'Gustavo '], colab.nome);
       
       // CPF (formatado)
-      xml = xml.replaceAll('>114.151.744-23<', `>${formatCPF(colab.cpf)}<`);
+      xml = replaceText(xml, ['114.151.744-23', '11415174423'], formatCPF(colab.cpf));
 
       // Conteúdo programático
       const conteudoLines = conteudo.split('\n');
