@@ -173,6 +173,10 @@ export async function generateCertificatePPTX({
       xml = replaceText(xml, ['da Silva'], middleName);
       xml = replaceText(xml, ['Araújo'], lastName);
 
+      // Remover negrito do Cargo do Instrutor no Slide 2 (apenas o Nome do Instrutor permanece em negrito)
+      xml = xml.replace(/<a:r>(?:(?!<\/a:r>)[\s\S])*?<a:t>Técnico em Segurança do Trabalho<\/a:t>[\s\S]*?<\/a:r>/g, (m) => m.replace('b="1"', 'b="0"'));
+      xml = xml.replace(/<a:endParaRPr sz="3200" b="1"/g, '<a:endParaRPr sz="3200" b="0"');
+
       xml = replaceText(xml, ['Técnico em Segurança do Trabalho'], instrutorCargo);
       xml = replaceText(xml, ['SRTE N° 0009823/RN'], instrutorRegistro);
 
