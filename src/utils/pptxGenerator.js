@@ -139,7 +139,7 @@ export async function generateCertificatePPTX({
 
       let replacement = `${safeNome}</a:t></a:r></a:p>`;
       if (safeCargo) {
-        replacement += `<a:p><a:pPr lvl="0" algn="ctr"><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="2400" b="1"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:latin typeface="Montserrat"/><a:cs typeface="Montserrat"/></a:rPr><a:t>${safeCargo}</a:t></a:r></a:p>`;
+        replacement += `<a:p><a:pPr lvl="0" algn="ctr"><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="2400"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:latin typeface="Montserrat"/><a:cs typeface="Montserrat"/></a:rPr><a:t>${safeCargo}</a:t></a:r></a:p>`;
       }
       if (safeRegistro) {
         replacement += `<a:p><a:pPr lvl="0" algn="ctr"><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="2400"><a:solidFill><a:srgbClr val="494949"/></a:solidFill><a:latin typeface="Montserrat"/><a:cs typeface="Montserrat"/></a:rPr><a:t>${safeRegistro}</a:t></a:r></a:p>`;
