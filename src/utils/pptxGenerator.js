@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 
 /**
- * Gera um PPTX a partir do novo template 'modelo final.pptx'.
+ * Gera um PPTX a partir do template 'modelo final.pptx'.
  * Abordagem: mantém os 2 slides modelo intactos com suas imagens/layout,
  * clona-os para cada colaborador com texto substituído.
  * 
@@ -82,17 +82,57 @@ export async function generateCertificatePPTX({
     // === CERTIFICADO (slide1 template) ===
     {
       let xml = templates.cert;
-      xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`); // Aparece no nome e assinatura
-      xml = xml.replaceAll('>Sobre <', `>${descricao}<`);
-      xml = xml.replaceAll('>07/08/2026<', `>${formattedDate}<`);
-      xml = xml.replaceAll('>Mossoró<', `>${local}<`);
-      xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
-      xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
-      xml = xml.replaceAll('>Nome do Instrutor<', `>${instrutorNome}<`);
       
-      // Novos placeholders para a página 1 (Certificado)
-      xml = xml.replaceAll('>Cargo do Instrutor<', `>${instrutorCargo}<`);
-      xml = xml.replaceAll('>Registro do Instrutor<', `>${instrutorRegistro}<`);
+      // Nome do colaborador (aparece 2x: no topo e na assinatura)
+      xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`);
+      
+      // Descrição do treinamento
+      xml = xml.replaceAll('>Sobre <', `>${descricao}<`);
+      
+      // Data
+      xml = xml.replaceAll('>07/08/2026<', `>${formattedDate}<`);
+      
+      // Local
+      xml = xml.replaceAll('>Mossoró<', `>${local}<`);
+      
+      // Empresa
+      xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
+      
+      // CPF (formatado)
+      xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
+      
+      // --- Alinhamento da caixa do colaborador (id=91) ---
+      // Mover de y=19348444 para y=19672909 para alinhar com o instrutor
+      xml = xml.replace(
+        '<a:off x="6676291" y="19348444"/>',
+        '<a:off x="6676291" y="19672909"/>'
+      );
+      
+      // --- Instrutor: substituir o bloco inteiro para incluir Nome + Cargo + Registro ---
+      // O bloco do instrutor contém: "Nome do Instrutor" seguido de um <a:br/> e linha vazia
+      // Vamos substituir todo o conteúdo textual desse shape
+      const instrOriginalBlock = [
+        '<a:r><a:rPr lang="pt-BR" sz="3200" b="1" dirty="0"/><a:t>Nome do Instrutor</a:t></a:r>',
+        '<a:r><a:rPr lang="en-US" sz="3200" b="1" dirty="0"><a:solidFill><a:schemeClr val="tx1"><a:lumMod val="85000"/><a:lumOff val="15000"/></a:schemeClr></a:solidFill><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:sym typeface="Montserrat"/></a:rPr><a:t/></a:r>',
+        '<a:br><a:rPr lang="en-US" sz="3200" b="1" dirty="0"><a:solidFill><a:schemeClr val="tx1"><a:lumMod val="85000"/><a:lumOff val="15000"/></a:schemeClr></a:solidFill><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:sym typeface="Montserrat"/></a:rPr></a:br>',
+        '<a:endParaRPr sz="3200" b="1" dirty="0"><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/></a:endParaRPr>'
+      ].join('');
+      
+      const instrNewBlock = [
+        // Nome do instrutor (bold)
+        `<a:r><a:rPr lang="pt-BR" sz="3200" b="1" dirty="0"><a:solidFill><a:schemeClr val="tx1"><a:lumMod val="85000"/><a:lumOff val="15000"/></a:schemeClr></a:solidFill><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/></a:rPr><a:t>${instrutorNome}</a:t></a:r>`,
+        // Line break
+        `<a:br><a:rPr lang="pt-BR" sz="2600" dirty="0"><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/></a:rPr></a:br>`,
+        // Cargo do instrutor (normal, smaller)
+        `<a:r><a:rPr lang="pt-BR" sz="2600" dirty="0"><a:solidFill><a:schemeClr val="tx1"><a:lumMod val="85000"/><a:lumOff val="15000"/></a:schemeClr></a:solidFill><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/></a:rPr><a:t>${instrutorCargo}</a:t></a:r>`,
+        // Line break
+        `<a:br><a:rPr lang="pt-BR" sz="2600" dirty="0"><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/></a:rPr></a:br>`,
+        // Registro do instrutor (normal, smaller)
+        `<a:r><a:rPr lang="pt-BR" sz="2600" dirty="0"><a:solidFill><a:schemeClr val="tx1"><a:lumMod val="85000"/><a:lumOff val="15000"/></a:schemeClr></a:solidFill><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/></a:rPr><a:t>${instrutorRegistro}</a:t></a:r>`,
+        `<a:endParaRPr sz="2600" dirty="0"><a:latin typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:cs typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/></a:endParaRPr>`
+      ].join('');
+      
+      xml = xml.replace(instrOriginalBlock, instrNewBlock);
 
       const sNum = slideCounter++;
       newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
@@ -103,24 +143,48 @@ export async function generateCertificatePPTX({
     // === LISTA DE PRESENÇA (slide2 template) ===
     {
       let xml = templates.list;
-      // Instrutor name might be split
-      xml = xml.replaceAll('>Adeylton<', `>${instrutorNome.split(' ')[0] || ''}<`);
-      xml = xml.replaceAll('> da Silva <', `> ${instrutorNome.split(' ').length > 2 ? instrutorNome.split(' ').slice(1, -1).join(' ') : ''} <`);
-      xml = xml.replaceAll('>Araújo<', `>${instrutorNome.split(' ').length > 1 ? instrutorNome.split(' ').slice(-1)[0] : ''}<`);
       
+      // Instrutor name (split into 3 runs in template: "Adeylton", " da Silva ", "Araújo")
+      // Replace all 3 parts with the full instructor name
+      const nameParts = instrutorNome.split(' ');
+      const firstName = nameParts[0] || '';
+      const middleName = nameParts.length > 2 ? ' ' + nameParts.slice(1, -1).join(' ') + ' ' : nameParts.length === 2 ? ' ' : '';
+      const lastName = nameParts.length > 1 ? nameParts.slice(-1)[0] : '';
+      
+      xml = xml.replaceAll('>Adeylton<', `>${firstName}<`);
+      xml = xml.replaceAll('> da Silva <', `>${middleName}<`);
+      xml = xml.replaceAll('>Araújo<', `>${lastName}<`);
+      
+      // Cargo e Registro do instrutor
       xml = xml.replaceAll('>Técnico em Segurança do Trabalho<', `>${instrutorCargo}<`);
       xml = xml.replaceAll('>SRTE N° 0009823/RN<', `>${instrutorRegistro}<`);
+      
+      // Treinamento NR
       xml = xml.replaceAll('>Treinamento de NR - 06<', `>Treinamento de ${nr}<`);
+      
+      // Empresa
       xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
+      
+      // Local
       xml = xml.replaceAll('>Mossoró<', `>${local}<`);
       
-      xml = xml.replace('>07<', `>${formattedDate.substring(0, 2)}<`);
-      xml = xml.replace('>/08/2026<', `>${formattedDate.substring(2)}<`);
+      // Data — template has date split: ">07<" and ">/08/2026<"
+      // Replace with the full formatted date in one go
+      const dd = formattedDate.substring(0, 2);
+      const restOfDate = formattedDate.substring(2); // "/MM/YYYY"
+      xml = xml.replace('>07<', `>${dd}<`);
+      xml = xml.replace('>/08/2026<', `>${restOfDate}<`);
       
+      // Duração
       xml = xml.replaceAll('>1 hora<', `>${duracao}<`);
+      
+      // Nome do colaborador
       xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`);
+      
+      // CPF (formatado)
       xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
 
+      // Conteúdo programático
       const conteudoLines = conteudo.split('\n');
       const defaultLines = [
         'a) descrição do equipamento e seus componentes;',
