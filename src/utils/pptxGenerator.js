@@ -100,8 +100,16 @@ export async function generateCertificatePPTX({
       
       // CPF (formatado)
       xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
-      // Instrutor
-      xml = xml.replaceAll('>Nome do Instrutor<', `>${instrutorNome}<`);
+      // --- Alinhamento da caixa do colaborador (id=91) ---
+      // Mover de y=19348444 para y=19672909 para alinhar com a caixa do instrutor
+      xml = xml.replace(
+        '<a:off x="6676291" y="19348444"/>',
+        '<a:off x="6676291" y="19672909"/>'
+      );
+      
+      // Instrutor (Injeta os dados em 3 linhas: Nome, Cargo, Registro)
+      const instrutorInjection = `>${instrutorNome}</a:t></a:r><a:br><a:rPr lang="pt-BR" sz="2400" dirty="0"/></a:br><a:r><a:rPr lang="pt-BR" sz="2400" dirty="0"/><a:t>${instrutorCargo}</a:t></a:r><a:br><a:rPr lang="pt-BR" sz="2400" dirty="0"/></a:br><a:r><a:rPr lang="pt-BR" sz="2400" dirty="0"/><a:t>${instrutorRegistro}<`;
+      xml = xml.replaceAll('>Nome do Instrutor<', instrutorInjection);
 
       const sNum = slideCounter++;
       newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
