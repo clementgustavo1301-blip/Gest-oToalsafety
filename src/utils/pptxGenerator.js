@@ -154,8 +154,13 @@ export async function generateCertificatePPTX({
       xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
 
       // --- AJUSTE FINO DE ALINHAMENTO (PÁGINA 2) ---
-      // Ajusta apenas o alinhamento do nome da empresa para subir um pouco
+      // Subir o texto em aprox. 139736 EMUs para alinhar perfeitamente com os rótulos verdes
       xml = xml.replace('y="8859736"', 'y="8720000"'); // Empresa
+      xml = xml.replace('y="9652955"', 'y="9513219"'); // Local
+      xml = xml.replace('y="10351431"', 'y="10211695"'); // Data
+      xml = xml.replace('y="11339337"', 'y="11199601"'); // Duracao
+      xml = xml.replace('y="12017266"', 'y="11877530"'); // Colab Nome
+      xml = xml.replace('y="12988690"', 'y="12848954"'); // CPF
 
       // Conteúdo programático
       const conteudoLines = conteudo.split('\n');
