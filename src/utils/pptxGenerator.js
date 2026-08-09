@@ -83,33 +83,28 @@ export async function generateCertificatePPTX({
     {
       let xml = templates.cert;
       
-      // Nome do colaborador (aparece 2x: no topo e na assinatura)
-      xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`);
+      // Nome do colaborador
+      xml = xml.replaceAll('>Gustavo Clement Onraed Vieira<', `>${colab.nome}<`);
       
       // Descrição do treinamento
-      xml = xml.replaceAll('>Sobre <', `>${descricao}<`);
+      xml = xml.replaceAll('>Sobre uso e guarda de EPI conzxzxzxforme exigências da Norma Regulamentadora - NR 06<', `>${descricao}<`);
       
       // Data
-      xml = xml.replaceAll('>07/08/2026<', `>${formattedDate}<`);
+      xml = xml.replaceAll('>09/08/2026<', `>${formattedDate}<`);
       
       // Local
-      xml = xml.replaceAll('>Mossoró<', `>${local}<`);
+      xml = xml.replaceAll('>mossoro<', `>${local}<`);
       
       // Empresa
-      xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
+      xml = xml.replaceAll('>ecoclinic<', `>${empresa}<`);
       
       // CPF (formatado)
-      xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
-      // --- Alinhamento da caixa do colaborador (id=91) ---
-      // Mover de y=19348444 para y=19672909 para alinhar com a caixa do instrutor
-      xml = xml.replace(
-        '<a:off x="6676291" y="19348444"/>',
-        '<a:off x="6676291" y="19672909"/>'
-      );
+      xml = xml.replaceAll('>114.151.744-23<', `>${formatCPF(colab.cpf)}<`);
       
-      // Instrutor (Injeta os dados em 3 linhas: Nome, Cargo, Registro)
-      const instrutorInjection = `>${instrutorNome}</a:t></a:r><a:br><a:rPr lang="pt-BR" sz="2400" dirty="0"/></a:br><a:r><a:rPr lang="pt-BR" sz="2400" dirty="0"/><a:t>${instrutorCargo}</a:t></a:r><a:br><a:rPr lang="pt-BR" sz="2400" dirty="0"/></a:br><a:r><a:rPr lang="pt-BR" sz="2400" dirty="0"/><a:t>${instrutorRegistro}<`;
-      xml = xml.replaceAll('>Nome do Instrutor<', instrutorInjection);
+      // Instrutor
+      xml = xml.replaceAll('>Adeylton da Silva Araújo<', `>${instrutorNome}<`);
+      xml = xml.replaceAll('>Técnico em Segurança do Trabalho<', `>${instrutorCargo}<`);
+      xml = xml.replaceAll('>SRTE N° 0009823/RN<', `>${instrutorRegistro}<`);
 
       const sNum = slideCounter++;
       newZip.file(`ppt/slides/slide${sNum}.xml`, xml);
@@ -121,18 +116,8 @@ export async function generateCertificatePPTX({
     {
       let xml = templates.list;
       
-      // Instrutor name (split into 3 runs in template: "Adeylton", " da Silva ", "Araújo")
-      // Replace all 3 parts with the full instructor name
-      const nameParts = instrutorNome.split(' ');
-      const firstName = nameParts[0] || '';
-      const middleName = nameParts.length > 2 ? ' ' + nameParts.slice(1, -1).join(' ') + ' ' : nameParts.length === 2 ? ' ' : '';
-      const lastName = nameParts.length > 1 ? nameParts.slice(-1)[0] : '';
-      
-      xml = xml.replaceAll('>Adeylton<', `>${firstName}<`);
-      xml = xml.replaceAll('> da Silva <', `>${middleName}<`);
-      xml = xml.replaceAll('>Araújo<', `>${lastName}<`);
-      
-      // Cargo e Registro do instrutor
+      // Instrutor
+      xml = xml.replaceAll('>Adeylton da Silva Araújo<', `>${instrutorNome}<`);
       xml = xml.replaceAll('>Técnico em Segurança do Trabalho<', `>${instrutorCargo}<`);
       xml = xml.replaceAll('>SRTE N° 0009823/RN<', `>${instrutorRegistro}<`);
       
@@ -140,35 +125,22 @@ export async function generateCertificatePPTX({
       xml = xml.replaceAll('>Treinamento de NR - 06<', `>Treinamento de ${nr}<`);
       
       // Empresa
-      xml = xml.replaceAll('>Ecoclinic<', `>${empresa}<`);
+      xml = xml.replaceAll('>ecoclinic<', `>${empresa}<`);
       
       // Local
-      xml = xml.replaceAll('>Mossoró<', `>${local}<`);
+      xml = xml.replaceAll('>mossoro<', `>${local}<`);
       
-      // Data — template has date split: ">07<" and ">/08/2026<"
-      // Replace with the full formatted date in one go
-      const dd = formattedDate.substring(0, 2);
-      const restOfDate = formattedDate.substring(2); // "/MM/YYYY"
-      xml = xml.replace('>07<', `>${dd}<`);
-      xml = xml.replace('>/08/2026<', `>${restOfDate}<`);
+      // Data
+      xml = xml.replaceAll('>09/08/2026<', `>${formattedDate}<`);
       
       // Duração
       xml = xml.replaceAll('>1 hora<', `>${duracao}<`);
       
       // Nome do colaborador
-      xml = xml.replaceAll('>Gustavo <', `>${colab.nome}<`);
+      xml = xml.replaceAll('>Gustavo Clement Onraed Vieira<', `>${colab.nome}<`);
       
       // CPF (formatado)
-      xml = xml.replaceAll('>11415174423<', `>${formatCPF(colab.cpf)}<`);
-
-      // --- AJUSTE FINO DE ALINHAMENTO (PÁGINA 2) ---
-      // Subir o texto em aprox. 139736 EMUs para alinhar perfeitamente com os rótulos verdes
-      xml = xml.replace('y="8859736"', 'y="8720000"'); // Empresa
-      xml = xml.replace('y="9652955"', 'y="9513219"'); // Local
-      xml = xml.replace('y="10351431"', 'y="10211695"'); // Data
-      xml = xml.replace('y="11339337"', 'y="11199601"'); // Duracao
-      xml = xml.replace('y="12017266"', 'y="11877530"'); // Colab Nome
-      xml = xml.replace('y="12988690"', 'y="12848954"'); // CPF
+      xml = xml.replaceAll('>114.151.744-23<', `>${formatCPF(colab.cpf)}<`);
 
       // Conteúdo programático
       const conteudoLines = conteudo.split('\n');
