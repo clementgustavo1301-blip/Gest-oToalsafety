@@ -141,6 +141,9 @@ export async function generateCertificatePPTX({
       xml = xml.replace(/<a:r>(?:(?!<\/a:r>)[\s\S])*?<a:t>11415174423<\/a:t>[\s\S]*?<\/a:r>/g, (m) => m.replace('b="1"', 'b="0"'));
       xml = xml.replace(/<a:endParaRPr sz="3200" b="1"/g, '<a:endParaRPr sz="3200" b="0"');
       xml = replaceText(xml, ['114.151.744-23', '11415174423'], formatCPF(colab.cpf));
+      
+      // Alinhar a caixa de assinatura do participante (Y=19348444) com a do instrutor (Y=19672909)
+      xml = xml.replace(/<a:off x="(\d+)" y="19348444"\/>/, '<a:off x="$1" y="19672909"/>');
 
       // Instrutor Box no Slide 1 (Nome, Cargo e Registro)
       const safeNome = escapeXml(instrutorNome);
@@ -193,7 +196,7 @@ export async function generateCertificatePPTX({
         const safeValue = escapeXml(value);
         // Removed txBox="1" so some viewers (like LibreOffice/web) don't force transparent backgrounds
         // Added dirty="0" and used 0E0E0E for black to match template exact behavior
-        return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr spcFirstLastPara="1" wrap="square" lIns="100000" tIns="0" rIns="0" bIns="0" anchor="ctr" anchorCtr="0"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0"><a:lnSpc><a:spcPct val="140039"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="3200" b="1" dirty="0"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeLabel} </a:t></a:r><a:r><a:rPr lang="pt-BR" sz="3200" b="0" dirty="0"><a:solidFill><a:srgbClr val="0E0E0E"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeValue}</a:t></a:r></a:p></p:txBody></p:sp>`;
+        return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr spcFirstLastPara="1" wrap="square" lIns="100000" tIns="0" rIns="0" bIns="0" anchor="ctr" anchorCtr="0"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0"><a:lnSpc><a:spcPct val="140039"/></a:lnSpc></a:pPr><a:r><a:rPr lang="pt-BR" sz="3200" b="1" dirty="0"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeLabel} </a:t></a:r><a:r><a:rPr lang="pt-BR" sz="3200" b="1" dirty="0"><a:solidFill><a:srgbClr val="0E0E0E"/></a:solidFill><a:latin typeface="Montserrat"/><a:ea typeface="Montserrat"/><a:cs typeface="Montserrat"/><a:sym typeface="Montserrat"/></a:rPr><a:t>${safeValue}</a:t></a:r></a:p></p:txBody></p:sp>`;
       };
 
       const startX = "2850000"; // Moved right to avoid overlapping the black border, padding added to text
