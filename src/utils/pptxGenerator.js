@@ -129,7 +129,10 @@ export async function generateCertificatePPTX({
       // Empresa
       xml = replaceText(xml, ['Ecoclinic', 'ecoclinic'], empresa);
 
-      // CPF (formatado)
+      // CPF (formatado - remover negrito na página 1)
+      xml = xml.replace(/<a:r>(?:(?!<\/a:r>)[\s\S])*?<a:t>CPF:<\/a:t>[\s\S]*?<\/a:r>/g, (m) => m.replace('b="1"', 'b="0"'));
+      xml = xml.replace(/<a:r>(?:(?!<\/a:r>)[\s\S])*?<a:t>11415174423<\/a:t>[\s\S]*?<\/a:r>/g, (m) => m.replace('b="1"', 'b="0"'));
+      xml = xml.replace(/<a:endParaRPr sz="3200" b="1"/g, '<a:endParaRPr sz="3200" b="0"');
       xml = replaceText(xml, ['114.151.744-23', '11415174423'], formatCPF(colab.cpf));
 
       // Instrutor Box no Slide 1 (Nome, Cargo e Registro)
