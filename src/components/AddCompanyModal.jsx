@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Building2 } from 'lucide-react';
+import { X, Building2, Loader2, MapPin, CheckCircle2 } from 'lucide-react';
 
 function formatCNPJ(value) {
   const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -17,12 +17,51 @@ const AddCompanyModal = ({ onClose, onSave }) => {
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('TotalSafety');
   const [loading, setLoading] = useState(false);
+  const [fetchingCNPJ, setFetchingCNPJ] = useState(false);
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+
+  const fetchCnpjData = async (cnpjStr) => {
+    const clean = cnpjStr.replace(/\D/g, '');
+    if (clean.length !== 14) return;
+    
+    setFetchingCNPJ(true);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (data.cep) {
+          const cepRes = await fetch(`https://brasilapi.com.br/api/cep/v2/${data.cep.replace(/\D/g, '')}`);
+          if (cepRes.ok) {
+            const cepData = await cepRes.json();
+            if (cepData.location?.coordinates?.latitude) {
+              setLatitude(parseFloat(cepData.location.coordinates.latitude));
+              setLongitude(parseFloat(cepData.location.coordinates.longitude));
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao buscar BrasilAPI", err);
+    } finally {
+      setFetchingCNPJ(false);
+    }
+  };
+
+  const handleCnpjChange = (e) => {
+    const val = formatCNPJ(e.target.value);
+    setCnpj(val);
+    if (val.length === 18) {
+      fetchCnpjData(val);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !cnpj.trim()) return;
     setLoading(true);
-    await onSave({ name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim(), category });
+    await onSave({ name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim(), category, latitude, longitude });
     setLoading(false);
   };
 
@@ -63,17 +102,25 @@ const AddCompanyModal = ({ onClose, onSave }) => {
             </div>
             <div>
               <label className="modal-label" htmlFor="company-cnpj">CNPJ</label>
-              <input
-                id="company-cnpj"
-                type="text"
-                value={cnpj}
-                onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
-                placeholder="00.000.000/0000-00"
-                className="modal-input"
-                required
-                maxLength={18}
-                disabled={loading}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="company-cnpj"
+                  type="text"
+                  value={cnpj}
+                  onChange={handleCnpjChange}
+                  placeholder="00.000.000/0000-00"
+                  className="modal-input"
+                  required
+                  maxLength={18}
+                  disabled={loading || fetchingCNPJ}
+                />
+                {fetchingCNPJ && (
+                  <Loader2 size={18} className="spin" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }} />
+                )}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
+                Digite o CNPJ completo para buscar os dados automaticamente via Receita Federal.
+              </span>
             </div>
             <div className="grid-responsive-2">
               <div>
@@ -116,6 +163,15 @@ const AddCompanyModal = ({ onClose, onSave }) => {
                 <option value="Consultoria Fixa">Consultoria Fixa</option>
               </select>
             </div>
+
+            {latitude && longitude && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#ecfdf5', border: '1px solid #34d399', borderRadius: '8px' }}>
+                <CheckCircle2 size={18} color="#059669" />
+                <span style={{ fontSize: '0.85rem', color: '#065f46', fontWeight: '600' }}>
+                  Localização GPS e Endereço encontrados automaticamente!
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="modal-footer">

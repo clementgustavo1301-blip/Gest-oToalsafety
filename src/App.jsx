@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import CalendarView from './pages/CalendarView';
 import CompaniesPage from './pages/CompaniesPage';
 import CompanyDetailsPage from './pages/CompanyDetailsPage';
+import LogisticsPage from './pages/LogisticsPage';
 import DeliverablesPage from './pages/DeliverablesPage';
 import InventoryPage from './pages/InventoryPage';
 import AIAssistant from './pages/AIAssistant';
@@ -54,6 +55,7 @@ const AppLayout = () => {
             <Route path="/calendar" element={<CalendarView />} />
             <Route path="/companies" element={<CompaniesPage />} />
             <Route path="/company/:companyId" element={<CompanyDetailsPage />} />
+            <Route path="/logistics" element={<LogisticsPage />} />
             <Route path="/deliverables" element={<DeliverablesPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/ai-assistant" element={<AIAssistant />} />

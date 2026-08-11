@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar } from 'lucide-react';
+import { X, Calendar, AlertCircle } from 'lucide-react';
 import { getDeliverablesByCompany, getCompanies, getProfiles, getGroups } from '../services/storageService';
+import { supabase } from '../lib/supabase';
 
 const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyId || '');
@@ -28,6 +29,11 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Controle de colisão (mesma empresa no mesmo dia)
+  const [checkingCollision, setCheckingCollision] = useState(false);
+  const [collisionDetected, setCollisionDetected] = useState(false);
+  const [collisionChoice, setCollisionChoice] = useState('cancel'); // 'cancel', 'shared', 'separate'
 
   useEffect(() => {
     async function load() {
@@ -62,6 +68,26 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
     if (!date || !selectedCompanyId) return;
     if (isStandalone && !customTitle.trim()) return;
     if (!isStandalone && !selectedDeliverableId) return;
+
+    if (!collisionDetected) {
+      setCheckingCollision(true);
+      const { data: existing } = await supabase
+        .from('trainings')
+        .select('id, title')
+        .eq('company_id', selectedCompanyId)
+        .eq('date', date);
+      setCheckingCollision(false);
+
+      if (existing && existing.length > 0) {
+        setCollisionDetected(true);
+        return; // wait for user feedback
+      }
+    }
+
+    if (collisionDetected && collisionChoice === 'cancel') {
+      onClose();
+      return;
+    }
     
     setSaving(true);
     let title = customTitle.trim();
@@ -78,7 +104,9 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       time,
       instructor: instructor.trim(),
       participants: parseInt(participants) || 0,
-      description: description.trim(),
+      description: (collisionDetected && collisionChoice === 'shared') 
+        ? description.trim() + '\n[SHARED_TRIP]' 
+        : description.trim(),
       status: 'agendado',
       deliverableId,
       companyId: selectedCompanyId,
@@ -376,18 +404,47 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                   disabled={saving}
                   style={{ resize: 'vertical' }}
                 />
+                {collisionDetected && (
+                <div style={{ backgroundColor: 'var(--warning-light)', border: '1px solid var(--warning)', padding: '1rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--warning)' }}>
+                    <AlertCircle size={20} />
+                    <strong style={{ fontSize: '0.95rem' }}>Atenção: Agendamento Duplo</strong>
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
+                    Já existe um agendamento para esta empresa na mesma data. Deseja agendar mesmo assim?
+                  </p>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0, fontWeight: '600' }}>
+                    Como será feito o deslocamento logístico?
+                  </p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                      <input type="radio" name="collisionChoice" value="cancel" checked={collisionChoice === 'cancel'} onChange={(e) => setCollisionChoice(e.target.value)} />
+                      Cancelar e não agendar
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                      <input type="radio" name="collisionChoice" value="shared" checked={collisionChoice === 'shared'} onChange={(e) => setCollisionChoice(e.target.value)} />
+                      Aproveitar a mesma viagem (Compartilhar deslocamento)
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                      <input type="radio" name="collisionChoice" value="separate" checked={collisionChoice === 'separate'} onChange={(e) => setCollisionChoice(e.target.value)} />
+                      Fazer uma nova viagem (Ida e volta novamente)
+                    </label>
+                  </div>
+                </div>
+              )}
               </div>
 
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
+              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving || checkingCollision}>Cancelar</button>
               <button 
                 type="submit" 
                 className="btn btn-primary" 
-                disabled={saving || (!isStandalone && !selectedDeliverableId) || (isStandalone && !customTitle.trim()) || !date || !selectedCompanyId}
+                disabled={saving || checkingCollision || (collisionDetected && collisionChoice === 'cancel') || (!isStandalone && !selectedDeliverableId) || (isStandalone && !customTitle.trim()) || !date || !selectedCompanyId}
               >
-                {saving ? 'Agendando...' : 'Agendar'}
+                {checkingCollision ? 'Verificando...' : (saving ? 'Agendando...' : 'Agendar')}
               </button>
             </div>
           </form>

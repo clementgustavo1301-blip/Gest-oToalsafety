@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, Stethoscope, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, Stethoscope, MessageSquare, Map } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
@@ -49,6 +49,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
     { name: 'Empresas', path: '/companies', icon: <Building2 size={20} /> },
+    { name: 'Logística', path: '/logistics', icon: <Map size={20} />, badge: 'DEMO' },
     { name: 'Calendário', path: '/calendar', icon: <Calendar size={20} /> },
     { name: 'Entregáveis', path: '/deliverables', icon: <FileText size={20} /> },
     { 
@@ -312,9 +313,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                 
                 {item.badge && !isCollapsed && (
                   <div style={{
-                    color: 'var(--danger)',
+                    color: item.badge === 'DEMO' ? 'white' : 'var(--danger)',
+                    backgroundColor: item.badge === 'DEMO' ? 'var(--primary)' : 'transparent',
+                    padding: item.badge === 'DEMO' ? '2px 6px' : '0',
+                    borderRadius: item.badge === 'DEMO' ? '12px' : '0',
                     fontWeight: 'bold',
-                    fontSize: '1rem',
+                    fontSize: item.badge === 'DEMO' ? '0.7rem' : '1rem',
                     marginLeft: 'auto'
                   }}>
                     {item.badge}
@@ -325,18 +329,19 @@ const Sidebar = ({ isOpen, onClose }) => {
                     position: 'absolute',
                     top: '8px',
                     right: '8px',
-                    backgroundColor: 'var(--danger)',
+                    backgroundColor: item.badge === 'DEMO' ? 'var(--primary)' : 'var(--danger)',
                     color: 'white',
-                    fontSize: '0.625rem',
+                    fontSize: item.badge === 'DEMO' ? '0.5rem' : '0.625rem',
                     fontWeight: 'bold',
-                    width: '16px',
+                    width: item.badge === 'DEMO' ? 'auto' : '16px',
                     height: '16px',
-                    borderRadius: '50%',
+                    padding: item.badge === 'DEMO' ? '0 4px' : '0',
+                    borderRadius: item.badge === 'DEMO' ? '8px' : '50%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    {item.badge}
+                    {item.badge === 'DEMO' ? 'D' : item.badge}
                   </div>
                 )}
                 

@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2 } from 'lucide-react';
+import { X, Building2, MapPin, Loader2, CheckCircle2 } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Conserta os ícones do Leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Centro de Mossoró (fallback)
+const DEFAULT_CENTER = { lat: -5.1882, lng: -37.3415 };
 
 function formatCNPJ(value) {
   const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -10,13 +24,79 @@ function formatCNPJ(value) {
     .replace(/(\d{4})(\d)/, '$1-$2');
 }
 
+function LocationMarker({ position, setPosition }) {
+  useMapEvents({
+    click(e) {
+      setPosition(e.latlng);
+    },
+  });
+
+  return position === null ? null : (
+    <Marker 
+      position={position}
+      draggable={true}
+      eventHandlers={{
+        dragend: (e) => {
+          setPosition(e.target.getLatLng());
+        }
+      }}
+    />
+  );
+}
+
 const EditCompanyModal = ({ company, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [cnpj, setCnpj] = useState('');
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('TotalSafety');
+  const [position, setPosition] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fetchingCNPJ, setFetchingCNPJ] = useState(false);
+  const [autoLocationFound, setAutoLocationFound] = useState(false);
+
+  const fetchCnpjData = async (cnpjStr) => {
+    const clean = cnpjStr.replace(/\D/g, '');
+    if (clean.length !== 14) return;
+    
+    setFetchingCNPJ(true);
+    setAutoLocationFound(false);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (data.cep) {
+          const cepRes = await fetch(`https://brasilapi.com.br/api/cep/v2/${data.cep.replace(/\D/g, '')}`);
+          if (cepRes.ok) {
+            const cepData = await cepRes.json();
+            if (cepData.location?.coordinates?.latitude) {
+              setPosition({
+                lat: parseFloat(cepData.location.coordinates.latitude),
+                lng: parseFloat(cepData.location.coordinates.longitude)
+              });
+              setAutoLocationFound(true);
+              
+              // Remove the success message after 5 seconds
+              setTimeout(() => setAutoLocationFound(false), 5000);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao buscar BrasilAPI", err);
+    } finally {
+      setFetchingCNPJ(false);
+    }
+  };
+
+  const handleCnpjChange = (e) => {
+    const val = formatCNPJ(e.target.value);
+    setCnpj(val);
+    if (val.length === 18) {
+      fetchCnpjData(val);
+    }
+  };
 
   useEffect(() => {
     if (company) {
@@ -25,6 +105,9 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
       setContact(company.contact || '');
       setPhone(company.phone || '');
       setCategory(company.category || 'TotalSafety');
+      if (company.latitude && company.longitude) {
+        setPosition({ lat: company.latitude, lng: company.longitude });
+      }
     }
   }, [company]);
 
@@ -32,13 +115,23 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
     e.preventDefault();
     if (!name.trim() || !cnpj.trim()) return;
     setLoading(true);
-    await onSave(company.id, { name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim(), category });
+    await onSave(company.id, { 
+      name: name.trim(), 
+      cnpj, 
+      contact: contact.trim(), 
+      phone: phone.trim(), 
+      category,
+      latitude: position?.lat || null,
+      longitude: position?.lng || null
+    });
     setLoading(false);
   };
 
+  const center = position || DEFAULT_CENTER;
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
@@ -56,35 +149,51 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label className="modal-label" htmlFor="company-name">Razão Social</label>
-              <input
-                id="company-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: LD Agropecuária LTDA"
-                className="modal-input"
-                autoFocus
-                required
-                disabled={loading}
-              />
+          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div className="grid-responsive-2">
+              <div>
+                <label className="modal-label" htmlFor="company-name">Razão Social</label>
+                <input
+                  id="company-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: LD Agropecuária LTDA"
+                  className="modal-input"
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="modal-label" htmlFor="company-cnpj">CNPJ</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="company-cnpj"
+                    type="text"
+                    value={cnpj}
+                    onChange={handleCnpjChange}
+                    placeholder="00.000.000/0000-00"
+                    className="modal-input"
+                    required
+                    maxLength={18}
+                    disabled={loading || fetchingCNPJ}
+                  />
+                  {fetchingCNPJ && (
+                    <Loader2 size={18} className="spin" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }} />
+                  )}
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
+                  Aviso: Alterar o CNPJ buscará os dados atualizados da Receita Federal.
+                </span>
+                {autoLocationFound && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.5rem', color: '#059669' }}>
+                    <CheckCircle2 size={14} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>Localização atualizada no mapa!</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="modal-label" htmlFor="company-cnpj">CNPJ</label>
-              <input
-                id="company-cnpj"
-                type="text"
-                value={cnpj}
-                onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
-                placeholder="00.000.000/0000-00"
-                className="modal-input"
-                required
-                maxLength={18}
-                disabled={loading}
-              />
-            </div>
+            
             <div className="grid-responsive-2">
               <div>
                 <label className="modal-label" htmlFor="company-contact">Contato</label>
@@ -126,6 +235,54 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
                 <option value="Consultoria Fixa">Consultoria Fixa</option>
               </select>
             </div>
+            
+            {/* Mapa de Localização */}
+            <div style={{ marginTop: '0.5rem' }}>
+              <label className="modal-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <MapPin size={16} className="text-primary"/> 
+                Localização Geográfica (Opcional)
+              </label>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                Clique no mapa para adicionar o pino ou arraste-o para a posição exata da empresa. Isso é usado no painel de Logística.
+              </p>
+              
+              <div style={{ 
+                height: '250px', 
+                width: '100%', 
+                borderRadius: 'var(--radius-md)', 
+                overflow: 'hidden',
+                border: '1px solid var(--border)'
+              }}>
+                <MapContainer 
+                  center={[center.lat, center.lng]} 
+                  zoom={position ? 15 : 12} 
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <LocationMarker position={position} setPosition={setPosition} />
+                </MapContainer>
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setPosition(null)}
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--danger)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: position ? 'block' : 'none'
+                  }}
+                >
+                  Remover Localização
+                </button>
+              </div>
+            </div>
+
           </div>
 
           <div className="modal-footer">

@@ -12,6 +12,8 @@ function mapCompany(row) {
     contact: row.contact,
     phone: row.phone,
     category: row.category || 'TotalSafety',
+    latitude: row.latitude,
+    longitude: row.longitude,
   };
 }
 
@@ -139,6 +141,8 @@ export async function updateCompany(companyId, updates) {
   if (updates.contact !== undefined) snakeUpdates.contact = updates.contact;
   if (updates.phone !== undefined) snakeUpdates.phone = updates.phone;
   if (updates.category !== undefined) snakeUpdates.category = updates.category;
+  if (updates.latitude !== undefined) snakeUpdates.latitude = updates.latitude;
+  if (updates.longitude !== undefined) snakeUpdates.longitude = updates.longitude;
 
   const { data, error } = await supabase.from('companies').update(snakeUpdates).eq('id', companyId).select().single();
   if (error) { console.error('Error updating company:', error); return null; }
