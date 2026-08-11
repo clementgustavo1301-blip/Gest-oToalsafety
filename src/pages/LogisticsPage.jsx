@@ -130,6 +130,21 @@ export default function LogisticsPage() {
               textTransform: 'uppercase',
               letterSpacing: '0.5px'
             }}>Demo</span>
+            <span style={{
+              backgroundColor: '#fff3cd',
+              color: '#856404',
+              border: '1px solid #ffeeba',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              Os dados ainda não estão 100% corretos nesse relatório pois ainda vai ser ajustado o endereço correto das empresas
+            </span>
           </div>
           <p className="page-subtitle">Planeje as melhores rotas para visitação às empresas.</p>
         </div>
