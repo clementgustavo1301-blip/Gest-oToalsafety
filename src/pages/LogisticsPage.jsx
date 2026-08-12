@@ -25,8 +25,8 @@ const hqIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Coordenadas da EcoSafety (Av. Francisco Mota, 645 - Mossoró/RN)
-const HQ_COORDS = { lat: -5.2069, lng: -37.3300, name: "EcoSafety (Sede)" };
+// Coordenadas da EcoSafety (Travessa Filgueira Filho, 2 - Prédio do Cacim, Mossoró/RN)
+const HQ_COORDS = { lat: -5.1955, lng: -37.3308, name: "EcoSafety (Sede)" };
 
 // Componente para desenhar as rotas
 const RoutingControl = ({ waypoints }) => {

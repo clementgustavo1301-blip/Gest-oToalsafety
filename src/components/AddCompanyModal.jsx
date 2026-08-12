@@ -16,6 +16,7 @@ const AddCompanyModal = ({ onClose, onSave }) => {
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('TotalSafety');
+  const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchingCNPJ, setFetchingCNPJ] = useState(false);
   const [latitude, setLatitude] = useState(null);
@@ -31,10 +32,37 @@ const AddCompanyModal = ({ onClose, onSave }) => {
       if (res.ok) {
         const data = await res.json();
         
+        // Preenche campos manuais com os dados do CNPJ se estiverem vazios
+        if (!phone && data.ddd_telefone_1) setPhone(data.ddd_telefone_1);
+        
+        let contactName = '';
+        if (data.qsa && data.qsa.length > 0) {
+           contactName = data.qsa[0].nome_socio;
+        } else if (data.nome_fantasia) {
+           contactName = data.nome_fantasia;
+        }
+        if (!contact && contactName) setContact(contactName);
+
+        const addressParts = [];
+        if (data.logradouro) {
+           const street = data.descricao_tipo_de_logradouro ? `${data.descricao_tipo_de_logradouro} ${data.logradouro}` : data.logradouro;
+           addressParts.push(street);
+        }
+        if (data.numero) addressParts.push(data.numero);
+        if (data.bairro) addressParts.push(data.bairro);
+        if (data.municipio) addressParts.push(data.municipio);
+        if (data.uf) addressParts.push(data.uf);
+        if (data.cep) addressParts.push(data.cep);
+        
+        if (addressParts.length > 0) {
+          setAddress(addressParts.join(', '));
+        }
+        
         if (data.cep) {
           const cepRes = await fetch(`https://brasilapi.com.br/api/cep/v2/${data.cep.replace(/\D/g, '')}`);
           if (cepRes.ok) {
             const cepData = await cepRes.json();
+            
             if (cepData.location?.coordinates?.latitude) {
               setLatitude(parseFloat(cepData.location.coordinates.latitude));
               setLongitude(parseFloat(cepData.location.coordinates.longitude));
@@ -61,7 +89,7 @@ const AddCompanyModal = ({ onClose, onSave }) => {
     e.preventDefault();
     if (!name.trim() || !cnpj.trim()) return;
     setLoading(true);
-    await onSave({ name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim(), category, latitude, longitude });
+    await onSave({ name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim(), address: address.trim(), category, latitude, longitude });
     setLoading(false);
   };
 
@@ -147,6 +175,20 @@ const AddCompanyModal = ({ onClose, onSave }) => {
                   disabled={loading}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="modal-label" htmlFor="company-address">Endereço (Rua, Número, Bairro, Cidade, Estado, CEP)</label>
+              <textarea
+                id="company-address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Ex: Rua das Flores, 123, Centro, São Paulo, SP, 01000-000"
+                className="modal-input"
+                rows="2"
+                style={{ resize: 'vertical' }}
+                disabled={loading}
+              />
             </div>
 
             <div>
