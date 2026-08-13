@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, Clock, User, Users,
   CheckCircle, PauseCircle, XCircle, Calendar as CalendarIcon,
-  Trash2, Edit2, Sunrise, Sun
+  Trash2, Edit2, Sunrise, Sun, FileText
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -317,16 +317,32 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                   </button>
                 </div>
 
-                <div className="grid-responsive-2" style={{ gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                    <Clock size={14} /> {event.date ? new Date(event.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''} • {event.time}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                      <Clock size={14} /> {event.date ? new Date(event.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''} • {event.time}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                      <User size={14} /> {event.instructor || 'Sem instrutor'}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                      <Users size={14} /> {event.participants || 0} participantes
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                    <User size={14} /> {event.instructor || 'Sem instrutor'}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                    <Users size={14} /> {event.participants || 0} participantes
-                  </div>
+                  <button
+                    className="btn"
+                    onClick={() => alert('Em breve: Relatório de Treinamento (Em elaboração)')}
+                    style={{
+                      padding: '0.375rem 0.5rem', fontSize: '0.65rem',
+                      backgroundColor: 'var(--info-light)', color: 'var(--info)',
+                      border: '1px solid var(--info)', borderRadius: 'var(--radius-md)',
+                      fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem',
+                      flexShrink: 0
+                    }}
+                    title="Gerar Relatório de Treinamento"
+                  >
+                    <FileText size={12} /> Relatório de Treinamento
+                  </button>
                 </div>
 
                 {event.description && (

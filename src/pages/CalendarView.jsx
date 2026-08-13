@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2, Sunrise, Sun } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2, Sunrise, Sun, FileText } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
@@ -461,24 +461,40 @@ const CalendarView = () => {
                       <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: '0.375rem' }}>
                         {event.title}
                       </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                          <Building2 size={12} />
-                          <span 
-                            title={getCompanyCategory(event.companyId)}
-                            style={{
-                              width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                              backgroundColor: getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
-                            }} 
-                          />
-                          {event.companyName}
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                          <Clock size={12} /> {event.time}
-                        </span>
-                        {event.responsibleId && (
-                          <span>Responsável: {getProfileName(event.responsibleId)}</span>
-                        )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <Building2 size={12} />
+                            <span 
+                              title={getCompanyCategory(event.companyId)}
+                              style={{
+                                width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                                backgroundColor: getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
+                              }} 
+                            />
+                            {event.companyName}
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <Clock size={12} /> {event.time}
+                          </span>
+                          {event.responsibleId && (
+                            <span>Responsável: {getProfileName(event.responsibleId)}</span>
+                          )}
+                        </div>
+                        <button
+                          className="btn"
+                          onClick={() => alert('Em breve: Relatório de Treinamento (Em elaboração)')}
+                          style={{
+                            padding: '0.375rem 0.5rem', fontSize: '0.65rem',
+                            backgroundColor: 'var(--info-light)', color: 'var(--info)',
+                            border: '1px solid var(--info)', borderRadius: 'var(--radius-md)',
+                            fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem',
+                            flexShrink: 0
+                          }}
+                          title="Gerar Relatório de Treinamento"
+                        >
+                          <FileText size={12} /> Relatório de Treinamento
+                        </button>
                       </div>
                       {/* Status Actions */}
                       <div style={{
