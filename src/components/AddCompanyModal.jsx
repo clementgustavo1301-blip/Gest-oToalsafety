@@ -17,8 +17,10 @@ const AddCompanyModal = ({ onClose, onSave }) => {
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('TotalSafety');
   const [address, setAddress] = useState('');
+  const [cepInput, setCepInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchingCNPJ, setFetchingCNPJ] = useState(false);
+  const [fetchingCEP, setFetchingCEP] = useState(false);
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
 
@@ -74,6 +76,43 @@ const AddCompanyModal = ({ onClose, onSave }) => {
       console.error("Erro ao buscar BrasilAPI", err);
     } finally {
       setFetchingCNPJ(false);
+    }
+  };
+
+  const fetchCepData = async (cepStr) => {
+    const cleanCep = cepStr.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+    
+    setFetchingCEP(true);
+    try {
+      const cepRes = await fetch(`https://brasilapi.com.br/api/cep/v2/${cleanCep}`);
+      if (cepRes.ok) {
+        const cepData = await cepRes.json();
+        
+        const parts = [];
+        if (cepData.street) parts.push(cepData.street);
+        if (cepData.neighborhood) parts.push(cepData.neighborhood);
+        if (cepData.city) parts.push(cepData.city);
+        if (cepData.state) parts.push(cepData.state);
+        if (cepData.cep) parts.push(cepData.cep);
+        
+        if (parts.length > 0) {
+          // Mantém o número se já houver algo no endereço? Mais fácil sobrepor tudo:
+          setAddress(parts.join(', ') + ', Nº ');
+        }
+        
+        if (cepData.location?.coordinates?.latitude) {
+          setLatitude(parseFloat(cepData.location.coordinates.latitude));
+          setLongitude(parseFloat(cepData.location.coordinates.longitude));
+        }
+      } else {
+        alert('CEP não encontrado ou inválido.');
+      }
+    } catch (err) {
+      console.error("Erro ao buscar CEP", err);
+      alert('Erro ao conectar com o serviço de CEP.');
+    } finally {
+      setFetchingCEP(false);
     }
   };
 
@@ -177,18 +216,61 @@ const AddCompanyModal = ({ onClose, onSave }) => {
               </div>
             </div>
 
-            <div>
-              <label className="modal-label" htmlFor="company-address">Endereço (Rua, Número, Bairro, Cidade, Estado, CEP)</label>
-              <textarea
-                id="company-address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Ex: Rua das Flores, 123, Centro, São Paulo, SP, 01000-000"
-                className="modal-input"
-                rows="2"
-                style={{ resize: 'vertical' }}
-                disabled={loading}
-              />
+            <div style={{ padding: '1rem', backgroundColor: 'var(--surface-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="modal-label" htmlFor="company-cep">Preencher Endereço por CEP</label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    id="company-cep"
+                    type="text"
+                    value={cepInput}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+                      const formatted = val.replace(/^(\d{5})(\d)/, '$1-$2');
+                      setCepInput(formatted);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (cepInput.replace(/\D/g, '').length === 8) {
+                          fetchCepData(cepInput);
+                        }
+                      }
+                    }}
+                    placeholder="00000-000"
+                    className="modal-input"
+                    maxLength={9}
+                    disabled={loading || fetchingCEP}
+                    style={{ maxWidth: '150px' }}
+                  />
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => fetchCepData(cepInput)}
+                    disabled={loading || fetchingCEP || cepInput.replace(/\D/g, '').length !== 8}
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    {fetchingCEP ? <Loader2 size={16} className="spin" /> : 'Buscar CEP'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="modal-label" htmlFor="company-address">Endereço Completo</label>
+                <textarea
+                  id="company-address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Ex: Rua das Flores, 123, Centro, São Paulo, SP, 01000-000"
+                  className="modal-input"
+                  rows="2"
+                  style={{ resize: 'vertical' }}
+                  disabled={loading}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
+                  O endereço digitado acima será salvo e o mapa usará as coordenadas buscadas pelo CNPJ ou CEP.
+                </span>
+              </div>
             </div>
 
             <div>

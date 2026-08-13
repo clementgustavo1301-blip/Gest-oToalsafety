@@ -56,6 +56,7 @@ export default function LogisticsReport({ companies, hqCoords }) {
         
         // Verifica se a viagem foi aproveitada (compartilhada)
         const isSharedTrip = t.description && t.description.includes('[SHARED_TRIP]');
+        const isNoTravel = t.description && t.description.includes('[NO_TRAVEL]');
 
         unified.push({
           id: t.id,
@@ -64,7 +65,8 @@ export default function LogisticsReport({ companies, hqCoords }) {
           due_date: t.date,
           title: t.title || 'Treinamento',
           status: t.status,
-          isSharedTrip
+          isSharedTrip,
+          isNoTravel
         });
       });
 
@@ -77,7 +79,7 @@ export default function LogisticsReport({ companies, hqCoords }) {
           eventsByCompany[d.company_id] = { count: 0, trips: 0, events: [] };
         }
         eventsByCompany[d.company_id].count += 1;
-        if (!d.isSharedTrip) {
+        if (!d.isSharedTrip && !d.isNoTravel) {
           eventsByCompany[d.company_id].trips += 1;
         }
         eventsByCompany[d.company_id].events.push(d);

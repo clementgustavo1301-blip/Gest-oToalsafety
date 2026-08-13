@@ -24,6 +24,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
 
   const [customTitle, setCustomTitle] = useState('');
   const [isStandalone, setIsStandalone] = useState(false);
+  const [hasTravel, setHasTravel] = useState(null);
 
   const [pendingTrainings, setPendingTrainings] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -68,6 +69,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
     if (!date || !selectedCompanyId) return;
     if (isStandalone && !customTitle.trim()) return;
     if (!isStandalone && !selectedDeliverableId) return;
+    if (hasTravel === null) return;
 
     if (!collisionDetected) {
       setCheckingCollision(true);
@@ -99,14 +101,19 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       deliverableId = selectedDeliverableId;
     }
     
+    let finalDescription = description.trim();
+    if (!hasTravel) {
+      finalDescription += '\n[NO_TRAVEL]';
+    } else if (collisionDetected && collisionChoice === 'shared') {
+      finalDescription += '\n[SHARED_TRIP]';
+    }
+
     const baseItem = {
       title,
       time,
       instructor: instructor.trim(),
       participants: parseInt(participants) || 0,
-      description: (collisionDetected && collisionChoice === 'shared') 
-        ? description.trim() + '\n[SHARED_TRIP]' 
-        : description.trim(),
+      description: finalDescription,
       status: 'agendado',
       deliverableId,
       companyId: selectedCompanyId,
@@ -391,6 +398,21 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                 </div>
               </div>
 
+              {/* Travel options */}
+              <div>
+                <label className="modal-label">Haverá deslocamento até a empresa? <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                    <input type="radio" checked={hasTravel === true} onChange={() => setHasTravel(true)} disabled={saving} />
+                    Sim, contabilizar percurso
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                    <input type="radio" checked={hasTravel === false} onChange={() => setHasTravel(false)} disabled={saving} />
+                    Não (Ex: Online, interno)
+                  </label>
+                </div>
+              </div>
+
               {/* Description */}
               <div>
                 <label className="modal-label" htmlFor="training-description">Descrição / Observações</label>
@@ -413,24 +435,41 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
                     Já existe um agendamento para esta empresa na mesma data. Deseja agendar mesmo assim?
                   </p>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0, fontWeight: '600' }}>
-                    Como será feito o deslocamento logístico?
-                  </p>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
-                      <input type="radio" name="collisionChoice" value="cancel" checked={collisionChoice === 'cancel'} onChange={(e) => setCollisionChoice(e.target.value)} />
-                      Cancelar e não agendar
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
-                      <input type="radio" name="collisionChoice" value="shared" checked={collisionChoice === 'shared'} onChange={(e) => setCollisionChoice(e.target.value)} />
-                      Aproveitar a mesma viagem (Compartilhar deslocamento)
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
-                      <input type="radio" name="collisionChoice" value="separate" checked={collisionChoice === 'separate'} onChange={(e) => setCollisionChoice(e.target.value)} />
-                      Fazer uma nova viagem (Ida e volta novamente)
-                    </label>
-                  </div>
+                  {hasTravel && (
+                    <>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0, fontWeight: '600' }}>
+                        Como será feito o deslocamento logístico?
+                      </p>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                          <input type="radio" name="collisionChoice" value="cancel" checked={collisionChoice === 'cancel'} onChange={(e) => setCollisionChoice(e.target.value)} />
+                          Cancelar e não agendar
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                          <input type="radio" name="collisionChoice" value="shared" checked={collisionChoice === 'shared'} onChange={(e) => setCollisionChoice(e.target.value)} />
+                          Aproveitar a mesma viagem (Compartilhar deslocamento)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                          <input type="radio" name="collisionChoice" value="separate" checked={collisionChoice === 'separate'} onChange={(e) => setCollisionChoice(e.target.value)} />
+                          Fazer uma nova viagem (Ida e volta novamente)
+                        </label>
+                      </div>
+                    </>
+                  )}
+                  {!hasTravel && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                        <input type="radio" name="collisionChoiceNoTravel" value="cancel" checked={collisionChoice === 'cancel'} onChange={() => setCollisionChoice('cancel')} />
+                        Cancelar e não agendar
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                        <input type="radio" name="collisionChoiceNoTravel" value="separate" checked={collisionChoice === 'separate'} onChange={() => setCollisionChoice('separate')} />
+                        Sim, agendar
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
               </div>
@@ -442,7 +481,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
               <button 
                 type="submit" 
                 className="btn btn-primary" 
-                disabled={saving || checkingCollision || (collisionDetected && collisionChoice === 'cancel') || (!isStandalone && !selectedDeliverableId) || (isStandalone && !customTitle.trim()) || !date || !selectedCompanyId}
+                disabled={saving || checkingCollision || (collisionDetected && collisionChoice === 'cancel') || (!isStandalone && !selectedDeliverableId) || (isStandalone && !customTitle.trim()) || !date || !selectedCompanyId || hasTravel === null}
               >
                 {checkingCollision ? 'Verificando...' : (saving ? 'Agendando...' : 'Agendar')}
               </button>

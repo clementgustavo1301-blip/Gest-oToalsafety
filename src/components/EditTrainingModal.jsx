@@ -11,7 +11,8 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
   const [time, setTime] = useState(training.time || '');
   const [instructor, setInstructor] = useState(training.instructor || '');
   const [participants, setParticipants] = useState(training.participants || '');
-  const [description, setDescription] = useState(training.description || '');
+  const [description, setDescription] = useState((training.description || '').replace('[NO_TRAVEL]', '').replace('[SHARED_TRIP]', '').trim());
+  const [hasTravel, setHasTravel] = useState(!(training.description || '').includes('[NO_TRAVEL]'));
   const [responsibleId, setResponsibleId] = useState(training.responsibleId || '');
 
   const [profiles, setProfiles] = useState([]);
@@ -38,13 +39,20 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
     
     setSaving(true);
     
+    let finalDescription = description.trim();
+    if (!hasTravel) {
+      finalDescription += '\n[NO_TRAVEL]';
+    } else if (training.description && training.description.includes('[SHARED_TRIP]')) {
+      finalDescription += '\n[SHARED_TRIP]';
+    }
+
     const updatedData = {
       title: title.trim(),
       date,
       time,
       instructor: instructor.trim(),
       participants: parseInt(participants) || 0,
-      description: description.trim(),
+      description: finalDescription.trim(),
       companyId: selectedCompanyId,
       responsibleId: responsibleId || null
     };
@@ -171,6 +179,21 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
                     className="modal-input"
                     min="0"
                   />
+                </div>
+              </div>
+
+              {/* Travel options */}
+              <div>
+                <label className="modal-label">Haverá deslocamento até a empresa?</label>
+                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                    <input type="radio" checked={hasTravel} onChange={() => setHasTravel(true)} disabled={saving} />
+                    Sim, contabilizar percurso
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                    <input type="radio" checked={!hasTravel} onChange={() => setHasTravel(false)} disabled={saving} />
+                    Não (Ex: Online, interno)
+                  </label>
                 </div>
               </div>
 
