@@ -381,7 +381,7 @@ const ReportsPage = () => {
           </div>
           <span style={{ fontSize: '1.75rem', fontWeight: '700', color: '#15803d' }}>{stats.responsaveisCount}</span>
         </div>
-
+      </div>
       {/* Filters */}
       <div className="card" style={{ marginBottom: '1.25rem', padding: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '200px' }}>
