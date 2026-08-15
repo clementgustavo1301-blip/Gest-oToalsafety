@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getTrainingsByCompany, addTraining, updateTraining, deleteTraining } from '../services/storageService';
+import { getTrainingsByCompany, addTraining, updateTraining, deleteTraining, getProfiles } from '../services/storageService';
 import AddTrainingModal from './AddTrainingModal';
 import EditTrainingModal from './EditTrainingModal';
 
@@ -35,17 +35,22 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
   const [selectedEvents, setSelectedEvents] = useState([]);
   
   const [trainings, setTrainings] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadData = async () => {
+  async function loadData() {
     setLoading(true);
-    const trn = await getTrainingsByCompany(companyId);
-    setTrainings(trn);
+    const [tData, pData] = await Promise.all([
+      getTrainingsByCompany(companyId),
+      getProfiles()
+    ]);
+    setTrainings(tData || []);
+    setProfiles(pData || []);
     setLoading(false);
     if (selectedDate) {
-      setSelectedEvents(trn.filter(t => t.date === selectedDate));
+      setSelectedEvents(tData.filter(t => t.date === selectedDate));
     }
-  };
+  }
 
   useEffect(() => {
     if (companyId) loadData();
@@ -326,7 +331,7 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                       <User size={14} /> {event.instructor || 'Sem instrutor'}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                      <Users size={14} /> {event.participants || 0} participantes
+                      <Users size={14} /> Responsável: {profiles.find(p => p.id === event.responsibleId)?.name || 'Nenhum'}
                     </div>
                   </div>
                   <button

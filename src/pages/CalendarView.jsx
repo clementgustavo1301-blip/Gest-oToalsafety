@@ -30,6 +30,7 @@ const CalendarView = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterRegion, setFilterRegion] = useState('all');
   
   const [calendarScope, setCalendarScope] = useState('geral');
   const [calendarCompanyId, setCalendarCompanyId] = useState('');
@@ -104,8 +105,11 @@ const CalendarView = () => {
   const startDate = startOfWeek(monthStart);
   const endDate = endOfWeek(monthEnd);
 
+  const getCompanyRegion = (companyId) => companies.find(c => c.id === companyId)?.region || 'Natal';
+
   const filteredTrainings = trainings.filter(t => {
     const matchStatus = filterStatus === 'all' || t.status === filterStatus;
+    const matchRegion = filterRegion === 'all' || getCompanyRegion(t.companyId) === filterRegion;
     const matchScope = calendarScope === 'geral' 
       ? true 
       : calendarScope === 'minha_agenda'
@@ -113,7 +117,7 @@ const CalendarView = () => {
       : calendarScope === 'empresa'
       ? t.companyId === calendarCompanyId
       : true;
-    return matchStatus && matchScope;
+    return matchStatus && matchRegion && matchScope;
   });
 
   const rows = [];
@@ -336,6 +340,21 @@ const CalendarView = () => {
             <option value="geral">Agenda Geral</option>
             <option value="minha_agenda">Minha Agenda</option>
             <option value="empresa">Por Empresa</option>
+          </select>
+
+          <select
+            value={filterRegion}
+            onChange={(e) => setFilterRegion(e.target.value)}
+            style={{
+              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)', fontSize: '0.8125rem',
+              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+              fontFamily: 'inherit', cursor: 'pointer'
+            }}
+          >
+            <option value="all">Todas as Regiões</option>
+            <option value="Natal">Natal</option>
+            <option value="Mossoró">Mossoró</option>
           </select>
 
           {calendarScope === 'empresa' && (

@@ -49,7 +49,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
     { name: 'Empresas', path: '/companies', icon: <Building2 size={20} /> },
-    { name: 'Logística', path: '/logistics', icon: <Map size={20} />, badge: 'DEMO' },
+    ...(activeLink?.role === 'Admin' ? [{ name: 'Logística', path: '/logistics', icon: <Map size={20} />, badge: 'DEMO' }] : []),
     { name: 'Calendário', path: '/calendar', icon: <Calendar size={20} /> },
     { name: 'Entregáveis', path: '/deliverables', icon: <FileText size={20} /> },
     { 

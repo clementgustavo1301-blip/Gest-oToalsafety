@@ -4,7 +4,7 @@ import {
   CheckCircle, Clock, XCircle, FileText,
   Users, ChevronDown, ChevronUp, FileDown, MapPin, User
 } from 'lucide-react';
-import { getTrainings, getCompanies } from '../services/storageService';
+import { getTrainings, getCompanies, getProfiles } from '../services/storageService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -18,6 +18,7 @@ const STATUS_CONFIG = {
 const ReportsPage = () => {
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [filterCompany, setFilterCompany] = useState('all');
@@ -30,12 +31,14 @@ const ReportsPage = () => {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [tData, cData] = await Promise.all([
+      const [tData, cData, pData] = await Promise.all([
         getTrainings(),
-        getCompanies()
+        getCompanies(),
+        getProfiles()
       ]);
       setTrainings(tData || []);
       setCompanies(cData || []);
+      setProfiles(pData || []);
       setLoading(false);
     }
     load();
@@ -56,9 +59,11 @@ const ReportsPage = () => {
       
       const monthKey = t.date ? t.date.substring(0, 7) : null;
       
-      return { ...t, companyName, normStatus, hasTravel, monthKey };
+      const responsibleName = profiles.find(p => p.id === t.responsibleId)?.name || 'Nenhum';
+      
+      return { ...t, companyName, normStatus, hasTravel, monthKey, responsibleName };
     });
-  }, [trainings, companies]);
+  }, [trainings, companies, profiles]);
 
   const availableMonths = useMemo(() => {
     const months = new Set();
@@ -68,7 +73,7 @@ const ReportsPage = () => {
 
   const formatMonth = (yyyy_mm) => {
     if (!yyyy_mm) return '';
-    const [y, m] = yyy_mm.split('-');
+    const [y, m] = yyyy_mm.split('-');
     const date = new Date(parseInt(y), parseInt(m) - 1, 1);
     const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
     const formatted = formatter.format(date);
@@ -112,8 +117,9 @@ const ReportsPage = () => {
     const realizados = filtered.filter(t => t.normStatus === 'realizado').length;
     const agendados = filtered.filter(t => t.normStatus === 'agendado').length;
     const pendentes = filtered.filter(t => t.normStatus === 'pendente').length;
-    const participantes = filtered.reduce((acc, t) => acc + (parseInt(t.participants) || 0), 0);
-    return { total, realizados, agendados, pendentes, participantes };
+    const uniqueResponsaveis = new Set(filtered.map(t => t.responsibleName).filter(n => n !== 'Nenhum'));
+    const responsaveisCount = uniqueResponsaveis.size;
+    return { total, realizados, agendados, pendentes, responsaveisCount };
   }, [filtered]);
 
   const handleSort = (field) => {
@@ -127,14 +133,14 @@ const ReportsPage = () => {
   };
 
   const exportCSV = () => {
-    const headers = ['Empresa', 'Treinamento', 'Data', 'Horario', 'Instrutor', 'Participantes', 'Deslocamento', 'Status'];
+    const headers = ['Empresa', 'Treinamento', 'Data', 'Horario', 'Instrutor', 'Responsável', 'Deslocamento', 'Status'];
     const rows = filtered.map(d => [
       d.companyName,
       d.title,
       d.date ? new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR') : '',
       d.time || '',
       d.instructor || '',
-      d.participants || 0,
+      d.responsibleName || 'Nenhum',
       d.hasTravel ? 'SIM' : 'NAO',
       STATUS_CONFIG[d.normStatus]?.label || d.normStatus
     ]);
@@ -226,7 +232,7 @@ const ReportsPage = () => {
       d.date ? new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR') : '—',
       d.time || '—',
       d.instructor || '—',
-      d.participants || '0',
+      d.responsibleName || 'Nenhum',
       d.hasTravel ? 'Sim' : 'Não',
       STATUS_CONFIG[d.normStatus]?.label || d.normStatus || ''
     ]);
@@ -371,11 +377,10 @@ const ReportsPage = () => {
         <div className="card" style={{ padding: '1.25rem', flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#15803d' }}>
             <Users size={18} />
-            <span style={{ fontSize: '0.8125rem', fontWeight: '500' }}>Participantes</span>
+            <span style={{ fontSize: '0.8125rem', fontWeight: '500' }}>Técnicos (Equipe)</span>
           </div>
-          <span style={{ fontSize: '1.75rem', fontWeight: '700', color: '#15803d' }}>{stats.participantes}</span>
+          <span style={{ fontSize: '1.75rem', fontWeight: '700', color: '#15803d' }}>{stats.responsaveisCount}</span>
         </div>
-      </div>
 
       {/* Filters */}
       <div className="card" style={{ marginBottom: '1.25rem', padding: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -420,7 +425,7 @@ const ReportsPage = () => {
                 { field: 'title', label: 'Treinamento' },
                 { field: 'date', label: 'Data / Horário' },
                 { field: 'instructor', label: 'Instrutor' },
-                { field: 'participants', label: 'Participantes' },
+                { field: 'responsibleName', label: 'Responsável' },
                 { field: 'logistics', label: 'Logística' },
                 { field: 'status', label: 'Status' },
               ].map(col => (
@@ -428,14 +433,14 @@ const ReportsPage = () => {
                   key={col.label}
                   onClick={() => ['company', 'title', 'date'].includes(col.field) && handleSort(col.field)}
                   style={{
-                    textAlign: col.field === 'participants' || col.field === 'logistics' ? 'center' : 'left', 
+                    textAlign: col.field === 'responsibleName' || col.field === 'logistics' ? 'center' : 'left', 
                     padding: '0.75rem 1rem', fontWeight: '600',
                     color: 'var(--text-secondary)', fontSize: '0.8125rem',
                     cursor: ['company', 'title', 'date'].includes(col.field) ? 'pointer' : 'default', userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: col.field === 'participants' || col.field === 'logistics' ? 'center' : 'flex-start' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: col.field === 'responsibleName' || col.field === 'logistics' ? 'center' : 'flex-start' }}>
                     {col.label}
                     {['company', 'title', 'date'].includes(col.field) && <SortIcon field={col.field} />}
                   </span>
@@ -474,7 +479,7 @@ const ReportsPage = () => {
                     ) : '—'}
                   </td>
                   <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8125rem', fontWeight: '500' }}>
-                    {d.participants > 0 ? d.participants : '—'}
+                    {d.responsibleName}
                   </td>
                   <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                     {d.hasTravel ? (

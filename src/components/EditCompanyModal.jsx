@@ -50,6 +50,7 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('TotalSafety');
+  const [region, setRegion] = useState('Natal');
   const [address, setAddress] = useState('');
   const [cepInput, setCepInput] = useState('');
   const [position, setPosition] = useState(null);
@@ -177,6 +178,7 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
       setPhone(company.phone || '');
       setAddress(company.address || '');
       setCategory(company.category || 'TotalSafety');
+      setRegion(company.region || 'Natal');
       if (company.latitude && company.longitude) {
         setPosition({ lat: company.latitude, lng: company.longitude });
       }
@@ -194,6 +196,7 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
       phone: phone.trim(), 
       address: address.trim(),
       category,
+      region,
       latitude: position?.lat || null,
       longitude: position?.lng || null
     });
@@ -351,19 +354,35 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
               </div>
             </div>
 
-            <div>
-              <label className="modal-label" htmlFor="company-category">Categoria</label>
-              <select
-                id="company-category"
-                className="modal-input"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                disabled={loading}
-                required
-              >
-                <option value="TotalSafety">TotalSafety</option>
-                <option value="Consultoria Fixa">Consultoria Fixa</option>
-              </select>
+            <div className="grid-responsive-2">
+              <div>
+                <label className="modal-label" htmlFor="company-category">Categoria</label>
+                <select
+                  id="company-category"
+                  className="modal-input"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  disabled={loading}
+                  required
+                >
+                  <option value="TotalSafety">TotalSafety</option>
+                  <option value="Consultoria Fixa">Consultoria Fixa</option>
+                </select>
+              </div>
+              <div>
+                <label className="modal-label" htmlFor="company-region">Região</label>
+                <select
+                  id="company-region"
+                  className="modal-input"
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                  disabled={loading}
+                  required
+                >
+                  <option value="Natal">Natal</option>
+                  <option value="Mossoró">Mossoró</option>
+                </select>
+              </div>
             </div>
             
             {/* Mapa de Localização */}

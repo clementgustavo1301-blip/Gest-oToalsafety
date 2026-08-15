@@ -249,6 +249,16 @@ const CompaniesPage = () => {
                                   }} 
                                 />
                               )}
+                              {company.region && (
+                                <span style={{
+                                  fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                                  backgroundColor: company.region === 'Natal' ? '#e0f2fe' : '#fce7f3',
+                                  color: company.region === 'Natal' ? '#0369a1' : '#be185d',
+                                  border: `1px solid ${company.region === 'Natal' ? '#7dd3fc' : '#fbcfe8'}`
+                                }}>
+                                  {company.region}
+                                </span>
+                              )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginTop: '0.125rem' }}>
                               <span style={{

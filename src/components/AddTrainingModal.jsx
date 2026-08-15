@@ -11,7 +11,6 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [date, setDate] = useState(defaultDate || '');
   const [time, setTime] = useState('08:00 - 12:00');
   const [instructor, setInstructor] = useState('');
-  const [participants, setParticipants] = useState('');
   const [description, setDescription] = useState('');
   const [responsibleId, setResponsibleId] = useState('');
 
@@ -112,7 +111,6 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       title,
       time,
       instructor: instructor.trim(),
-      participants: parseInt(participants) || 0,
       description: finalDescription,
       status: 'agendado',
       deliverableId,
@@ -367,35 +365,21 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                 </div>
               </div>
 
-              {/* Responsible and Participants */}
-              <div className="grid-responsive-2">
-                <div>
-                  <label className="modal-label" htmlFor="training-responsible">Responsável (Técnico)</label>
-                  <select
-                    id="training-responsible"
-                    value={responsibleId}
-                    onChange={(e) => setResponsibleId(e.target.value)}
-                    className="modal-input"
-                    disabled={saving}
-                  >
-                    <option value="">Nenhum</option>
-                    {profiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="modal-label" htmlFor="training-participants">Nº de Participantes</label>
-                  <input
-                    id="training-participants"
-                    type="number"
-                    value={participants}
-                    onChange={(e) => setParticipants(e.target.value)}
-                    placeholder="0"
-                    className="modal-input"
-                    min="0"
-                  />
-                </div>
+              {/* Responsible */}
+              <div>
+                <label className="modal-label" htmlFor="training-responsible">Responsável (Técnico)</label>
+                <select
+                  id="training-responsible"
+                  value={responsibleId}
+                  onChange={(e) => setResponsibleId(e.target.value)}
+                  className="modal-input"
+                  disabled={saving}
+                >
+                  <option value="">Nenhum</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                  ))}
+                </select>
               </div>
 
               {/* Travel options */}

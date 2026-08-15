@@ -4,6 +4,11 @@ import { supabase } from '../lib/supabase';
 
 function mapCompany(row) {
   if (!row) return null;
+  const rawCat = row.category || 'TotalSafety';
+  const parts = rawCat.split(' - ');
+  const catName = parts[0];
+  const regName = parts.length > 1 ? parts[1] : 'Natal';
+
   return {
     id: row.id,
     groupId: row.group_id,
@@ -11,7 +16,8 @@ function mapCompany(row) {
     cnpj: row.cnpj,
     contact: row.contact,
     phone: row.phone,
-    category: row.category || 'TotalSafety',
+    category: catName,
+    region: regName,
     address: row.address,
     latitude: row.latitude,
     longitude: row.longitude,
@@ -120,7 +126,7 @@ export async function addCompany(company) {
     contact: company.contact,
     phone: company.phone,
     address: company.address,
-    category: company.category || 'TotalSafety',
+    category: `${company.category || 'TotalSafety'} - ${company.region || 'Natal'}`,
     latitude: company.latitude,
     longitude: company.longitude
   }]).select().single();
@@ -144,10 +150,22 @@ export async function updateCompany(companyId, updates) {
   if (updates.cnpj !== undefined) snakeUpdates.cnpj = updates.cnpj;
   if (updates.contact !== undefined) snakeUpdates.contact = updates.contact;
   if (updates.phone !== undefined) snakeUpdates.phone = updates.phone;
-  if (updates.category !== undefined) snakeUpdates.category = updates.category;
   if (updates.address !== undefined) snakeUpdates.address = updates.address;
   if (updates.latitude !== undefined) snakeUpdates.latitude = updates.latitude;
   if (updates.longitude !== undefined) snakeUpdates.longitude = updates.longitude;
+
+  if (updates.category !== undefined || updates.region !== undefined) {
+    const { data: current } = await supabase.from('companies').select('category').eq('id', companyId).single();
+    const currentCatStr = current?.category || 'TotalSafety';
+    const parts = currentCatStr.split(' - ');
+    const oldCat = parts[0];
+    const oldReg = parts.length > 1 ? parts[1] : 'Natal';
+    
+    const newCat = updates.category !== undefined ? updates.category : oldCat;
+    const newReg = updates.region !== undefined ? updates.region : oldReg;
+    
+    snakeUpdates.category = `${newCat} - ${newReg}`;
+  }
 
   const { data, error } = await supabase.from('companies').update(snakeUpdates).eq('id', companyId).select().single();
   if (error) { console.error('Error updating company:', error); return null; }
