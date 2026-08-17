@@ -614,6 +614,7 @@ input, select, textarea {
 .tabs-container {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
 .grid-responsive-calendar {
   display: grid;
   grid-template-columns: 2fr 1fr;
