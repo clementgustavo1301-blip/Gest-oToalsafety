@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getTrainings, getCompanies, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from '../components/AddTrainingModal';
 import EditTrainingModal from '../components/EditTrainingModal';
+import ReportGeneratorModal from '../components/ReportGeneratorModal';
 
 const getPeriod = (timeStr) => {
   if (!timeStr) return 'manha';
@@ -29,6 +30,7 @@ const CalendarView = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [generatingReportFor, setGeneratingReportFor] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterRegion, setFilterRegion] = useState('all');
   
@@ -502,7 +504,7 @@ const CalendarView = () => {
                         </div>
                         <button
                           className="btn"
-                          onClick={() => alert('Em breve: Relatório de Treinamento (Em elaboração)')}
+                          onClick={() => setGeneratingReportFor(event)}
                           style={{
                             padding: '0.375rem 0.5rem', fontSize: '0.65rem',
                             backgroundColor: 'var(--info-light)', color: 'var(--info)',
@@ -510,9 +512,9 @@ const CalendarView = () => {
                             fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem',
                             flexShrink: 0
                           }}
-                          title="Gerar Relatório de Treinamento"
+                          title="Gerar Relatório"
                         >
-                          <FileText size={12} /> Relatório de Treinamento
+                          <FileText size={12} /> Gerar Relatório
                         </button>
                       </div>
                       {/* Status Actions */}
@@ -637,6 +639,14 @@ const CalendarView = () => {
           training={editingEvent}
           onClose={() => setEditingEvent(null)}
           onSave={() => { setEditingEvent(null); loadData(false); }}
+        />
+      )}
+
+      {generatingReportFor && (
+        <ReportGeneratorModal
+          event={generatingReportFor}
+          onClose={() => setGeneratingReportFor(null)}
+          userProfile={userProfile}
         />
       )}
     </div>
