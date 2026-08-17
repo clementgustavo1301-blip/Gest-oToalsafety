@@ -176,16 +176,15 @@ const CalendarView = () => {
               const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
               const compName = getCompanyName(event.companyId);
               return (
-                <div key={event.id} style={{
-                  fontSize: '0.6875rem', padding: '0.125rem 0.375rem',
+                <div key={event.id} className="calendar-event-item" style={{
                   backgroundColor: sc.bg, color: sc.color,
                   borderRadius: '3px', borderLeft: `3px solid ${sc.color}`,
                   overflow: 'hidden',
                   fontWeight: '500'
                 }}>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
-                    {event.time && <span style={{ fontSize: '0.5625rem', opacity: 0.8, marginLeft: '0.25rem', flexShrink: 0 }}>{event.time.split(' ')[0]}</span>}
+                    <span className="calendar-event-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
+                    {event.time && <span className="calendar-event-time" style={{ opacity: 0.8, marginLeft: '0.25rem', flexShrink: 0 }}>{event.time.split(' ')[0]}</span>}
                   </div>
                   {compName && compName !== 'N/A' && (
                     <div style={{
@@ -194,15 +193,14 @@ const CalendarView = () => {
                       gap: '0.25rem',
                       marginTop: '1px',
                     }}>
-                      <span 
+                      <span className="calendar-event-dot"
                         title={getCompanyCategory(event.companyId)}
                         style={{
                           width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
                           backgroundColor: getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
                         }} 
                       />
-                      <div style={{
-                        fontSize: '0.5625rem',
+                      <div className="calendar-event-company" style={{
                         opacity: 0.85,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -218,35 +216,24 @@ const CalendarView = () => {
             };
 
             return (
-              <>
-                {/* Mobile view: small dots */}
-                <div className="hide-on-desktop" style={{ display: 'flex', justifyContent: 'center', gap: '3px', marginTop: '6px', flexWrap: 'wrap' }}>
-                  {dayEvents.map((event, idx) => {
-                    const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
-                    return <div key={idx} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: sc.color }} />
-                  })}
-                </div>
-
-                {/* Desktop view: detailed list */}
-                <div className="hide-on-mobile" style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  {manhaEvents.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                      <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                        <Sunrise size={10} /> Manhã
-                      </div>
-                      {manhaEvents.map(renderEventItem)}
+              <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {manhaEvents.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                    <div className="calendar-period-label" style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                      <Sunrise size={10} /> Manhã
                     </div>
-                  )}
-                  {tardeEvents.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                      <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                        <Sun size={10} /> Tarde
-                      </div>
-                      {tardeEvents.map(renderEventItem)}
+                    {manhaEvents.map(renderEventItem)}
+                  </div>
+                )}
+                {tardeEvents.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                    <div className="calendar-period-label" style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                      <Sun size={10} /> Tarde
                     </div>
-                  )}
-                </div>
-              </>
+                    {tardeEvents.map(renderEventItem)}
+                  </div>
+                )}
+              </div>
             );
           })()}
         </div>
