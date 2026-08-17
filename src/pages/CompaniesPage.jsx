@@ -241,13 +241,14 @@ const CompaniesPage = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{company.name}</h4>
                               {company.category && (
-                                <span 
-                                  title={company.category}
-                                  style={{
-                                    width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-                                    backgroundColor: company.category === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
-                                  }} 
-                                />
+                                <span style={{
+                                  fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                                  backgroundColor: company.category === 'Consultoria Fixa' ? '#ffedd5' : '#dcfce7',
+                                  color: company.category === 'Consultoria Fixa' ? '#c2410c' : '#15803d',
+                                  border: `1px solid ${company.category === 'Consultoria Fixa' ? '#fdba74' : '#86efac'}`
+                                }}>
+                                  {company.category === 'Consultoria Fixa' ? 'Consultoria Fixa' : 'TotalSafety'}
+                                </span>
                               )}
                               {company.region && (
                                 <span style={{
