@@ -632,5 +632,28 @@ input, select, textarea {
 }
 
 .calendar-scroll-inner {
-  min-width: 800px;
+  min-width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .calendar-scroll-inner {
+    min-width: 800px;
+  }
+}
+
+.calendar-day-cell {
+  min-height: 100px;
+  padding: 0.5rem;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+@media (max-width: 1023px) {
+  .calendar-day-cell {
+    min-height: 60px;
+    padding: 0.25rem;
+  }
 }

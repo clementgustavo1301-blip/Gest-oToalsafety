@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { X, Upload, Trash2, FileText, Plus, Camera, ChevronDown, ChevronUp } from 'lucide-react';
 import { generateSSTReport } from '../services/pdfReportGenerator';
+import { generateSSTWordReport } from '../services/wordReportGenerator';
 import { format } from 'date-fns';
 
 const ReportGeneratorModal = ({ event, onClose, userProfile }) => {
   const [loading, setLoading] = useState(false);
+  const [loadingWord, setLoadingWord] = useState(false);
   const [expandedActionId, setExpandedActionId] = useState(1);
 
   const [formData, setFormData] = useState({
@@ -115,6 +117,23 @@ const ReportGeneratorModal = ({ event, onClose, userProfile }) => {
       alert('Ocorreu um erro ao gerar o PDF. Verifique o console para mais detalhes.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateWord = async () => {
+    setLoadingWord(true);
+    try {
+      const reportData = {
+        ...formData,
+        actions
+      };
+      await generateSSTWordReport(reportData);
+      onClose();
+    } catch (error) {
+      console.error('Erro ao gerar relatório Word', error);
+      alert('Ocorreu um erro ao gerar o Word. Verifique o console para mais detalhes.');
+    } finally {
+      setLoadingWord(false);
     }
   };
 
@@ -268,10 +287,15 @@ const ReportGeneratorModal = ({ event, onClose, userProfile }) => {
         </div>
 
         <div className="modal-footer" style={{ borderTop: '1px solid var(--border)' }}>
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleGenerate} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {loading ? 'Gerando...' : <><FileText size={16} /> Gerar PDF do Relatório</>}
-          </button>
+          <button className="btn btn-secondary" onClick={onClose} disabled={loading || loadingWord}>Cancelar</button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-secondary" onClick={handleGenerateWord} disabled={loading || loadingWord} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: '#2b579a', color: '#2b579a' }}>
+              {loadingWord ? 'Gerando...' : <><FileText size={16} /> Gerar Word</>}
+            </button>
+            <button className="btn btn-primary" onClick={handleGenerate} disabled={loading || loadingWord} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {loading ? 'Gerando...' : <><FileText size={16} /> Gerar PDF do Relatório</>}
+            </button>
+          </div>
         </div>
       </div>
     </div>

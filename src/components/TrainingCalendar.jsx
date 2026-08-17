@@ -115,13 +115,11 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
       days.push(
         <div
           key={dateStr}
+          className="calendar-day-cell"
           onClick={() => handleDayClick(cloneDay)}
           style={{
-            minHeight: '100px', padding: '0.5rem', minWidth: 0,
-            borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)',
             backgroundColor: !isCurrentMonth ? 'var(--background)' : isSelected ? 'var(--primary-light)' : 'var(--surface)',
             opacity: isCurrentMonth ? 1 : 0.5,
-            transition: 'var(--transition)', cursor: 'pointer'
           }}
           onMouseEnter={(e) => {
             if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--primary-light)';
@@ -146,6 +144,8 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
             const manhaEvents = dayTrainings.filter(t => getPeriod(t.time) === 'manha');
             const tardeEvents = dayTrainings.filter(t => getPeriod(t.time) === 'tarde');
 
+            if (dayTrainings.length === 0) return null;
+
             const renderItem = (t) => {
               const sc = STATUS_CONFIG[t.status] || STATUS_CONFIG.agendado;
               return (
@@ -164,24 +164,35 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
             };
 
             return (
-              <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {manhaEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sunrise size={10} /> Manhã
+              <>
+                {/* Mobile view: small dots */}
+                <div className="hide-on-desktop" style={{ display: 'flex', justifyContent: 'center', gap: '3px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {dayTrainings.map((t, idx) => {
+                    const sc = STATUS_CONFIG[t.status] || STATUS_CONFIG.agendado;
+                    return <div key={idx} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: sc.color }} />
+                  })}
+                </div>
+
+                {/* Desktop view: detailed list */}
+                <div className="hide-on-mobile" style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {manhaEvents.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                      <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                        <Sunrise size={10} /> Manhã
+                      </div>
+                      {manhaEvents.map(renderItem)}
                     </div>
-                    {manhaEvents.map(renderItem)}
-                  </div>
-                )}
-                {tardeEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sun size={10} /> Tarde
+                  )}
+                  {tardeEvents.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                      <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                        <Sun size={10} /> Tarde
+                      </div>
+                      {tardeEvents.map(renderItem)}
                     </div>
-                    {tardeEvents.map(renderItem)}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </>
             );
           })()}
         </div>
