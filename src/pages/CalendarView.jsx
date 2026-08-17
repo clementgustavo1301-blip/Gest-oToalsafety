@@ -138,17 +138,11 @@ const CalendarView = () => {
       days.push(
         <div 
           key={dateStr}
+          className="calendar-day-cell"
           onClick={() => handleDayClick(cloneDay)}
           style={{
-            minHeight: '120px',
-            minWidth: 0, /* Fixes grid item blowout */
-            padding: '0.5rem',
-            borderRight: '1px solid var(--border)',
-            borderBottom: '1px solid var(--border)',
             backgroundColor: !isCurrentMonth ? 'var(--background)' : isSelected ? 'var(--primary-light)' : 'var(--surface)',
             color: !isCurrentMonth ? 'var(--text-secondary)' : 'var(--text-primary)',
-            transition: 'var(--transition)',
-            cursor: 'pointer',
             opacity: isCurrentMonth ? 1 : 0.5
           }}
           onMouseEnter={(e) => {
@@ -175,6 +169,8 @@ const CalendarView = () => {
           {(() => {
             const manhaEvents = dayEvents.filter(t => getPeriod(t.time) === 'manha');
             const tardeEvents = dayEvents.filter(t => getPeriod(t.time) === 'tarde');
+
+            if (dayEvents.length === 0) return null;
 
             const renderEventItem = (event) => {
               const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
@@ -222,24 +218,35 @@ const CalendarView = () => {
             };
 
             return (
-              <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {manhaEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sunrise size={10} /> Manhã
+              <>
+                {/* Mobile view: small dots */}
+                <div className="hide-on-desktop" style={{ display: 'flex', justifyContent: 'center', gap: '3px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {dayEvents.map((event, idx) => {
+                    const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
+                    return <div key={idx} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: sc.color }} />
+                  })}
+                </div>
+
+                {/* Desktop view: detailed list */}
+                <div className="hide-on-mobile" style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {manhaEvents.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                      <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                        <Sunrise size={10} /> Manhã
+                      </div>
+                      {manhaEvents.map(renderEventItem)}
                     </div>
-                    {manhaEvents.map(renderEventItem)}
-                  </div>
-                )}
-                {tardeEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sun size={10} /> Tarde
+                  )}
+                  {tardeEvents.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                      <div style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
+                        <Sun size={10} /> Tarde
+                      </div>
+                      {tardeEvents.map(renderEventItem)}
                     </div>
-                    {tardeEvents.map(renderEventItem)}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </>
             );
           })()}
         </div>
