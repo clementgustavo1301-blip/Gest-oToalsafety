@@ -82,7 +82,7 @@ export const generateSSTWordReport = async (data) => {
       new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph({ text: `Obra: ${data.siteName || ''}` })],
+            children: [new Paragraph({ text: `Local: ${data.siteName || ''}` })],
             columnSpan: 2,
             margins: { top: 100, bottom: 100, left: 100, right: 100 },
           }),
@@ -115,42 +115,34 @@ export const generateSSTWordReport = async (data) => {
             }),
           ],
         }),
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: "Irregularidades apontadas:", bold: true })] })],
-              shading: { fill: "F0F0F0", type: ShadingType.CLEAR },
-              margins: { top: 100, bottom: 100, left: 100, right: 100 },
-            }),
-          ],
-        }),
-      ];
+      // Irregularities Header + List
+      if (action.irregularities && action.irregularities.trim()) {
+        actionTableRows.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: "Irregularidades apontadas:", bold: true })] })],
+                shading: { fill: "F0F0F0", type: ShadingType.CLEAR },
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+            ],
+          })
+        );
 
-      // Irregularities List
-      if (action.irregularities) {
         const irregularities = action.irregularities.split('\n');
         const listItems = irregularities.map(item => new Paragraph({ text: `• ${item.trim()}` }));
-        actionTableRows.push(
-          new TableRow({
-            children: [
-              new TableCell({
-                children: listItems.length > 0 && listItems[0].text !== '• ' ? listItems : [new Paragraph({ text: "Nenhuma irregularidade apontada." })],
-                margins: { top: 100, bottom: 100, left: 100, right: 100 },
-              }),
-            ],
-          })
-        );
-      } else {
-        actionTableRows.push(
-          new TableRow({
-            children: [
-              new TableCell({
-                children: [new Paragraph({ text: "Nenhuma irregularidade apontada." })],
-                margins: { top: 100, bottom: 100, left: 100, right: 100 },
-              }),
-            ],
-          })
-        );
+        if (listItems.length > 0 && listItems[0].text !== '• ') {
+          actionTableRows.push(
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: listItems,
+                  margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                }),
+              ],
+            })
+          );
+        }
       }
 
       // Photos
@@ -226,44 +218,34 @@ export const generateSSTWordReport = async (data) => {
         );
       }
 
-      // Recommendations Header
-      actionTableRows.push(
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: "Ação recomendada:", bold: true })] })],
-              shading: { fill: "F0F0F0", type: ShadingType.CLEAR },
-              margins: { top: 100, bottom: 100, left: 100, right: 100 },
-            }),
-          ],
-        })
-      );
+      // Recommendations Header + List
+      if (action.recommendations && action.recommendations.trim()) {
+        actionTableRows.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: "Ação recomendada:", bold: true })] })],
+                shading: { fill: "F0F0F0", type: ShadingType.CLEAR },
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+            ],
+          })
+        );
 
-      // Recommendations List
-      if (action.recommendations) {
         const recs = action.recommendations.split('\n');
         const listItems = recs.map(item => new Paragraph({ text: `• ${item.trim()}` }));
-        actionTableRows.push(
-          new TableRow({
-            children: [
-              new TableCell({
-                children: listItems.length > 0 && listItems[0].text !== '• ' ? listItems : [new Paragraph({ text: "Nenhuma recomendação apontada." })],
-                margins: { top: 100, bottom: 100, left: 100, right: 100 },
-              }),
-            ],
-          })
-        );
-      } else {
-        actionTableRows.push(
-          new TableRow({
-            children: [
-              new TableCell({
-                children: [new Paragraph({ text: "Nenhuma recomendação apontada." })],
-                margins: { top: 100, bottom: 100, left: 100, right: 100 },
-              }),
-            ],
-          })
-        );
+        if (listItems.length > 0 && listItems[0].text !== '• ') {
+          actionTableRows.push(
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: listItems,
+                  margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                }),
+              ],
+            })
+          );
+        }
       }
 
       const actionTable = new Table({

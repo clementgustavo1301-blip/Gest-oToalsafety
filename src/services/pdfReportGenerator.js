@@ -64,7 +64,7 @@ export const generateSSTReport = async (data) => {
           { content: 'Nº documento:\nSGST 001' },
           { content: 'Revisão:\n000' },
           { content: `Data Emissão / Rev.:\n${data.date || '01/07/2025'}` },
-          { content: `Página: ${data_hook.pageNumber} de ${totalPagesExp}` }
+          { content: `Página:\n${data_hook.pageNumber} de ${totalPagesExp}` }
         ]
       ]
     });
@@ -98,7 +98,7 @@ export const generateSSTReport = async (data) => {
         { content: `Empresa: ${data.companyName}`, colSpan: 2, styles: { fontStyle: 'bold' } }
       ],
       [
-        { content: `Obra: ${data.siteName || ''}`, colSpan: 2 }
+        { content: `Local: ${data.siteName || ''}`, colSpan: 2 }
       ]
     ],
     didDrawPage: didDrawPage
@@ -115,42 +115,59 @@ export const generateSSTReport = async (data) => {
         startY += 5;
       }
 
+      // Estima a altura necessária para esta ação
+      let requiredHeight = 30; // Altura base (Ação + Justificativa)
+      if (action.irregularities && action.irregularities.trim()) requiredHeight += 20;
+      if (action.recommendations && action.recommendations.trim()) requiredHeight += 20;
+      if (action.photos && action.photos.length > 0) {
+        const maxCols = action.photos.length > 2 ? 3 : 2;
+        requiredHeight += 85 * Math.ceil(action.photos.length / maxCols);
+      }
+
+      // Se a altura necessária for maior que o espaço disponível, força quebra de página
+      if (startY + requiredHeight > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        const hookData = { pageNumber: doc.internal.getNumberOfPages(), settings: { margin: { top: margin } } };
+        didDrawPage(hookData);
+        startY = hookData.settings.margin.top;
+      }
+
       // Actions and Justification
+      const actionBody = [
+        [{ content: `Ação: ${action.actionText}` }],
+        [{ content: `Justificativa da ação: ${action.justificationText}` }]
+      ];
+      if (action.irregularities && action.irregularities.trim()) {
+        actionBody.push([{ content: 'Irregularidades apontadas:', styles: { fontStyle: 'bold', fillColor: [240,240,240] } }]);
+      }
+
       autoTable(doc, {
         startY: startY + 2,
         margin: { left: margin, right: margin },
         theme: 'plain',
+        pageBreak: 'avoid',
         styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
-        body: [
-          [{ content: `Ação: ${action.actionText}` }],
-          [{ content: `Justificativa da ação: ${action.justificationText}` }],
-          [{ content: 'Irregularidades apontadas:', styles: { fontStyle: 'bold', fillColor: [240,240,240] } }]
-        ],
+        body: actionBody,
         didDrawPage: didDrawPage
       });
       
       startY = doc.lastAutoTable.finalY;
 
       // Irregularities list
-      if (action.irregularities) {
+      if (action.irregularities && action.irregularities.trim()) {
         const listBody = action.irregularities.split('\n').map(item => [{ content: `• ${item.trim()}` }]);
         if (listBody.length > 0 && listBody[0][0].content !== '• ') {
             autoTable(doc, {
             startY: startY,
             margin: { left: margin, right: margin },
             theme: 'plain',
+            pageBreak: 'avoid',
             styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
             body: listBody,
             didDrawPage: didDrawPage
             });
             startY = doc.lastAutoTable.finalY;
-        } else {
-            autoTable(doc, { startY: startY, margin: { left: margin, right: margin }, theme: 'plain', styles: { lineColor: [0, 0, 0], lineWidth: 0.2 }, body: [['Nenhuma irregularidade apontada.']], didDrawPage: didDrawPage });
-            startY = doc.lastAutoTable.finalY;
         }
-      } else {
-        autoTable(doc, { startY: startY, margin: { left: margin, right: margin }, theme: 'plain', styles: { lineColor: [0, 0, 0], lineWidth: 0.2 }, body: [['Nenhuma irregularidade apontada.']], didDrawPage: didDrawPage });
-        startY = doc.lastAutoTable.finalY;
       }
 
       // Fotos
@@ -158,6 +175,8 @@ export const generateSSTReport = async (data) => {
         const maxCols = action.photos.length > 2 ? 3 : 2;
         const padding = 2;
         const photoHeight = 75; 
+        const availableWidth = doc.internal.pageSize.getWidth() - (margin * 2);
+        const colWidth = availableWidth / maxCols;
         
         const photoRows = [];
         
@@ -167,11 +186,11 @@ export const generateSSTReport = async (data) => {
           for (let j = 0; j < maxCols; j++) {
             const photo = action.photos[i + j];
             if (photo) {
-              rowImages.push({ content: '', styles: { minCellHeight: photoHeight } });
-              rowDesc.push({ content: photo.description || ' ', styles: { minCellHeight: 10, halign: 'center' } }); 
+              rowImages.push({ content: '', styles: { minCellHeight: photoHeight, cellWidth: colWidth } });
+              rowDesc.push({ content: photo.description || ' ', styles: { minCellHeight: 10, halign: 'center', cellWidth: colWidth } }); 
             } else {
-              rowImages.push({ content: '', styles: { minCellHeight: photoHeight } });
-              rowDesc.push({ content: ' ', styles: { minCellHeight: 10 } });
+              rowImages.push({ content: '', styles: { minCellHeight: photoHeight, cellWidth: colWidth } });
+              rowDesc.push({ content: ' ', styles: { minCellHeight: 10, cellWidth: colWidth } });
             }
           }
           photoRows.push(rowImages);
@@ -182,6 +201,7 @@ export const generateSSTReport = async (data) => {
           startY: startY,
           margin: { left: margin, right: margin },
           theme: 'plain',
+          pageBreak: 'avoid',
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 8, cellPadding: 1, halign: 'center', valign: 'middle' },
           body: photoRows,
           didDrawCell: (cellData) => {
@@ -231,37 +251,33 @@ export const generateSSTReport = async (data) => {
       }
 
       // Ação Recomendada
-      autoTable(doc, {
-        startY: startY,
-        margin: { left: margin, right: margin },
-        theme: 'plain',
-        styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
-        body: [
-          [{ content: 'Ação recomendada:', styles: { fontStyle: 'bold', fillColor: [240,240,240] } }]
-        ],
-        didDrawPage: didDrawPage
-      });
-      startY = doc.lastAutoTable.finalY;
-      
-      if (action.recommendations) {
+      if (action.recommendations && action.recommendations.trim()) {
+        autoTable(doc, {
+          startY: startY,
+          margin: { left: margin, right: margin },
+          theme: 'plain',
+          pageBreak: 'avoid',
+          styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
+          body: [
+            [{ content: 'Ação recomendada:', styles: { fontStyle: 'bold', fillColor: [240,240,240] } }]
+          ],
+          didDrawPage: didDrawPage
+        });
+        startY = doc.lastAutoTable.finalY;
+        
         const listBody = action.recommendations.split('\n').map(item => [{ content: `• ${item.trim()}` }]);
         if (listBody.length > 0 && listBody[0][0].content !== '• ') {
             autoTable(doc, {
             startY: startY,
             margin: { left: margin, right: margin },
             theme: 'plain',
+            pageBreak: 'avoid',
             styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
             body: listBody,
             didDrawPage: didDrawPage
             });
             startY = doc.lastAutoTable.finalY;
-        } else {
-            autoTable(doc, { startY: startY, margin: { left: margin, right: margin }, theme: 'plain', styles: { lineColor: [0, 0, 0], lineWidth: 0.2 }, body: [['Nenhuma recomendação apontada.']], didDrawPage: didDrawPage });
-            startY = doc.lastAutoTable.finalY;
         }
-      } else {
-        autoTable(doc, { startY: startY, margin: { left: margin, right: margin }, theme: 'plain', styles: { lineColor: [0, 0, 0], lineWidth: 0.2 }, body: [['Nenhuma recomendação apontada.']], didDrawPage: didDrawPage });
-        startY = doc.lastAutoTable.finalY;
       }
     });
   }

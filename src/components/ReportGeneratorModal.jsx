@@ -164,7 +164,7 @@ const ReportGeneratorModal = ({ event, onClose, userProfile }) => {
               <input type="text" className="modal-input" name="companyName" value={formData.companyName} onChange={handleChange} />
             </div>
             <div>
-              <label className="modal-label">Obra / Local</label>
+              <label className="modal-label">Local</label>
               <input type="text" className="modal-input" name="siteName" value={formData.siteName} onChange={handleChange} />
             </div>
           </div>
