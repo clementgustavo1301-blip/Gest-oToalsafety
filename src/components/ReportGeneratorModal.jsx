@@ -47,12 +47,42 @@ const ReportGeneratorModal = ({ event, onClose, userProfile }) => {
     files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setActions(prev => prev.map(a => {
-          if (a.id === actionId) {
-            return { ...a, photos: [...a.photos, { base64: reader.result, description: '' }] };
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Redimensionar mantendo proporção (max 1200px)
+          const MAX_SIZE = 1200;
+          if (width > height && width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          } else if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
           }
-          return a;
-        }));
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          
+          // O drawImage no canvas em navegadores modernos já aplica a rotação EXIF correta.
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          const correctedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          
+          setActions(prev => prev.map(a => {
+            if (a.id === actionId) {
+              return { 
+                ...a, 
+                photos: [...a.photos, { base64: correctedBase64, description: '', width, height }] 
+              };
+            }
+            return a;
+          }));
+        };
+        img.src = reader.result;
       };
       reader.readAsDataURL(file);
     });

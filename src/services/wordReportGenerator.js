@@ -115,6 +115,8 @@ export const generateSSTWordReport = async (data) => {
             }),
           ],
         }),
+      ];
+      
       // Irregularities Header + List
       if (action.irregularities && action.irregularities.trim()) {
         actionTableRows.push(
@@ -158,6 +160,21 @@ export const generateSSTWordReport = async (data) => {
                 if (photo && photo.base64) {
                     try {
                         const uint8Data = base64ToUint8Array(photo.base64);
+                        // Definir tamanho da imagem com base na proporção, limitando a 200x150
+                        let renderW = 200;
+                        let renderH = 150;
+                        
+                        if (photo.width && photo.height) {
+                            const ratio = photo.width / photo.height;
+                            if (ratio > (200 / 150)) { // mais larga
+                                renderW = 200;
+                                renderH = 200 / ratio;
+                            } else { // mais alta
+                                renderH = 150;
+                                renderW = 150 * ratio;
+                            }
+                        }
+
                         cellsImages.push(new TableCell({
                             children: [
                                 new Paragraph({
@@ -166,8 +183,8 @@ export const generateSSTWordReport = async (data) => {
                                         new ImageRun({
                                             data: uint8Data,
                                             transformation: {
-                                                width: 200,
-                                                height: 150,
+                                                width: renderW,
+                                                height: renderH,
                                             },
                                         })
                                     ]
