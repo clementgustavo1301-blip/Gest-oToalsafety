@@ -7,7 +7,7 @@ export const generateSSTReport = async (data) => {
   const margin = 10;
   
   // Total pages placeholder
-  const totalPagesExp = '{total_pages_count_string}';
+  const totalPagesExp = '{tp}';
   
   const didDrawPage = (data_hook) => {
     // Save current Y to restore later
@@ -133,25 +133,31 @@ export const generateSSTReport = async (data) => {
       }
 
       // Actions and Justification
-      const actionBody = [
-        [{ content: `Ação: ${action.actionText}` }],
-        [{ content: `Justificativa da ação: ${action.justificationText}` }]
-      ];
+      const actionBody = [];
+      if (action.actionText && action.actionText.trim()) {
+        actionBody.push([{ content: `Ação: ${action.actionText}` }]);
+      }
+      if (action.justificationText && action.justificationText.trim()) {
+        actionBody.push([{ content: `Justificativa da ação: ${action.justificationText}` }]);
+      }
       if (action.irregularities && action.irregularities.trim()) {
         actionBody.push([{ content: 'Irregularidades apontadas:', styles: { fontStyle: 'bold', fillColor: [240,240,240] } }]);
       }
 
-      autoTable(doc, {
-        startY: startY + 2,
-        margin: { left: margin, right: margin },
-        theme: 'plain',
-        pageBreak: 'avoid',
-        styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
-        body: actionBody,
-        didDrawPage: didDrawPage
-      });
-      
-      startY = doc.lastAutoTable.finalY;
+      if (actionBody.length > 0) {
+        autoTable(doc, {
+          startY: startY + 2,
+          margin: { left: margin, right: margin },
+          theme: 'plain',
+          pageBreak: 'avoid',
+          styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
+          body: actionBody,
+          didDrawPage: didDrawPage
+        });
+        startY = doc.lastAutoTable.finalY;
+      } else {
+        startY += 2;
+      }
 
       // Irregularities list
       if (action.irregularities && action.irregularities.trim()) {
@@ -183,18 +189,22 @@ export const generateSSTReport = async (data) => {
         for (let i = 0; i < action.photos.length; i += maxCols) {
           const rowImages = [];
           const rowDesc = [];
+          let hasAnyDesc = false;
           for (let j = 0; j < maxCols; j++) {
             const photo = action.photos[i + j];
             if (photo) {
               rowImages.push({ content: '', styles: { minCellHeight: photoHeight, cellWidth: colWidth } });
               rowDesc.push({ content: photo.description || ' ', styles: { minCellHeight: 10, halign: 'center', cellWidth: colWidth } }); 
+              if (photo.description && photo.description.trim()) hasAnyDesc = true;
             } else {
               rowImages.push({ content: '', styles: { minCellHeight: photoHeight, cellWidth: colWidth } });
               rowDesc.push({ content: ' ', styles: { minCellHeight: 10, cellWidth: colWidth } });
             }
           }
           photoRows.push(rowImages);
-          photoRows.push(rowDesc);
+          if (hasAnyDesc) {
+            photoRows.push(rowDesc);
+          }
         }
         
         autoTable(doc, {
@@ -205,8 +215,12 @@ export const generateSSTReport = async (data) => {
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 8, cellPadding: 1, halign: 'center', valign: 'middle' },
           body: photoRows,
           didDrawCell: (cellData) => {
-            if (cellData.row.index % 2 === 0) {
-              const imgIndex = (cellData.row.index / 2) * maxCols + cellData.column.index;
+            if (cellData.cell.raw && cellData.cell.raw.content === '' && cellData.cell.styles.minCellHeight === photoHeight) {
+              let imgRowIndex = 0;
+              for (let r = 0; r < cellData.row.index; r++) {
+                 if (cellData.table.body[r].cells[0].raw.content === '') imgRowIndex++;
+              }
+              const imgIndex = imgRowIndex * maxCols + cellData.column.index;
               const photo = action.photos[imgIndex];
               if (photo && photo.base64) {
                 try {
@@ -282,29 +296,15 @@ export const generateSSTReport = async (data) => {
     });
   }
 
-  // Aviso Técnico 
-  if (data.technicalNotice) {
+  // Observações 
+  if (data.observation && data.observation.trim()) {
      autoTable(doc, {
       startY: startY + 8,
       margin: { left: margin, right: margin },
       theme: 'plain',
-      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 10, fontStyle: 'bold', cellPadding: 2, fillColor: [255, 255, 0], textColor: [0,0,0] },
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 10, cellPadding: 2, fillColor: [255, 255, 255], textColor: [0,0,0] },
       body: [
-        [{ content: 'Aviso Técnico:\n' + data.technicalNotice }]
-      ],
-      didDrawPage: didDrawPage
-    });
-    startY = doc.lastAutoTable.finalY;
-  }
-
-  if (data.technicalNoticeRed) {
-    autoTable(doc, {
-      startY: startY,
-      margin: { left: margin, right: margin },
-      theme: 'plain',
-      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 10, fontStyle: 'bold', cellPadding: 2, fillColor: [220, 38, 38], textColor: [255,255,255] }, 
-      body: [
-        [{ content: data.technicalNoticeRed }]
+        [{ content: 'Observações:\n' + data.observation }]
       ],
       didDrawPage: didDrawPage
     });

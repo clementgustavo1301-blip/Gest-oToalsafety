@@ -98,24 +98,31 @@ export const generateSSTWordReport = async (data) => {
   if (data.actions && data.actions.length > 0) {
     data.actions.forEach((action, actionIndex) => {
       // Action Table
-      const actionTableRows = [
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ text: `Ação: ${action.actionText}` })],
-              margins: { top: 100, bottom: 100, left: 100, right: 100 },
-            }),
-          ],
-        }),
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ text: `Justificativa da ação: ${action.justificationText}` })],
-              margins: { top: 100, bottom: 100, left: 100, right: 100 },
-            }),
-          ],
-        }),
-      ];
+      const actionTableRows = [];
+      if (action.actionText && action.actionText.trim()) {
+          actionTableRows.push(
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [new Paragraph({ text: `Ação: ${action.actionText}` })],
+                  margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                }),
+              ],
+            })
+          );
+      }
+      if (action.justificationText && action.justificationText.trim()) {
+          actionTableRows.push(
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [new Paragraph({ text: `Justificativa da ação: ${action.justificationText}` })],
+                  margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                }),
+              ],
+            })
+          );
+      }
       
       // Irregularities Header + List
       if (action.irregularities && action.irregularities.trim()) {
@@ -155,6 +162,7 @@ export const generateSSTWordReport = async (data) => {
         for (let i = 0; i < action.photos.length; i += maxCols) {
             const cellsImages = [];
             const cellsDesc = [];
+            let hasAnyDesc = false;
             for (let j = 0; j < maxCols; j++) {
                 const photo = action.photos[i + j];
                 if (photo && photo.base64) {
@@ -196,6 +204,7 @@ export const generateSSTWordReport = async (data) => {
                             children: [new Paragraph({ text: photo.description || ' ', alignment: AlignmentType.CENTER })],
                             margins: { top: 100, bottom: 100, left: 100, right: 100 },
                         }));
+                        if (photo.description && photo.description.trim()) hasAnyDesc = true;
                     } catch (e) {
                         console.error(e);
                         cellsImages.push(new TableCell({ children: [new Paragraph({ text: "Erro na imagem" })] }));
@@ -207,7 +216,9 @@ export const generateSSTWordReport = async (data) => {
                 }
             }
             photoTableRows.push(new TableRow({ children: cellsImages }));
-            photoTableRows.push(new TableRow({ children: cellsDesc }));
+            if (hasAnyDesc) {
+                photoTableRows.push(new TableRow({ children: cellsDesc }));
+            }
         }
 
         actionTableRows.push(
@@ -265,7 +276,30 @@ export const generateSSTWordReport = async (data) => {
         }
       }
 
-      const actionTable = new Table({
+      if (actionTableRows.length > 0) {
+        const actionTable = new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: {
+              top: { style: BorderStyle.SINGLE, size: 1 },
+              bottom: { style: BorderStyle.SINGLE, size: 1 },
+              left: { style: BorderStyle.SINGLE, size: 1 },
+              right: { style: BorderStyle.SINGLE, size: 1 },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+          },
+          rows: actionTableRows,
+        });
+
+        children.push(actionTable);
+        children.push(new Paragraph({ spacing: { after: 400 } }));
+      }
+    });
+  }
+
+  // Observações
+  if (data.observation && data.observation.trim()) {
+    children.push(
+      new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: {
             top: { style: BorderStyle.SINGLE, size: 1 },
@@ -275,28 +309,14 @@ export const generateSSTWordReport = async (data) => {
             insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
             insideVertical: { style: BorderStyle.SINGLE, size: 1 },
         },
-        rows: actionTableRows,
-      });
-
-      children.push(actionTable);
-      children.push(new Paragraph({ spacing: { after: 400 } }));
-    });
-  }
-
-  // Technical Notices
-  if (data.technicalNotice) {
-    children.push(
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
         rows: [
           new TableRow({
             children: [
               new TableCell({
-                shading: { fill: "FFFF00", type: ShadingType.CLEAR },
                 margins: { top: 150, bottom: 150, left: 150, right: 150 },
                 children: [
                   new Paragraph({
-                    children: [new TextRun({ text: "Aviso Técnico:\n" + data.technicalNotice, bold: true })],
+                    children: [new TextRun({ text: "Observações:\n" + data.observation, bold: true })],
                   })
                 ]
               })
@@ -305,31 +325,7 @@ export const generateSSTWordReport = async (data) => {
         ]
       })
     );
-    children.push(new Paragraph({ spacing: { after: 200 } }));
-  }
-
-  if (data.technicalNoticeRed) {
-    children.push(
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({
-                shading: { fill: "DC2626", type: ShadingType.CLEAR },
-                margins: { top: 150, bottom: 150, left: 150, right: 150 },
-                children: [
-                  new Paragraph({
-                    children: [new TextRun({ text: data.technicalNoticeRed, bold: true, color: "FFFFFF" })],
-                  })
-                ]
-              })
-            ]
-          })
-        ]
-      })
-    );
-    children.push(new Paragraph({ spacing: { after: 600 } }));
+    children.push(new Paragraph({ spacing: { after: 400 } }));
   }
 
   // Signature

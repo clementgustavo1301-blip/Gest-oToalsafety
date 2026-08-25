@@ -15,8 +15,7 @@ const ReportGeneratorModal = ({ event, onClose, userProfile }) => {
     date: event?.date ? format(new Date(event.date + 'T12:00:00'), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy'),
     companyName: event?.companyName || '',
     siteName: event?.companyName || '',
-    technicalNotice: 'Fica estabelecida a obrigatoriedade da elaboração e execução dos projetos de Sistema de Proteção Coletiva (SPQ), Instalações Elétricas Provisórias, aterramentos, área de Vivência, em estrita conformidade com as normas regulamentadoras vigentes.\n\nAlém disso, as demais solicitações conforme notificação do MTE.',
-    technicalNoticeRed: 'Visita realizada em periodo noturno, tendo a necessidade de visitas durante o dia para indicar novas adequações in LOCO.',
+    observation: 'Fica estabelecida a obrigatoriedade da elaboração e execução dos projetos de Sistema de Proteção Coletiva (SPQ), Instalações Elétricas Provisórias, aterramentos, área de Vivência, em estrita conformidade com as normas regulamentadoras vigentes.\n\nAlém disso, as demais solicitações conforme notificação do MTE.',
     technicianName: userProfile?.name || 'Adeylton da Silva Araújo',
     technicianRegister: 'Técnico em Segurança do Trabalho\nSRTE N° 0009823/RN'
   });
@@ -292,14 +291,10 @@ const ReportGeneratorModal = ({ event, onClose, userProfile }) => {
             ))}
           </div>
 
-          <div style={{ borderTop: '2px dashed var(--border)', paddingTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ borderTop: '2px dashed var(--border)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
              <div>
-              <label className="modal-label" style={{ color: '#d97706' }}>Aviso Técnico (Fundo Amarelo)</label>
-              <textarea className="modal-input" name="technicalNotice" rows="4" value={formData.technicalNotice} onChange={handleChange} />
-            </div>
-            <div>
-              <label className="modal-label" style={{ color: 'var(--danger)' }}>Alerta Final (Fundo Vermelho)</label>
-              <textarea className="modal-input" name="technicalNoticeRed" rows="4" value={formData.technicalNoticeRed} onChange={handleChange} />
+              <label className="modal-label">Observações (Caixa Branca)</label>
+              <textarea className="modal-input" name="observation" rows="4" value={formData.observation} onChange={handleChange} />
             </div>
           </div>
 
