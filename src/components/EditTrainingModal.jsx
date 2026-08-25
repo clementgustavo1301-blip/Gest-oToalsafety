@@ -10,9 +10,20 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
   const [date, setDate] = useState(training.date || '');
   const [time, setTime] = useState(training.time || '');
   const [instructor, setInstructor] = useState(training.instructor || '');
-  const [description, setDescription] = useState((training.description || '').replace('[NO_TRAVEL]', '').replace('[SHARED_TRIP]', '').trim());
+  const parseSecondaryResponsible = (desc) => {
+    if (!desc) return { cleaned: '', resp2: '' };
+    const match = desc.match(/\[RESP2_ID:([^\]]+)\]/);
+    if (match) {
+      return { cleaned: desc.replace(match[0], '').trim(), resp2: match[1] };
+    }
+    return { cleaned: desc, resp2: '' };
+  };
+
+  const parsedDesc = parseSecondaryResponsible((training.description || '').replace('[NO_TRAVEL]', '').replace('[SHARED_TRIP]', '').trim());
+  const [description, setDescription] = useState(parsedDesc.cleaned);
   const [hasTravel, setHasTravel] = useState(!(training.description || '').includes('[NO_TRAVEL]'));
   const [responsibleId, setResponsibleId] = useState(training.responsibleId || '');
+  const [secondaryResponsibleId, setSecondaryResponsibleId] = useState(parsedDesc.resp2);
 
   const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -43,6 +54,9 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
       finalDescription += '\n[NO_TRAVEL]';
     } else if (training.description && training.description.includes('[SHARED_TRIP]')) {
       finalDescription += '\n[SHARED_TRIP]';
+    }
+    if (secondaryResponsibleId) {
+      finalDescription += `\n[RESP2_ID:${secondaryResponsibleId}]`;
     }
 
     const updatedData = {
@@ -99,7 +113,13 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
                   title={training.deliverableId ? "Não é possível alterar a empresa de um treinamento vinculado a uma pendência" : ""}
                 >
                   <option value="" disabled>Selecione a empresa...</option>
-                  {companies.map(c => (
+                  {[...companies]
+                    .sort((a,b) => {
+                      const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
+                      const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
+                      return nameA.localeCompare(nameB);
+                    })
+                    .map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -150,20 +170,37 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
               </div>
 
               {/* Responsible */}
-              <div>
-                <label className="modal-label" htmlFor="edit-responsible">Responsável (Técnico)</label>
-                <select
-                  id="edit-responsible"
-                  value={responsibleId}
-                  onChange={(e) => setResponsibleId(e.target.value)}
-                  className="modal-input"
-                  disabled={saving}
-                >
-                  <option value="">Nenhum</option>
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
-                  ))}
-                </select>
+              <div className="grid-responsive-2">
+                <div>
+                  <label className="modal-label" htmlFor="edit-responsible">Responsável 1 (Técnico)</label>
+                  <select
+                    id="edit-responsible"
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="edit-responsible-2">Responsável 2 (Técnico)</label>
+                  <select
+                    id="edit-responsible-2"
+                    value={secondaryResponsibleId}
+                    onChange={(e) => setSecondaryResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Travel options */}

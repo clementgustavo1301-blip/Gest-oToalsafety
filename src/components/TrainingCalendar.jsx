@@ -94,6 +94,16 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando calendário...</div>;
   }
 
+  const cleanDescription = (desc) => {
+    if (!desc) return '';
+    return desc.replace(/\[NO_TRAVEL\]/g, '').replace(/\[SHARED_TRIP\]/g, '').replace(/\[RESP2_ID:[^\]]+\]/g, '').trim();
+  };
+  const getSecondaryResponsible = (desc) => {
+    if (!desc) return null;
+    const match = desc.match(/\[RESP2_ID:([^\]]+)\]/);
+    return match ? match[1] : null;
+  };
+
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
   const calStart = startOfWeek(monthStart);
@@ -330,7 +340,7 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                       <User size={14} /> {event.instructor || 'Sem instrutor'}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                      <Users size={14} /> Responsável: {profiles.find(p => p.id === event.responsibleId)?.name || 'Nenhum'}
+                      <Users size={14} /> Responsável: {[profiles.find(p => p.id === event.responsibleId)?.name, getSecondaryResponsible(event.description) ? profiles.find(p => p.id === getSecondaryResponsible(event.description))?.name : null].filter(Boolean).join(' e ') || 'Nenhum'}
                     </div>
                   </div>
                   <button
@@ -349,13 +359,13 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
                   </button>
                 </div>
 
-                {event.description && (
+                {cleanDescription(event.description) && (
                   <div style={{
                     fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1rem',
                     padding: '0.5rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-sm)',
                     borderLeft: '2px solid var(--border)'
                   }}>
-                    {event.description}
+                    {cleanDescription(event.description)}
                   </div>
                 )}
 

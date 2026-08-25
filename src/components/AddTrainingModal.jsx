@@ -13,6 +13,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [instructor, setInstructor] = useState('');
   const [description, setDescription] = useState('');
   const [responsibleId, setResponsibleId] = useState('');
+  const [secondaryResponsibleId, setSecondaryResponsibleId] = useState('');
 
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
@@ -105,6 +106,9 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       finalDescription += '\n[NO_TRAVEL]';
     } else if (collisionDetected && collisionChoice === 'shared') {
       finalDescription += '\n[SHARED_TRIP]';
+    }
+    if (secondaryResponsibleId) {
+      finalDescription += `\n[RESP2_ID:${secondaryResponsibleId}]`;
     }
 
     const baseItem = {
@@ -203,7 +207,13 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                     disabled={saving}
                   >
                     <option value="">Todos os Grupos</option>
-                    {groups.map(g => (
+                    {[...groups]
+                      .sort((a,b) => {
+                        const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
+                        const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
+                        return nameA.localeCompare(nameB);
+                      })
+                      .map(g => (
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
                   </select>
@@ -225,6 +235,11 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                     <option value="" disabled>Selecione a empresa...</option>
                     {companies
                       .filter(c => !selectedGroupId || c.groupId === selectedGroupId)
+                      .sort((a,b) => {
+                        const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
+                        const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
+                        return nameA.localeCompare(nameB);
+                      })
                       .map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -366,20 +381,37 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
               </div>
 
               {/* Responsible */}
-              <div>
-                <label className="modal-label" htmlFor="training-responsible">Responsável (Técnico)</label>
-                <select
-                  id="training-responsible"
-                  value={responsibleId}
-                  onChange={(e) => setResponsibleId(e.target.value)}
-                  className="modal-input"
-                  disabled={saving}
-                >
-                  <option value="">Nenhum</option>
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
-                  ))}
-                </select>
+              <div className="grid-responsive-2">
+                <div>
+                  <label className="modal-label" htmlFor="training-responsible">Responsável 1 (Técnico)</label>
+                  <select
+                    id="training-responsible"
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="training-responsible-2">Responsável 2 (Técnico)</label>
+                  <select
+                    id="training-responsible-2"
+                    value={secondaryResponsibleId}
+                    onChange={(e) => setSecondaryResponsibleId(e.target.value)}
+                    className="modal-input"
+                    disabled={saving}
+                  >
+                    <option value="">Nenhum</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Travel options */}

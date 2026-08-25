@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCirc
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
-import { getTrainings, getCompanies, addTraining, updateTraining, deleteTraining } from '../services/storageService';
+import { getTrainings, getCompanies, getGroups, addTraining, updateTraining, deleteTraining } from '../services/storageService';
 import AddTrainingModal from '../components/AddTrainingModal';
 import EditTrainingModal from '../components/EditTrainingModal';
 import ReportGeneratorModal from '../components/ReportGeneratorModal';
@@ -41,15 +41,17 @@ const CalendarView = () => {
 
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [pendingTrainings, setPendingTrainings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
-    const [trn, comp, { getDeliverables, getProfiles }] = await Promise.all([
+    const [trn, comp, grps, { getDeliverables, getProfiles }] = await Promise.all([
       getTrainings(),
       getCompanies(),
+      getGroups(),
       import('../services/storageService')
     ]);
     const deliverables = await getDeliverables();
@@ -57,6 +59,7 @@ const CalendarView = () => {
     
     setTrainings(trn);
     setCompanies(comp);
+    setGroups(grps);
     setProfiles(profs);
     setPendingTrainings(deliverables.filter(d => d.type === 'treinamento' && d.status === 'pendente'));
     if (showLoading) setLoading(false);
@@ -88,6 +91,12 @@ const CalendarView = () => {
   };
 
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
+  const getCompanyGroupName = (companyId) => {
+    const comp = companies.find(c => c.id === companyId);
+    if (!comp || !comp.groupId) return '';
+    const group = groups.find(g => g.id === comp.groupId);
+    return group ? group.name.replace(/^\d+\s*-\s*/, '').trim() : '';
+  };
   const getCompanyCategory = (companyId) => companies.find(c => c.id === companyId)?.category || 'TotalSafety';
   const getProfileName = (profileId) => profiles.find(p => p.id === profileId)?.name || 'Desconhecido';
 
@@ -101,6 +110,16 @@ const CalendarView = () => {
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Carregando calendário...</div>;
   }
+
+  const cleanDescription = (desc) => {
+    if (!desc) return '';
+    return desc.replace(/\[NO_TRAVEL\]/g, '').replace(/\[SHARED_TRIP\]/g, '').replace(/\[RESP2_ID:[^\]]+\]/g, '').trim();
+  };
+  const getSecondaryResponsible = (desc) => {
+    if (!desc) return null;
+    const match = desc.match(/\[RESP2_ID:([^\]]+)\]/);
+    return match ? match[1] : null;
+  };
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -205,9 +224,10 @@ const CalendarView = () => {
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        lineHeight: '1.1'
+                        lineHeight: '1.1',
+                        fontSize: '0.7rem'
                       }}>
-                        {compName}
+                        {getCompanyGroupName(event.companyId) ? `${getCompanyGroupName(event.companyId)} / ${compName}` : compName}
                       </div>
                     </div>
                   )}
@@ -492,8 +512,8 @@ const CalendarView = () => {
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                             <Clock size={12} /> {event.time}
                           </span>
-                          {event.responsibleId && (
-                            <span>Responsável: {getProfileName(event.responsibleId)}</span>
+                          {(event.responsibleId || getSecondaryResponsible(event.description)) && (
+                            <span>Responsável: {[getProfileName(event.responsibleId), getSecondaryResponsible(event.description) ? getProfileName(getSecondaryResponsible(event.description)) : null].filter(Boolean).join(' e ')}</span>
                           )}
                         </div>
                         <button
