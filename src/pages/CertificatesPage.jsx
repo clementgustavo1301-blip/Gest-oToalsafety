@@ -21,6 +21,7 @@ const CertificatesPage = () => {
   ]);
 
   const [generating, setGenerating] = useState(false);
+  const [isManual, setIsManual] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -98,6 +99,13 @@ const CertificatesPage = () => {
 
   const handleNrChange = (e) => {
     const nr = e.target.value;
+    if (nr === 'manual') {
+      setIsManual(true);
+      setFormData(prev => ({ ...prev, nr: '' }));
+      return;
+    }
+    setIsManual(false);
+    if (!nr) return;
     setFormData(prev => ({
       ...prev,
       nr,
@@ -168,10 +176,29 @@ const CertificatesPage = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
           <div>
             <label className="modal-label">NR do Treinamento</label>
-            <select name="nr" value={formData.nr} onChange={handleNrChange} className="modal-input">
+            <select 
+              onChange={handleNrChange} 
+              className="modal-input" 
+              value={isManual ? "manual" : (nrOptions.some(opt => opt.value === formData.nr) ? formData.nr : "manual")}
+            >
+              <option value="" disabled>-- Selecione uma opção --</option>
               {nrOptions.map(nr => <option key={nr.value} value={nr.value}>{nr.label}</option>)}
+              <option value="manual">Outros / Preencher manualmente</option>
             </select>
           </div>
+          {isManual && (
+            <div>
+              <label className="modal-label">Nome do Treinamento <span style={{color:'var(--error)'}}>*</span></label>
+              <input 
+                type="text" 
+                name="nr" 
+                value={formData.nr} 
+                onChange={handleChange} 
+                className="modal-input" 
+                placeholder="Ex: Treinamento Específico"
+              />
+            </div>
+          )}
           <div>
             <label className="modal-label">Data do Treinamento <span style={{color:'var(--error)'}}>*</span></label>
             <input type="date" name="data" value={formData.data} onChange={handleChange} className="modal-input" />
