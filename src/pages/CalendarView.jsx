@@ -36,6 +36,7 @@ const CalendarView = () => {
   
   const [calendarScope, setCalendarScope] = useState('geral');
   const [calendarCompanyId, setCalendarCompanyId] = useState('');
+  const [calendarResponsibleId, setCalendarResponsibleId] = useState('');
   
   const { userProfile } = useAuth();
 
@@ -134,9 +135,11 @@ const CalendarView = () => {
     const matchScope = calendarScope === 'geral' 
       ? true 
       : calendarScope === 'minha_agenda'
-      ? t.responsibleId === userProfile?.id
+      ? t.responsibleId === userProfile?.id || getSecondaryResponsible(t.description) === userProfile?.id
       : calendarScope === 'empresa'
       ? t.companyId === calendarCompanyId
+      : calendarScope === 'responsavel'
+      ? t.responsibleId === calendarResponsibleId || getSecondaryResponsible(t.description) === calendarResponsibleId
       : true;
     return matchStatus && matchRegion && matchScope;
   });
@@ -345,6 +348,9 @@ const CalendarView = () => {
               if (e.target.value === 'empresa' && companies.length > 0 && !calendarCompanyId) {
                 setCalendarCompanyId(companies[0].id);
               }
+              if (e.target.value === 'responsavel' && profiles.length > 0 && !calendarResponsibleId) {
+                setCalendarResponsibleId(profiles[0].id);
+              }
             }}
             style={{
               padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
@@ -356,6 +362,7 @@ const CalendarView = () => {
             <option value="geral">Agenda Geral</option>
             <option value="minha_agenda">Minha Agenda</option>
             <option value="empresa">Por Empresa</option>
+            <option value="responsavel">Por Responsável</option>
           </select>
 
           <select
@@ -387,6 +394,24 @@ const CalendarView = () => {
               <option value="" disabled>Selecione a Empresa</option>
               {companies.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
+
+          {calendarScope === 'responsavel' && (
+            <select
+              value={calendarResponsibleId}
+              onChange={(e) => setCalendarResponsibleId(e.target.value)}
+              style={{
+                padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)', fontSize: '0.8125rem',
+                backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                fontFamily: 'inherit', cursor: 'pointer', maxWidth: '200px'
+              }}
+            >
+              <option value="" disabled>Selecione o Responsável</option>
+              {profiles.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           )}
