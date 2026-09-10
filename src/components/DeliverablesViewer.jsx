@@ -479,6 +479,23 @@ const DeliverablesViewer = ({ companyId }) => {
                       </button>
                     </>
                   )}
+                  {['entregue', 'feito', 'adiado', 'cancelado', 'nao_se_aplica'].includes(d.status) && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={(e) => { e.preventDefault(); handleChangeStatus(d.id, 'pendente'); }}
+                      style={{
+                        padding: viewMode === 'grid' ? '0.5rem' : '0.5rem 1rem', fontSize: '0.75rem',
+                        backgroundColor: '#fef3c7', color: '#b45309',
+                        border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
+                        fontWeight: '600', whiteSpace: 'nowrap'
+                      }}
+                      title="Voltar o status para Pendente"
+                    >
+                      <Clock size={12} style={{ marginRight: '4px' }} />
+                      Tornar Pendente
+                    </button>
+                  )}
                   <button
                     onClick={() => setEditingDeliverable(d)}
                     style={{
