@@ -620,6 +620,21 @@ const CalendarView = () => {
                             <CalendarIcon size={12} /> Reagendar
                           </button>
                         )}
+                        {event.status !== 'agendado' && event.status !== 'pendente' && (
+                          <button
+                            className="btn"
+                            onClick={() => handleStatusChange(event.id, 'pendente')}
+                            style={{
+                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
+                              backgroundColor: '#fef3c7', color: '#b45309',
+                              border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
+                              fontWeight: '600', gap: '0.375rem'
+                            }}
+                            title="Voltar status para Pendente"
+                          >
+                            <Clock size={12} /> Tornar Pendente
+                          </button>
+                        )}
                         <button
                           className="btn"
                           onClick={() => handleDeleteTraining(event.id)}
