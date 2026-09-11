@@ -4,6 +4,9 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, en
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 import { getTrainings, getCompanies, getGroups, addTraining, updateTraining, deleteTraining } from '../services/storageService';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { logoBase64 } from '../assets/logoBase64';
 import AddTrainingModal from '../components/AddTrainingModal';
 import EditTrainingModal from '../components/EditTrainingModal';
 import ReportGeneratorModal from '../components/ReportGeneratorModal';
@@ -285,31 +288,67 @@ const CalendarView = () => {
 
     currentMonthEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    const headers = ['Data', 'Horario', 'Empresa', 'Treinamento', 'Status', 'Responsavel'];
-    const rows = currentMonthEvents.map(t => {
-      const resp1 = getProfileName(t.responsibleId);
-      const resp2Id = getSecondaryResponsible(t.description);
-      const resp2 = resp2Id ? getProfileName(resp2Id) : '';
-      const responsible = [resp1, resp2].filter(Boolean).join(' e ');
-      const dateFormatted = format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy');
-      return [
-        dateFormatted,
-        t.time || '',
-        `"${getCompanyName(t.companyId)}"`,
-        `"${t.title}"`,
-        STATUS_CONFIG[t.status]?.label || t.status,
-        `"${responsible}"`
-      ].join(',');
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for better table fit
+    const margin = 10;
+    
+    // Header Table
+    autoTable(doc, {
+      startY: margin,
+      margin: { left: margin, right: margin },
+      theme: 'plain',
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, halign: 'center', valign: 'middle', cellPadding: 2 },
+      body: [
+        [
+          { content: '', rowSpan: 2, styles: { minCellWidth: 40 } }, // Placeholder for logo
+          { content: 'SISTEMA DE GESTÃO DE SEGURANÇA NO TRABALHO - SGST', styles: { fontStyle: 'bold', fontSize: 11, minCellHeight: 15 } }
+        ],
+        [
+          { content: `TÍTULO: CRONOGRAMA DE AGENDAMENTOS - ${format(currentDate, 'MMMM yyyy', { locale: ptBR }).toUpperCase()}`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
+        ]
+      ],
+      didDrawCell: (cellData) => {
+        if (cellData.section === 'body' && cellData.column.index === 0 && cellData.row.index === 0) {
+          if (logoBase64) {
+            doc.addImage(logoBase64, 'PNG', cellData.cell.x + 2, cellData.cell.y + 2, 36, 16);
+          }
+        }
+      }
     });
 
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `cronograma_${format(currentDate, 'MM_yyyy')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Content Table
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 5,
+      margin: { left: margin, right: margin, bottom: margin + 10 },
+      head: [['Data', 'Horário', 'Empresa', 'Treinamento', 'Status', 'Responsável']],
+      body: currentMonthEvents.map(t => {
+        const resp1 = getProfileName(t.responsibleId);
+        const resp2Id = getSecondaryResponsible(t.description);
+        const resp2 = resp2Id ? getProfileName(resp2Id) : '';
+        const responsible = [resp1, resp2].filter(Boolean).join(' e ');
+        const dateFormatted = format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy');
+        return [
+          dateFormatted,
+          t.time || '',
+          getCompanyName(t.companyId),
+          t.title,
+          STATUS_CONFIG[t.status]?.label || t.status,
+          responsible
+        ];
+      }),
+      theme: 'grid',
+      headStyles: { fillColor: [43, 87, 154], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 8, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      didDrawPage: (data) => {
+        // Footer with page number
+        const pageSize = doc.internal.pageSize;
+        const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+        doc.setFontSize(8);
+        doc.text(`Página ${doc.internal.getNumberOfPages()}`, pageSize.width / 2, pageHeight - 10, { align: 'center' });
+      }
+    });
+
+    doc.save(`cronograma_${format(currentDate, 'MM_yyyy')}.pdf`);
   };
 
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
