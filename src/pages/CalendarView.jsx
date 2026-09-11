@@ -37,8 +37,9 @@ const CalendarView = () => {
   const [calendarScope, setCalendarScope] = useState('geral');
   const [calendarCompanyId, setCalendarCompanyId] = useState('');
   const [calendarResponsibleId, setCalendarResponsibleId] = useState('');
-  
-  const { userProfile } = useAuth();
+  const { userProfile, activeLink } = useAuth();
+
+  const canGenerateSchedule = activeLink?.sector === 'Diretoria' && activeLink?.role === 'Admin';
 
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -271,6 +272,46 @@ const CalendarView = () => {
     days = [];
   }
 
+  const handleGenerateMonthlySchedule = () => {
+    const currentMonthEvents = filteredTrainings.filter(t => {
+      const tDate = new Date(t.date + 'T12:00:00');
+      return isSameMonth(tDate, currentDate) && t.status === 'agendado';
+    });
+
+    if (currentMonthEvents.length === 0) {
+      alert("Não há treinamentos agendados para este mês no filtro atual.");
+      return;
+    }
+
+    currentMonthEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const headers = ['Data', 'Horario', 'Empresa', 'Treinamento', 'Status', 'Responsavel'];
+    const rows = currentMonthEvents.map(t => {
+      const resp1 = getProfileName(t.responsibleId);
+      const resp2Id = getSecondaryResponsible(t.description);
+      const resp2 = resp2Id ? getProfileName(resp2Id) : '';
+      const responsible = [resp1, resp2].filter(Boolean).join(' e ');
+      const dateFormatted = format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy');
+      return [
+        dateFormatted,
+        t.time || '',
+        `"${getCompanyName(t.companyId)}"`,
+        `"${t.title}"`,
+        STATUS_CONFIG[t.status]?.label || t.status,
+        `"${responsible}"`
+      ].join(',');
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `cronograma_${format(currentDate, 'MM_yyyy')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   const selectedDayEvents = selectedDate
@@ -292,6 +333,15 @@ const CalendarView = () => {
           <p className="text-subtitle">Visão geral de todas as empresas. Acesse a empresa para agendar.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {canGenerateSchedule && (
+             <button 
+               className="btn btn-primary" 
+               onClick={handleGenerateMonthlySchedule}
+               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}
+             >
+               <FileText size={16} /> Gerar Cronograma (Mês)
+             </button>
+          )}
           {pendingTrainings.length > 0 && (
             <div style={{
               padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
