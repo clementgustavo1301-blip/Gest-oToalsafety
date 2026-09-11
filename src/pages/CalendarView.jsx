@@ -278,11 +278,11 @@ const CalendarView = () => {
   const handleGenerateMonthlySchedule = () => {
     const currentMonthEvents = filteredTrainings.filter(t => {
       const tDate = new Date(t.date + 'T12:00:00');
-      return isSameMonth(tDate, currentDate) && t.status === 'agendado';
+      return isSameMonth(tDate, currentDate);
     });
 
     if (currentMonthEvents.length === 0) {
-      alert("Não há treinamentos agendados para este mês no filtro atual.");
+      alert("Não há treinamentos para este mês no filtro atual.");
       return;
     }
 
@@ -338,7 +338,29 @@ const CalendarView = () => {
       theme: 'grid',
       headStyles: { fillColor: [43, 87, 154], textColor: 255, fontStyle: 'bold' },
       styles: { fontSize: 8, cellPadding: 3 },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
+      didParseCell: (data) => {
+        if (data.section === 'body') {
+          const status = currentMonthEvents[data.row.index].status;
+          
+          if (status === 'agendado') {
+            data.cell.styles.fillColor = [239, 246, 255]; 
+          } else if (status === 'concluido') {
+            data.cell.styles.fillColor = [236, 253, 245]; 
+          } else if (status === 'adiado') {
+            data.cell.styles.fillColor = [254, 243, 199]; 
+          } else if (status === 'nao_feito') {
+            data.cell.styles.fillColor = [254, 226, 226]; 
+          }
+
+          if (data.column.index === 4) {
+             data.cell.styles.fontStyle = 'bold';
+             if (status === 'agendado') data.cell.styles.textColor = [59, 130, 246];
+             else if (status === 'concluido') data.cell.styles.textColor = [16, 185, 129];
+             else if (status === 'adiado') data.cell.styles.textColor = [180, 83, 9];
+             else if (status === 'nao_feito') data.cell.styles.textColor = [239, 68, 68];
+          }
+        }
+      },
       didDrawPage: (data) => {
         // Footer with page number
         const pageSize = doc.internal.pageSize;
