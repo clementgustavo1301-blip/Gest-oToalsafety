@@ -50,28 +50,40 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    const fetchSessionAndProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      
-      if (session?.user) {
-        await fetchProfile(session.user.id, session.user.user_metadata);
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (isMounted) setSession(session);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id, session.user.user_metadata);
+        }
+      } catch (error) {
+        console.error("Erro na autenticação inicial:", error);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setLoading(false);
     };
 
-    fetchSessionAndProfile();
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
+      if (isMounted) setSession(session);
       if (session?.user) {
         await fetchProfile(session.user.id, session.user.user_metadata);
       } else {
-        setUserProfile(null);
+        if (isMounted) setUserProfile(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
   const hasAccess = (allowedSectors, allowedRoles) => {
