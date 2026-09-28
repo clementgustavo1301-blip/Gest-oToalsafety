@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Activity, Truck, Building2, FileText, CheckCircle2,
+  Activity, Building2, CheckCircle2,
   AlertTriangle, Maximize2, Minimize2, ArrowLeft,
-  ShieldCheck, MapPin, Radio, BarChart3,
-  Navigation, Calendar, Clock, Users, ChevronRight, Zap
+  ShieldCheck, Radio, BarChart3,
+  Navigation, Calendar
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  Tooltip as RechartsTooltip, ResponsiveContainer
 } from 'recharts';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import RoutingMachine from '../components/RoutingMachine';
@@ -71,8 +70,6 @@ const basePin = L.divIcon({
 const campPin = makePin('#2563eb', 16);
 const partPin = makePin('#10b981', 14);
 
-const PIE_COLORS = ['#10b981', '#f59e0b', '#ef4444', '#2563eb'];
-
 /* ═════════════════ MAIN COMPONENT ═════════════════ */
 export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
   campaigns, partners,
@@ -122,9 +119,7 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
   const totalAsos = onlyCampaigns.reduce((s, c) => s + (c.returnedAsos || 0), 0);
   const kitsPending = onlyCampaigns.filter(c => !c.kitReady).length;
   const awaitingSOC = onlyCampaigns.filter(c => !c.insertedSOC && c.attendedCount > 0).length;
-  const insertedSOC = onlyCampaigns.filter(c => c.insertedSOC).length;
-  const scannedOnly = onlyCampaigns.filter(c => c.scanned && !c.insertedSOC).length;
-  const pendingDigit = onlyCampaigns.filter(c => !c.scanned && c.attendedCount > 0).length;
+
   const totalPartValue = partners.reduce((s, p) => s + p.value, 0);
   const pctAttended = totalExpected > 0 ? Math.round((totalAttended / totalExpected) * 100) : 0;
   const pctAsos = totalAttended > 0 ? Math.round((totalAsos / totalAttended) * 100) : 0;
@@ -136,11 +131,7 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
     Atendidos: c.attendedCount,
   }));
 
-  const pieData = [
-    { name: 'No SOC', value: insertedSOC || 1 },
-    { name: 'Escaneado', value: scannedOnly },
-    { name: 'Pendente', value: pendingDigit },
-  ].filter(d => d.value > 0);
+
 
   /* Time */
   const time = currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -159,13 +150,7 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
     return undefined;
   }, [nextCampaign]);
 
-  const daysUntil = useMemo(() => {
-    if (!nextCampaign) return null;
-    const diff = Math.ceil((new Date(nextCampaign.date).getTime() - new Date().getTime()) / 864e5);
-    if (diff <= 0) return 'HOJE';
-    if (diff === 1) return 'AMANHÃ';
-    return `em ${diff} dias`;
-  }, [nextCampaign]);
+
 
   /* Ticker */
   const alerts = [

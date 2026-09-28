@@ -3,6 +3,7 @@ import {
   Printer, Download, TrendingUp, DollarSign, ShieldAlert
 } from 'lucide-react';
 import type { Campaign, PartnerAppointment, ToastType } from '../types';
+import { EVENT_TYPE_LABELS } from '../types';
 import { fmtDate, fmtCurrency, exportToCSV } from '../utils/format';
 
 interface ReportsPageProps {

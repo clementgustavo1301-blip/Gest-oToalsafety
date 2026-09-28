@@ -1,7 +1,7 @@
 import L from 'leaflet';
 import 'leaflet-routing-machine';
-import { useEffect, useState } from 'react';
-import { useMap, Polyline } from 'react-leaflet';
+import { useEffect } from 'react';
+import { useMap } from 'react-leaflet';
 
 interface RoutingMachineProps {
   start: [number, number];
@@ -11,13 +11,9 @@ interface RoutingMachineProps {
 
 export default function RoutingMachine({ start, end, color = '#00e5ff' }: RoutingMachineProps) {
   const map = useMap();
-  const [routeLoaded, setRouteLoaded] = useState(false);
 
   useEffect(() => {
     if (!map) return;
-    
-    // Reset route loaded state when coordinates change
-    setRouteLoaded(false);
 
     // Ensure leaflet-routing-machine is loaded
     if (!(L as any).Routing) {
@@ -57,7 +53,6 @@ export default function RoutingMachine({ start, end, color = '#00e5ff' }: Routin
       });
 
       routingControl.on('routesfound', () => {
-        setRouteLoaded(true);
       });
 
       routingControl.on('routingerror', (e: any) => {
