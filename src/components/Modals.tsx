@@ -37,6 +37,7 @@ interface CampaignFormProps {
   initial?: Campaign;
   defaultDate?: string;
   defaultType?: EventType;
+  existingCompanies?: string[];
 }
 
 export const CampaignForm: React.FC<CampaignFormProps> = ({
@@ -44,10 +45,13 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
   onClose,
   initial,
   defaultDate,
-  defaultType
+  defaultType,
+  existingCompanies = []
 }) => {
   const [company, setCompany] = useState(initial?.company ?? '');
   const [location, setLocation] = useState(initial?.location ?? '');
+  const [cep, setCep] = useState('');
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
   const [date, setDate] = useState(initial?.date ?? defaultDate ?? '');
   const [eventType, setEventType] = useState<EventType>(initial?.eventType ?? defaultType ?? 'campanha');
   const [expectedCount, setExpectedCount] = useState(initial?.expectedCount ?? 50);
@@ -55,6 +59,41 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
   const [returnedAsos, setReturnedAsos] = useState(initial?.returnedAsos ?? 0);
   const [kitReady, setKitReady] = useState(initial?.kitReady ?? false);
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  
+  const [lat, setLat] = useState<number | undefined>(initial?.lat);
+  const [lng, setLng] = useState<number | undefined>(initial?.lng);
+
+  const handleCepBlur = async () => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length === 8) {
+      setIsFetchingCep(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          const fullAddress = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
+          setLocation(fullAddress);
+          
+          // Fetch coordinates via Nominatim
+          const searchParams = new URLSearchParams({
+            format: 'json',
+            q: `${data.logradouro}, ${data.localidade}, Brazil`,
+            limit: '1'
+          });
+          const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?${searchParams}`);
+          const geoData = await geoRes.json();
+          if (geoData && geoData.length > 0) {
+            setLat(parseFloat(geoData[0].lat));
+            setLng(parseFloat(geoData[0].lon));
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao buscar CEP:", err);
+      } finally {
+        setIsFetchingCep(false);
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,14 +102,14 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
       location,
       date,
       eventType,
-      kitReady,
-      expectedCount: Number(expectedCount) || 0,
-      attendedCount: Number(attendedCount) || 0,
-      returnedAsos: Number(returnedAsos) || 0,
+      kitReady: eventType === 'campanha' ? kitReady : false,
+      expectedCount: eventType === 'campanha' ? (Number(expectedCount) || 0) : 0,
+      attendedCount: eventType === 'campanha' ? (Number(attendedCount) || 0) : 0,
+      returnedAsos: eventType === 'campanha' ? (Number(returnedAsos) || 0) : 0,
       scanned: initial?.scanned ?? false,
       insertedSOC: initial?.insertedSOC ?? false,
-      lat: initial?.lat,
-      lng: initial?.lng,
+      lat,
+      lng,
       notes,
     });
     onClose();
@@ -108,21 +147,42 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
               onChange={e => setCompany(e.target.value)}
               required
               placeholder="Ex: Indústria Alpha Metalúrgica S.A."
+              list="companies-list"
             />
+            <datalist id="companies-list">
+              {existingCompanies.map((cName, idx) => (
+                <option key={idx} value={cName} />
+              ))}
+            </datalist>
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Localização / Endereço Completo</label>
-          <div className="input-with-icon">
-            <MapPin size={16} className="input-icon" />
+        <div className="form-row">
+          <div className="form-group" style={{ flex: '0 0 120px' }}>
+            <label>CEP</label>
             <input
               type="text"
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              required
-              placeholder="Ex: Filial Sul - São Paulo / SP"
+              value={cep}
+              onChange={e => setCep(e.target.value)}
+              onBlur={handleCepBlur}
+              placeholder="00000-000"
+              maxLength={9}
             />
+            {isFetchingCep && <span style={{fontSize: '10px', color: '#666'}}>Buscando...</span>}
+          </div>
+
+          <div className="form-group" style={{ flex: '1' }}>
+            <label>Localização / Endereço</label>
+            <div className="input-with-icon">
+              <MapPin size={16} className="input-icon" />
+              <input
+                type="text"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                required
+                placeholder="Rua, Bairro, Cidade - UF"
+              />
+            </div>
           </div>
         </div>
 
@@ -140,51 +200,57 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
             </div>
           </div>
 
-          <div className="form-group">
-            <label>Vidas Previstas</label>
-            <input
-              type="number"
-              min="1"
-              value={expectedCount}
-              onChange={e => setExpectedCount(Number(e.target.value))}
-              required
-            />
-          </div>
+          {eventType === 'campanha' && (
+            <div className="form-group">
+              <label>Vidas Previstas</label>
+              <input
+                type="number"
+                min="1"
+                value={expectedCount}
+                onChange={e => setExpectedCount(Number(e.target.value))}
+                required
+              />
+            </div>
+          )}
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Atendidos (Executado)</label>
-            <input
-              type="number"
-              min="0"
-              value={attendedCount}
-              onChange={e => setAttendedCount(Number(e.target.value))}
-            />
-          </div>
+        {eventType === 'campanha' && (
+          <>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Atendidos (Executado)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={attendedCount}
+                  onChange={e => setAttendedCount(Number(e.target.value))}
+                />
+              </div>
 
-          <div className="form-group">
-            <label>ASOs Físicos Retornados</label>
-            <input
-              type="number"
-              min="0"
-              value={returnedAsos}
-              onChange={e => setReturnedAsos(Number(e.target.value))}
-            />
-          </div>
-        </div>
+              <div className="form-group">
+                <label>ASOs Físicos Retornados</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={returnedAsos}
+                  onChange={e => setReturnedAsos(Number(e.target.value))}
+                />
+              </div>
+            </div>
 
-        <div className="form-group">
-          <label className="checkbox-toggle-label" style={{ marginTop: '4px' }}>
-            <input
-              type="checkbox"
-              className="custom-checkbox"
-              checked={kitReady}
-              onChange={e => setKitReady(e.target.checked)}
-            />
-            <span>Kit de Campanha (insumos, tubos e guias) já separado e conferido</span>
-          </label>
-        </div>
+            <div className="form-group">
+              <label className="checkbox-toggle-label" style={{ marginTop: '4px' }}>
+                <input
+                  type="checkbox"
+                  className="custom-checkbox"
+                  checked={kitReady}
+                  onChange={e => setKitReady(e.target.checked)}
+                />
+                <span>Kit de Campanha (insumos, tubos e guias) já separado e conferido</span>
+              </label>
+            </div>
+          </>
+        )}
 
         <div className="form-group">
           <label>Observações Operacionais / Equipe</label>

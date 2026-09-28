@@ -33,28 +33,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   // Filter calculations
   const filteredCampaigns = campaigns.filter(c => {
     if (filterPeriod === 'all') return true;
-    if (filterPeriod === 'urgent') return !c.kitReady || (!c.insertedSOC && c.attendedCount > 0);
+    if (filterPeriod === 'urgent') return c.eventType === 'campanha' && (!c.kitReady || (!c.insertedSOC && c.attendedCount > 0));
     // Month filter (October / current month)
     return c.date.startsWith('2026-10');
   });
 
-  const totalExpected = filteredCampaigns.reduce((s, c) => s + c.expectedCount, 0);
-  const totalAttended = filteredCampaigns.reduce((s, c) => s + c.attendedCount, 0);
-  const kitsNotReady = filteredCampaigns.filter(c => !c.kitReady).length;
-  const awaitingSOC = filteredCampaigns.filter(c => !c.insertedSOC && c.attendedCount > 0).length;
+  const onlyCampaigns = filteredCampaigns.filter(c => c.eventType === 'campanha');
+
+  const totalExpected = onlyCampaigns.reduce((s, c) => s + c.expectedCount, 0);
+  const totalAttended = onlyCampaigns.reduce((s, c) => s + c.attendedCount, 0);
+  const kitsNotReady = onlyCampaigns.filter(c => !c.kitReady).length;
+  const awaitingSOC = onlyCampaigns.filter(c => !c.insertedSOC && c.attendedCount > 0).length;
   const totalPartnersValue = partners.reduce((s, p) => s + p.value, 0);
   const unpaidPartners = partners.filter(p => !p.paid).length;
 
   // Chart data
-  const barData = filteredCampaigns.slice(0, 7).map(c => ({
+  const barData = onlyCampaigns.slice(0, 7).map(c => ({
     name: c.company.length > 14 ? c.company.substring(0, 14) + '…' : c.company,
     Previstos: c.expectedCount,
     Atendidos: c.attendedCount,
   }));
 
-  const insertedCount = filteredCampaigns.filter(c => c.insertedSOC).length;
-  const scannedOnlyCount = filteredCampaigns.filter(c => c.scanned && !c.insertedSOC).length;
-  const pendingCount = filteredCampaigns.filter(c => !c.scanned && c.attendedCount > 0).length;
+  const insertedCount = onlyCampaigns.filter(c => c.insertedSOC).length;
+  const scannedOnlyCount = onlyCampaigns.filter(c => c.scanned && !c.insertedSOC).length;
+  const pendingCount = onlyCampaigns.filter(c => !c.scanned && c.attendedCount > 0).length;
 
   const pieData = [
     { name: 'Integrados no SOC', value: insertedCount || 1 },
@@ -75,19 +77,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             className={`filter-tab ${filterPeriod === 'all' ? 'active' : ''}`}
             onClick={() => setFilterPeriod('all')}
           >
-            Visão Geral Completa ({campaigns.length})
+            Visão Geral Completa ({campaigns.filter(c => c.eventType === 'campanha').length})
           </button>
           <button
             className={`filter-tab ${filterPeriod === 'month' ? 'active' : ''}`}
             onClick={() => setFilterPeriod('month')}
           >
-            Mês de Outubro ({campaigns.filter(c => c.date.startsWith('2026-10')).length})
+            Mês de Outubro ({campaigns.filter(c => c.date.startsWith('2026-10') && c.eventType === 'campanha').length})
           </button>
           <button
             className={`filter-tab ${filterPeriod === 'urgent' ? 'active' : ''}`}
             onClick={() => setFilterPeriod('urgent')}
           >
-            ⚠️ Atenção Operacional ({campaigns.filter(c => !c.kitReady || (!c.insertedSOC && c.attendedCount > 0)).length})
+            ⚠️ Atenção Operacional ({campaigns.filter(c => c.eventType === 'campanha' && (!c.kitReady || (!c.insertedSOC && c.attendedCount > 0))).length})
           </button>
         </div>
 
@@ -111,7 +113,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <div>
               <span className="label">CAMPANHAS & ATENDIMENTOS</span>
               <div className="value-group">
-                <span className="value">{campaigns.length}</span>
+                <span className="value">{campaigns.filter(c => c.eventType === 'campanha').length}</span>
                 <span className="value-badge success">{totalAttended} realizados</span>
               </div>
             </div>

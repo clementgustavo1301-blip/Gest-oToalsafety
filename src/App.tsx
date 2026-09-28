@@ -16,6 +16,7 @@ import './ipa-layout.css';
 import './ipa-tables.css';
 import './ipa-reports.css';
 import './ipa-map-calendar.css';
+import './tv2.css';
 
 let toastCounter = 0;
 
@@ -177,6 +178,7 @@ function MainLayout() {
         <CampaignForm
           initial={editingCampaign}
           defaultDate={defaultCampaignDate}
+          existingCompanies={[...new Set(campaigns.map(c => c.company))]}
           onClose={() => setShowCampaignModal(false)}
           onSave={data => {
             if (editingCampaign) {

@@ -61,7 +61,7 @@ const CalendarView = () => {
     ]);
     const deliverables = await getDeliverables();
     const profs = await getProfiles();
-    
+
     setTrainings(trn);
     setCompanies(comp);
     setGroups(grps);

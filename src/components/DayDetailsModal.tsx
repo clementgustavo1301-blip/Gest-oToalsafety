@@ -172,9 +172,11 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
                               <span className="item-location">
                                 <MapPin size={13} /> {camp.location}
                               </span>
-                              <span className="item-attendance">
-                                <Users size={13} /> {camp.attendedCount} / {camp.expectedCount} vidas
-                              </span>
+                              {camp.eventType === 'campanha' && (
+                                <span className="item-attendance">
+                                  <Users size={13} /> {camp.attendedCount} / {camp.expectedCount} vidas
+                                </span>
+                              )}
                             </div>
                           </div>
 

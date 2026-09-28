@@ -138,12 +138,18 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         </div>
         {isCamp && camp && (
           <div className="event-details-row">
-            <span className="event-detail-item">
-              <Users size={10} /> {camp.attendedCount || camp.expectedCount} vidas
-            </span>
-            <span className={`status-mini-indicator ${camp.kitReady ? 'kit-ok' : 'kit-wait'}`}>
-              {camp.kitReady ? 'Kit OK' : 'Sem Kit'}
-            </span>
+            {camp.eventType !== 'campanha' ? (
+              <span className="event-detail-item">{EVENT_TYPE_LABELS[camp.eventType]}</span>
+            ) : (
+              <span className="event-detail-item">
+                <Users size={10} /> {camp.attendedCount || camp.expectedCount} vidas
+              </span>
+            )}
+            {camp.eventType === 'campanha' && (
+              <span className={`status-mini-indicator ${camp.kitReady ? 'kit-ok' : 'kit-wait'}`}>
+                {camp.kitReady ? 'Kit OK' : 'Sem Kit'}
+              </span>
+            )}
           </div>
         )}
         {!isCamp && part && (
@@ -352,7 +358,8 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
                   <span className="dock-item-tag móvel">{EVENT_TYPE_LABELS[c.eventType]}</span>
                   <strong>{c.company}</strong>
                   <span className="dock-item-sub">
-                    <Users size={12} /> {c.expectedCount} vidas • {c.kitReady ? '✓ Kit Pronto' : '⚠️ Sem Kit'}
+                    <Users size={12} /> {c.eventType !== 'campanha' ? EVENT_TYPE_LABELS[c.eventType] : `${c.expectedCount} vidas`} 
+                    {c.eventType === 'campanha' && ` • ${c.kitReady ? '✓ Kit Pronto' : '⚠️ Sem Kit'}`}
                   </span>
                 </div>
               ))}

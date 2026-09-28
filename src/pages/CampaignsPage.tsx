@@ -103,9 +103,10 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
   };
 
   // Quick summary counts
-  const totalExpected = filteredCampaigns.reduce((s, c) => s + c.expectedCount, 0);
-  const totalAttended = filteredCampaigns.reduce((s, c) => s + c.attendedCount, 0);
-  const totalKitsOk = filteredCampaigns.filter(c => c.kitReady).length;
+  const onlyCampaigns = filteredCampaigns.filter(c => c.eventType === 'campanha');
+  const totalExpected = onlyCampaigns.reduce((s, c) => s + c.expectedCount, 0);
+  const totalAttended = onlyCampaigns.reduce((s, c) => s + c.attendedCount, 0);
+  const totalKitsOk = onlyCampaigns.filter(c => c.kitReady).length;
 
   return (
     <div className="page-wrapper campaigns-management-layout">
@@ -159,7 +160,7 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
       <div className="campaigns-stats-ribbon">
         <div className="ribbon-item">
           <span className="ribbon-num">{filteredCampaigns.length}</span>
-          <span className="ribbon-lbl">Campanhas Listadas</span>
+          <span className="ribbon-lbl">Eventos Listados</span>
         </div>
         <div className="ribbon-item">
           <span className="ribbon-num text-cyan">{totalExpected}</span>
@@ -170,7 +171,7 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
           <span className="ribbon-lbl">Exames Realizados</span>
         </div>
         <div className="ribbon-item">
-          <span className="ribbon-num">{totalKitsOk} / {filteredCampaigns.length}</span>
+          <span className="ribbon-num">{totalKitsOk} / {filteredCampaigns.filter(c => c.eventType === 'campanha').length}</span>
           <span className="ribbon-lbl">Kits Prontos</span>
         </div>
       </div>
@@ -255,23 +256,31 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
                     </td>
                     <td>
                       <div className="attendance-cell">
-                        <span className="attendance-counts">
-                          <strong>{c.attendedCount}</strong> / {c.expectedCount} vidas
-                        </span>
-                        <div className="mini-progress-track">
-                          <div
-                            className="mini-progress-bar"
-                            style={{
-                              width: `${Math.min(100, percentAttended)}%`,
-                              backgroundColor: percentAttended >= 80 ? 'var(--ok)' : 'var(--blue)'
-                            }}
-                          />
-                        </div>
+                        {c.eventType !== 'campanha' ? (
+                          <span className="attendance-counts" style={{ color: '#64748b' }}>
+                            {EVENT_TYPE_LABELS[c.eventType]} (N/A)
+                          </span>
+                        ) : (
+                          <>
+                            <span className="attendance-counts">
+                              <strong>{c.attendedCount}</strong> / {c.expectedCount} vidas
+                            </span>
+                            <div className="mini-progress-track">
+                              <div
+                                className="mini-progress-bar"
+                                style={{
+                                  width: `${Math.min(100, percentAttended)}%`,
+                                  backgroundColor: percentAttended >= 80 ? 'var(--ok)' : 'var(--blue)'
+                                }}
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className="count-badge">
-                        {c.returnedAsos || '-'}
+                        {c.eventType === 'campanha' ? (c.returnedAsos || '-') : '-'}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -354,6 +363,7 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
       {showForm && (
         <CampaignForm
           initial={editing}
+          existingCompanies={[...new Set(campaigns.map(c => c.company))]}
           onClose={() => setShowForm(false)}
           onSave={data => {
             if (editing) {

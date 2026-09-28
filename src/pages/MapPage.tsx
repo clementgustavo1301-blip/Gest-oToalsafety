@@ -74,7 +74,7 @@ function MapCenterController({ center }: { center: [number, number] }) {
 
 export const MapPage: React.FC<MapPageProps> = ({ campaigns, partners }) => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'campaign' | 'partner'>('all');
-  const baseCoords: [number, number] = [-5.2077, -37.3314];
+  const baseCoords: [number, number] = [-5.2056619002795514, -37.32918467893605];
   const [selectedPoint, setSelectedPoint] = useState<[number, number]>(baseCoords);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -90,8 +90,8 @@ export const MapPage: React.FC<MapPageProps> = ({ campaigns, partners }) => {
       count: c.expectedCount,
       status: c.kitReady ? 'Kit Pronto' : 'Kit Pendente',
       isKitReady: c.kitReady,
-      lat: c.lat ?? -5.2077,
-      lng: c.lng ?? -37.3314,
+      lat: c.lat ?? -5.2056619002795514,
+      lng: c.lng ?? -37.32918467893605,
     })),
     ...partners.map(p => ({
       id: `p_${p.id}`,
@@ -103,8 +103,8 @@ export const MapPage: React.FC<MapPageProps> = ({ campaigns, partners }) => {
       count: p.value,
       status: p.paid ? 'Pago' : 'Faturamento Pendente',
       isKitReady: true,
-      lat: p.lat ?? -5.2077,
-      lng: p.lng ?? -37.3314,
+      lat: p.lat ?? -5.2056619002795514,
+      lng: p.lng ?? -37.32918467893605,
     })),
   ];
 
@@ -171,9 +171,9 @@ export const MapPage: React.FC<MapPageProps> = ({ campaigns, partners }) => {
               {(selectedPoint[0] !== baseCoords[0] || selectedPoint[1] !== baseCoords[1]) && (
                 <RoutingMachine start={baseCoords} end={selectedPoint} color="#00e5ff" />
               )}
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              <TileLayer 
+                attribution='&copy; Google Maps'
+                url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" 
               />
 
               {/* Base / Matriz Ponto de Partida */}
@@ -184,9 +184,9 @@ export const MapPage: React.FC<MapPageProps> = ({ campaigns, partners }) => {
                       <span className="popup-type-tag" style={{ background: '#0f172a', color: '#00e5ff' }}>PONTO DE PARTIDA</span>
                     </div>
                     <div className="popup-body">
-                      <h3>Ecoclinic (Anexo ao Ed. CACIM)</h3>
-                      <p>Tv. Filgueira Filho, 2 - Alto de São Manoel</p>
-                      <p style={{ color: '#00e5ff', fontWeight: 600 }}>Sede Operacional (Mossoró - RN)</p>
+                      <h3>CACIM (Alto de São Manoel)</h3>
+                      <p>Rua Francisco Mota, 645 - Alto de São Manoel</p>
+                      <p style={{ color: '#00e5ff', fontWeight: 600 }}>Ponto de Partida / Unidade Móvel</p>
                     </div>
                   </div>
                 </Popup>

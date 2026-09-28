@@ -692,3 +692,20 @@ input, select, textarea {
     font-size: 0.5rem !important;
   }
 }
+
+/* Esconder painel de rotas do Leaflet Routing Machine */
+.leaflet-routing-container {
+  display: none !important;
+}
+
+/* Efeito de Luz no Trajeto (RoutingMachine) */
+.route-light-animation {
+  stroke-dasharray: 15 150;
+  stroke-linecap: round;
+  animation: routeLightTravel 3s linear infinite;
+}
+
+@keyframes routeLightTravel {
+  0% { stroke-dashoffset: 165; }
+  100% { stroke-dashoffset: 0; }
+}

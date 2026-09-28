@@ -19,15 +19,16 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
   const [activeReportTab, setActiveReportTab] = useState<'prod' | 'scan' | 'fin'>('prod');
 
   // Calculations for Prod
-  const executedCampaigns = campaigns.filter(c => c.attendedCount > 0);
-  const totalPrevisto = campaigns.reduce((s, c) => s + c.expectedCount, 0);
-  const totalRealizado = campaigns.reduce((s, c) => s + c.attendedCount, 0);
+  const onlyCampaigns = campaigns.filter(c => c.eventType === 'campanha');
+  const executedCampaigns = onlyCampaigns.filter(c => c.attendedCount > 0);
+  const totalPrevisto = onlyCampaigns.reduce((s, c) => s + c.expectedCount, 0);
+  const totalRealizado = onlyCampaigns.reduce((s, c) => s + c.attendedCount, 0);
   const taxaGeral = totalPrevisto > 0 ? Math.round((totalRealizado / totalPrevisto) * 100) : 0;
 
   // Calculations for Scan / SOC
-  const pendingScans = campaigns.filter(c => c.attendedCount > 0 && !c.scanned);
-  const pendingSOC = campaigns.filter(c => c.scanned && !c.insertedSOC);
-  const fullSOC = campaigns.filter(c => c.insertedSOC);
+  const pendingScans = onlyCampaigns.filter(c => c.attendedCount > 0 && !c.scanned);
+  const pendingSOC = onlyCampaigns.filter(c => c.scanned && !c.insertedSOC);
+  const fullSOC = onlyCampaigns.filter(c => c.insertedSOC);
 
   // Calculations for Financial
   const totalValue = partners.reduce((s, p) => s + p.value, 0);
@@ -190,27 +191,37 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                         <td><strong>{c.company}</strong></td>
                         <td>{fmtDate(c.date)}</td>
                         <td>{c.location}</td>
-                        <td>{c.expectedCount} vidas</td>
-                        <td>{c.attendedCount} vidas</td>
-                        <td>
-                          <div className="progress-cell-wrap">
-                            <span className="progress-num font-tabular">{rate}%</span>
-                            <div className="mini-track">
-                              <div
-                                className="mini-bar"
-                                style={{
-                                  width: `${Math.min(100, rate)}%`,
-                                  backgroundColor: rate >= 90 ? 'var(--ok)' : rate >= 60 ? 'var(--warn)' : 'var(--blue)'
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`badge ${rate >= 90 ? 'success' : rate > 0 ? 'warning' : 'neutral'}`}>
-                            {rate >= 90 ? 'Excelente' : rate > 0 ? 'Regular' : 'Programada'}
-                          </span>
-                        </td>
+                        {c.eventType === 'campanha' ? (
+                          <>
+                            <td>{c.expectedCount} vidas</td>
+                            <td>{c.attendedCount} vidas</td>
+                            <td>
+                              <div className="progress-cell-wrap">
+                                <span className="progress-num font-tabular">{rate}%</span>
+                                <div className="mini-track">
+                                  <div
+                                    className="mini-bar"
+                                    style={{
+                                      width: `${Math.min(100, rate)}%`,
+                                      backgroundColor: rate >= 90 ? 'var(--ok)' : rate >= 60 ? 'var(--warn)' : 'var(--blue)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className={`badge ${rate >= 90 ? 'success' : rate > 0 ? 'warning' : 'neutral'}`}>
+                                {rate >= 90 ? 'Excelente' : rate > 0 ? 'Regular' : 'Programada'}
+                              </span>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td colSpan={4} style={{ textAlign: 'center', color: '#64748b' }}>
+                              {EVENT_TYPE_LABELS[c.eventType]} (N/A)
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}

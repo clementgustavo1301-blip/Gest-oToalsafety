@@ -38,7 +38,12 @@ export default function RoutingMachine({ start, end, color = '#00e5ff' }: Routin
           profile: 'driving'
         }),
         lineOptions: {
-          styles: [{ color, weight: 4, opacity: 0.8 }],
+          styles: [
+            // Base contínua e visível do trajeto
+            { color: color, weight: 6, opacity: 0.8 },
+            // Luz branca percorrendo o caminho
+            { color: '#ffffff', weight: 4, opacity: 1, className: 'route-light-animation' }
+          ],
           extendToWaypoints: false,
           missingRouteTolerance: 0
         },
@@ -74,24 +79,7 @@ export default function RoutingMachine({ start, end, color = '#00e5ff' }: Routin
         }
       }
     };
-  }, [map, start, end, color]);
-
-  // Se a rota ainda não foi carregada (ou se falhou), mostra a linha pontilhada animada
-  if (!routeLoaded) {
-    return (
-      <Polyline
-        positions={[start, end]}
-        pathOptions={{
-          color,
-          weight: 4,
-          dashArray: '10, 15',
-          opacity: 0.8,
-          lineCap: 'round',
-          className: 'animated-trajectory'
-        }}
-      />
-    );
-  }
+  }, [map, start[0], start[1], end[0], end[1], color]);
 
   return null;
 }
