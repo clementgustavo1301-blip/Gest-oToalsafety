@@ -75,8 +75,6 @@ function MainLayout() {
 
 
 
-  const pendingKitsCount = campaigns.filter(c => !c.kitReady).length;
-  const pendingSocCount = campaigns.filter(c => c.attendedCount > 0 && !c.insertedSOC).length;
 
   if (location.pathname === '/ipa/tv') {
     return (
