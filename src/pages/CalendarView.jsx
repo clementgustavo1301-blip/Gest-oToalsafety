@@ -42,7 +42,7 @@ const CalendarView = () => {
   const [calendarResponsibleId, setCalendarResponsibleId] = useState('');
   const { userProfile, activeLink } = useAuth();
 
-  const canGenerateSchedule = activeLink?.sector === 'Diretoria' && activeLink?.role === 'Admin';
+  const canGenerateSchedule = (activeLink?.sector === 'Diretoria' && activeLink?.role === 'Admin') || activeLink?.sector === 'IPA';
 
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);

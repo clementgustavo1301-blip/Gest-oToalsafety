@@ -10,8 +10,8 @@ export const generateSSTReport = async (data) => {
   const totalPagesExp = '{tp}';
   
   const didDrawPage = (data_hook) => {
-    // Save current Y to restore later
-    const currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 0;
+    // Save current table state to restore later
+    const previousAutoTable = doc.lastAutoTable;
     
     autoTable(doc, {
       startY: margin,
@@ -69,24 +69,24 @@ export const generateSSTReport = async (data) => {
       ]
     });
     
-    // Top margin for subsequent autoTables
-    data_hook.settings.margin.top = doc.lastAutoTable.finalY + 5;
+    // Restore previous autoTable state so we don't mess up Y coordinates of main tables
+    doc.lastAutoTable = previousAutoTable;
   };
 
   // We use a dummy table just to trigger the first page header properly and set startY
   autoTable(doc, {
     startY: 0,
-    margin: { top: 40 }, // will be overridden by didDrawPage on next pages
+    margin: { top: 45 },
     body: [],
     didDrawPage: didDrawPage
   });
   
-  let startY = 40; // Approx finalY of header
+  let startY = 45; // Approx finalY of header
 
   // Header and initial tables (Company Info)
   autoTable(doc, {
     startY: startY,
-    margin: { left: margin, right: margin },
+    margin: { top: 45, left: margin, right: margin },
     theme: 'plain',
     styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
     body: [
@@ -127,9 +127,8 @@ export const generateSSTReport = async (data) => {
       // Se a altura necessária for maior que o espaço disponível, força quebra de página
       if (startY + requiredHeight > doc.internal.pageSize.getHeight() - margin) {
         doc.addPage();
-        const hookData = { pageNumber: doc.internal.getNumberOfPages(), settings: { margin: { top: margin } } };
-        didDrawPage(hookData);
-        startY = hookData.settings.margin.top;
+        didDrawPage({ pageNumber: doc.internal.getNumberOfPages() });
+        startY = 45;
       }
 
       // Actions and Justification
@@ -147,7 +146,7 @@ export const generateSSTReport = async (data) => {
       if (actionBody.length > 0) {
         autoTable(doc, {
           startY: startY + 2,
-          margin: { left: margin, right: margin },
+          margin: { top: 45, left: margin, right: margin },
           theme: 'plain',
           pageBreak: 'avoid',
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
@@ -165,7 +164,7 @@ export const generateSSTReport = async (data) => {
         if (listBody.length > 0 && listBody[0][0].content !== '• ') {
             autoTable(doc, {
             startY: startY,
-            margin: { left: margin, right: margin },
+            margin: { top: 45, left: margin, right: margin },
             theme: 'plain',
             pageBreak: 'avoid',
             styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
@@ -209,7 +208,7 @@ export const generateSSTReport = async (data) => {
         
         autoTable(doc, {
           startY: startY,
-          margin: { left: margin, right: margin },
+          margin: { top: 45, left: margin, right: margin },
           theme: 'plain',
           pageBreak: 'avoid',
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 8, cellPadding: 1, halign: 'center', valign: 'middle' },
@@ -268,7 +267,7 @@ export const generateSSTReport = async (data) => {
       if (action.recommendations && action.recommendations.trim()) {
         autoTable(doc, {
           startY: startY,
-          margin: { left: margin, right: margin },
+          margin: { top: 45, left: margin, right: margin },
           theme: 'plain',
           pageBreak: 'avoid',
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
@@ -283,7 +282,7 @@ export const generateSSTReport = async (data) => {
         if (listBody.length > 0 && listBody[0][0].content !== '• ') {
             autoTable(doc, {
             startY: startY,
-            margin: { left: margin, right: margin },
+            margin: { top: 45, left: margin, right: margin },
             theme: 'plain',
             pageBreak: 'avoid',
             styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
@@ -300,7 +299,7 @@ export const generateSSTReport = async (data) => {
   if (data.observation && data.observation.trim()) {
      autoTable(doc, {
       startY: startY + 8,
-      margin: { left: margin, right: margin },
+      margin: { top: 45, left: margin, right: margin },
       theme: 'plain',
       styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 10, cellPadding: 2, fillColor: [255, 255, 255], textColor: [0,0,0] },
       body: [
@@ -315,8 +314,8 @@ export const generateSSTReport = async (data) => {
   const pageHeight = doc.internal.pageSize.getHeight();
   if (pageHeight - startY < 50) {
     doc.addPage();
-    didDrawPage({ pageNumber: doc.internal.getNumberOfPages(), settings: { margin: { top: 40 } } });
-    startY = 40;
+    didDrawPage({ pageNumber: doc.internal.getNumberOfPages() });
+    startY = 45;
   }
 
   startY += 30; 

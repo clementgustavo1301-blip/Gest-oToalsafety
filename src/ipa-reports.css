@@ -1,0 +1,225 @@
+/* Reports Navigation Grid */
+.reports-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.report-selector-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  align-items: flex-start;
+}
+
+.report-selector-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+
+.report-selector-card.active {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.selector-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.selector-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.selector-content h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.selector-content p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.selector-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  align-self: flex-start;
+}
+
+/* Report Main Area */
+.report-card-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.report-main-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.report-main-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.report-header-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.report-body-section {
+  padding: 1.5rem;
+  background-color: var(--surface);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* KPI Row */
+.report-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.report-kpi-box {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* Progress Cells */
+.progress-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100px;
+}
+
+.progress-num {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-track {
+  height: 4px;
+  background-color: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mini-bar {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.flow-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+.flow-status.ok { color: var(--success); background-color: var(--secondary-light); }
+.flow-status.warn { color: var(--warning); background-color: #fef3c7; }
+.flow-status.err { color: var(--danger); background-color: #fee2e2; }
+.flow-status.neutral { color: var(--text-secondary); background-color: var(--background); }
+
+.uf-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+}
+
+/* Financial Footer */
+.financial-total-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background-color: var(--primary-light);
+  border-radius: var(--radius-md);
+  margin-top: 2rem;
+}
+
+.total-bar-left span {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.total-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.total-bar-right span {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.total-bar-right strong {
+  font-size: 1.5rem;
+  font-weight: 800;
+}

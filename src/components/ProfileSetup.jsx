@@ -7,7 +7,8 @@ const SECTORS_AND_ROLES = {
   'SST': ['Técnico', 'Supervisor'],
   'Clínica': ['Enfermagem', 'Médico', 'Recepcionista'],
   'Administrativo': ['Financeiro', 'RH', 'Gerente'],
-  'Diretoria': ['Admin']
+  'Diretoria': ['Admin'],
+  'IPA': ['Analista']
 };
 
 const ProfileSetup = () => {

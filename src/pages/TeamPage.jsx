@@ -128,11 +128,11 @@ const TeamPage = () => {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                         padding: '0.125rem 0.625rem', borderRadius: '1rem',
-                        backgroundColor: link.role === 'Admin' ? 'var(--primary-light)' : 'var(--secondary-light)',
-                        color: link.role === 'Admin' ? 'var(--primary)' : 'var(--secondary-hover)',
+                        backgroundColor: link.role === 'Admin' || link.sector === 'IPA' ? 'var(--primary-light)' : 'var(--secondary-light)',
+                        color: link.role === 'Admin' || link.sector === 'IPA' ? 'var(--primary)' : 'var(--secondary-hover)',
                         fontWeight: '600', fontSize: '0.75rem'
                       }}>
-                        {link.role === 'Admin' && <ShieldCheck size={12} />}
+                        {(link.role === 'Admin' || link.sector === 'IPA') && <ShieldCheck size={12} />}
                         {link.role || '-'}
                       </span>
                     </td>

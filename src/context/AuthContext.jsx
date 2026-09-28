@@ -77,8 +77,8 @@ export function AuthProvider({ children }) {
   const hasAccess = (allowedSectors, allowedRoles) => {
     if (!activeLink) return false;
     
-    // Admin tem acesso total (verifica se o link ativo é de Admin)
-    if (activeLink.role === 'Admin') return true;
+    // Admin tem acesso total (verifica se o link ativo é de Admin ou setor IPA)
+    if (activeLink.role === 'Admin' || activeLink.sector === 'IPA') return true;
 
     const sectorMatch = !allowedSectors || allowedSectors.includes(activeLink.sector);
     const roleMatch = !allowedRoles || allowedRoles.includes(activeLink.role);

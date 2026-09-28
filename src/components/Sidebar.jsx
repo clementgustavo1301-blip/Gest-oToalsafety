@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, Stethoscope, MessageSquare, Map } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, Stethoscope, MessageSquare, Map, Tv } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
@@ -13,9 +13,9 @@ const Sidebar = ({ isOpen, onClose }) => {
   const [expandedMenus, setExpandedMenus] = useState({});
   const [pendingTeamCount, setPendingTeamCount] = useState(0);
 
-  const isAdminDiretoria = activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria';
+  const isAdminDiretoria = (activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria') || activeLink?.sector === 'IPA';
   const isClinicaOrAdmin = activeLink?.sector === 'Clínica' || isAdminDiretoria;
-  const isSSTOrAdmin = activeLink?.sector === 'SST' || activeLink?.role === 'Admin';
+  const isSSTOrAdmin = activeLink?.sector === 'SST' || isAdminDiretoria;
 
   useEffect(() => {
     if (isAdminDiretoria) {
@@ -48,8 +48,24 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
+    ...(activeLink?.sector === 'IPA' ? [
+      { 
+        name: 'Painel IPA', 
+        icon: <Tv size={20} />, 
+        badge: 'IPA',
+        subItems: [
+          { name: 'Dashboard Operacional', path: '/ipa', icon: <LayoutDashboard size={18} /> },
+          { name: 'TV / War Room', path: '/ipa/tv', icon: <Tv size={18} /> },
+          { name: 'Calendário & Agenda', path: '/ipa/calendar', icon: <Calendar size={18} /> },
+          { name: 'Itinerários & Mapa', path: '/ipa/map', icon: <Map size={18} /> },
+          { name: 'Unidade Móvel', path: '/ipa/campaigns', icon: <Building2 size={18} /> },
+          { name: 'Clínicas Parceiras', path: '/ipa/partners', icon: <Building2 size={18} /> },
+          { name: 'Relatórios IPA', path: '/ipa/reports', icon: <FileText size={18} /> }
+        ]
+      }
+    ] : []),
     { name: 'Empresas', path: '/companies', icon: <Building2 size={20} /> },
-    ...(activeLink?.role === 'Admin' ? [{ name: 'Logística', path: '/logistics', icon: <Map size={20} />, badge: 'DEMO' }] : []),
+
     { name: 'Calendário', path: '/calendar', icon: <Calendar size={20} /> },
     { name: 'Entregáveis', path: '/deliverables', icon: <FileText size={20} /> },
     { 

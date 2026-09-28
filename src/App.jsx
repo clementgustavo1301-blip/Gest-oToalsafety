@@ -6,7 +6,7 @@ import Dashboard from './pages/Dashboard';
 import CalendarView from './pages/CalendarView';
 import CompaniesPage from './pages/CompaniesPage';
 import CompanyDetailsPage from './pages/CompanyDetailsPage';
-import LogisticsPage from './pages/LogisticsPage';
+
 import DeliverablesPage from './pages/DeliverablesPage';
 import InventoryPage from './pages/InventoryPage';
 import AIAssistant from './pages/AIAssistant';
@@ -26,6 +26,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AIProvider } from './context/AIContext';
+import IPASystem from './App.tsx';
 
 // Novo componente para proteger o layout dependendo do perfil
 const AppLayout = () => {
@@ -55,7 +56,7 @@ const AppLayout = () => {
             <Route path="/calendar" element={<CalendarView />} />
             <Route path="/companies" element={<CompaniesPage />} />
             <Route path="/company/:companyId" element={<CompanyDetailsPage />} />
-            <Route path="/logistics" element={<LogisticsPage />} />
+
             <Route path="/deliverables" element={<DeliverablesPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/ai-assistant" element={<AIAssistant />} />
@@ -89,6 +90,11 @@ const AppLayout = () => {
                 <CertificatesPage />
               </ProtectedRoute>
             } />
+            <Route path="/ipa/*" element={
+              <ProtectedRoute allowedSectors={['IPA']}>
+                <IPASystem />
+              </ProtectedRoute>
+            } />
           </Routes>
         </main>
       </div>
@@ -101,7 +107,6 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Rota Pública */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/cat-form" element={<PublicCATPage />} />
 
