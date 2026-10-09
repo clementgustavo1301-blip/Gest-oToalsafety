@@ -218,3 +218,29 @@ CREATE POLICY "Enable read access for authenticated users" ON public.group_conta
 CREATE POLICY "Enable insert for authenticated users" ON public.group_contacts FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Enable update for authenticated users" ON public.group_contacts FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Enable delete for authenticated users" ON public.group_contacts FOR DELETE TO authenticated USING (true);
+
+-- ==========================================
+-- 9. Custom Trainings Table (Certificados)
+-- ==========================================
+CREATE TABLE public.custom_trainings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,
+    duracao TEXT,
+    conteudo TEXT,
+    descricao TEXT,
+    instrutor_nome TEXT,
+    instrutor_cargo TEXT,
+    instrutor_registro TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TRIGGER handle_updated_at_custom_trainings BEFORE UPDATE ON public.custom_trainings
+  FOR EACH ROW EXECUTE PROCEDURE moddatetime (updated_at);
+
+ALTER TABLE public.custom_trainings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for all" ON public.custom_trainings FOR SELECT USING (true);
+CREATE POLICY "Enable insert for all" ON public.custom_trainings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Enable update for all" ON public.custom_trainings FOR UPDATE USING (true);
+CREATE POLICY "Enable delete for all" ON public.custom_trainings FOR DELETE USING (true);
+

@@ -569,3 +569,7 @@ export async function getProfiles() {
   if (error) { console.error('Error fetching profiles:', error); return []; }
   return data;
 }
+
+// --- Custom Trainings (Certificates) ---
+export { getCustomTrainings, saveCustomTraining, deleteCustomTraining } from './customTrainingsService';
+
