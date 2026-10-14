@@ -678,8 +678,8 @@ input, select, textarea {
 }
 
 .calendar-day-cell {
-  min-height: 86px;
-  padding: 0.35rem 0.25rem;
+  min-height: 112px;
+  padding: 0.35rem 0.35rem;
   min-width: 0;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -691,10 +691,15 @@ input, select, textarea {
 
 .calendar-event-item {
   font-size: 0.65rem;
-  padding: 0.15rem 0.35rem;
+  padding: 0.2rem 0.35rem;
   border-radius: 4px;
-  line-height: 1.2;
+  line-height: 1.25;
   cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.calendar-event-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.06);
 }
 .calendar-event-title {
   font-size: inherit;

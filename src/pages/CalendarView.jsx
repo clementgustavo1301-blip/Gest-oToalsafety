@@ -184,6 +184,7 @@ const CalendarView = () => {
       const isCurrentMonth = isSameMonth(day, monthStart);
       const isToday = isSameDay(day, new Date());
       const isSelected = selectedDate === dateStr;
+      const isWeekend = day.getDay() === 0 || day.getDay() === 6;
 
       days.push(
         <div 
@@ -191,7 +192,13 @@ const CalendarView = () => {
           className="calendar-day-cell"
           onClick={() => handleDayClick(cloneDay)}
           style={{
-            backgroundColor: !isCurrentMonth ? 'var(--background)' : isSelected ? 'var(--primary-light)' : 'var(--surface)',
+            backgroundColor: !isCurrentMonth 
+              ? 'var(--background)' 
+              : isSelected 
+              ? 'var(--primary-light)' 
+              : isWeekend 
+              ? 'rgba(0,0,0,0.015)' 
+              : 'var(--surface)',
             color: !isCurrentMonth ? 'var(--text-secondary)' : 'var(--text-primary)',
             opacity: isCurrentMonth ? 1 : 0.45,
             border: isSelected ? '2px solid var(--primary)' : undefined,
@@ -200,88 +207,133 @@ const CalendarView = () => {
             if (!isSelected && isCurrentMonth) e.currentTarget.style.backgroundColor = 'var(--primary-light)';
           }}
           onMouseLeave={(e) => {
-            if (!isSelected) e.currentTarget.style.backgroundColor = !isCurrentMonth ? 'var(--background)' : 'var(--surface)';
+            if (!isSelected) e.currentTarget.style.backgroundColor = !isCurrentMonth ? 'var(--background)' : (isWeekend ? 'rgba(0,0,0,0.015)' : 'var(--surface)');
           }}
         >
           {/* Day Number */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '3px' }}>
             <span style={{ 
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: isMobile ? '20px' : '22px', height: isMobile ? '20px' : '22px', borderRadius: '50%',
               backgroundColor: isToday ? 'var(--primary)' : 'transparent',
               color: isToday ? 'white' : 'inherit',
-              fontWeight: isToday || isSelected ? '700' : 'normal',
+              fontWeight: isToday || isSelected ? '700' : '600',
               fontSize: isMobile ? '0.7rem' : '0.75rem'
             }}>
               {format(day, 'd')}
             </span>
           </div>
           
-          {/* Mobile view (< 1200px or phones): colored event dots */}
+          {/* Mobile view (< 768px): micro-badge with group name */}
           {isMobile && dayEvents.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '3px', flexWrap: 'wrap', marginTop: 'auto', paddingBottom: '2px' }}>
-              {dayEvents.slice(0, 3).map((ev) => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden', marginTop: 'auto', paddingBottom: '2px' }}>
+              {dayEvents.slice(0, 2).map((ev) => {
                 const isExt = ev.isExternal || ev.demandType === 'externa' || (ev.description && ev.description.includes('[EXTERNAL_COMPANY:'));
                 const sc = STATUS_CONFIG[ev.status] || STATUS_CONFIG.agendado;
+                let extName = ev.externalCompanyName;
+                if (!extName && ev.description) {
+                  const m = ev.description.match(/\[EXTERNAL_COMPANY:([^\]]+)\]/);
+                  if (m) extName = m[1].trim();
+                }
+                const rawGroupName = getCompanyGroupName(ev.companyId);
+                const rawCompName = getCompanyName(ev.companyId);
+                const displayGroup = isExt ? (extName || 'Ext') : (rawGroupName || rawCompName);
+
                 return (
-                  <span
+                  <div
                     key={ev.id}
                     style={{
-                      width: '6px', height: '6px', borderRadius: '50%',
-                      backgroundColor: isExt ? '#8b5cf6' : sc.color,
-                      flexShrink: 0
+                      display: 'flex', alignItems: 'center', gap: '2px',
+                      backgroundColor: sc.bg, color: sc.color,
+                      borderLeft: `2px solid ${isExt ? '#8b5cf6' : sc.color}`,
+                      padding: '1px 3px', borderRadius: '2px',
+                      fontSize: '0.52rem', fontWeight: '700',
+                      overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                      lineHeight: 1.15
                     }}
-                  />
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {displayGroup}
+                    </span>
+                  </div>
                 );
               })}
-              {dayEvents.length > 3 && (
-                <span style={{ fontSize: '0.55rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
-                  +{dayEvents.length - 3}
+              {dayEvents.length > 2 && (
+                <span style={{ fontSize: '0.52rem', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                  +{dayEvents.length - 2}
                 </span>
               )}
             </div>
           )}
 
-          {/* Desktop view (>= 1200px): Compact event chips */}
+          {/* Desktop view (>= 768px): Group Name prominent + Activity Title + Time */}
           {!isMobile && dayEvents.length > 0 && (() => {
-            const maxVisible = 2;
+            const maxVisible = 3;
             const visibleEvents = dayEvents.slice(0, maxVisible);
             const remaining = dayEvents.length - maxVisible;
 
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', overflow: 'hidden' }}>
                 {visibleEvents.map((event) => {
                   const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
                   const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
-                  const compName = isExt ? (event.externalCompanyName || 'Demanda Externa') : getCompanyName(event.companyId);
+                  let extName = event.externalCompanyName;
+                  if (!extName && event.description) {
+                    const m = event.description.match(/\[EXTERNAL_COMPANY:([^\]]+)\]/);
+                    if (m) extName = m[1].trim();
+                  }
+                  const rawGroupName = getCompanyGroupName(event.companyId);
+                  const rawCompName = getCompanyName(event.companyId);
+                  const displayGroup = isExt 
+                    ? (extName || 'Demanda Externa') 
+                    : (rawGroupName || rawCompName);
                   const timeShort = event.time ? event.time.split(' ')[0] : '';
+
                   return (
                     <div 
                       key={event.id}
                       className="calendar-event-item"
-                      title={`${event.title} - ${compName} (${event.time || ''})`}
+                      title={`${displayGroup} • ${event.title} (${event.time || ''})`}
                       style={{
                         backgroundColor: sc.bg, color: sc.color,
-                        borderLeft: `2.5px solid ${isExt ? '#8b5cf6' : sc.color}`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        gap: '2px', padding: '1px 3px', borderRadius: '2px'
+                        borderLeft: `3px solid ${isExt ? '#8b5cf6' : sc.color}`,
+                        display: 'flex', flexDirection: 'column',
+                        gap: '1px', padding: '2px 5px', borderRadius: '3px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                       }}
                     >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '600' }}>
-                        {isExt ? `⚡ ${compName}` : event.title}
-                      </span>
-                      {timeShort && (
-                        <span style={{ opacity: 0.8, fontSize: '0.5625rem', flexShrink: 0 }}>
-                          {timeShort}
+                      {/* Line 1: Group Name (Prominent & Uppercase) + Time */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '3px' }}>
+                        <span style={{ 
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', 
+                          fontWeight: '700', fontSize: '0.67rem', letterSpacing: '0.01em',
+                          color: isExt ? '#7c3aed' : sc.color
+                        }}>
+                          {isExt ? `⚡ ${displayGroup}` : displayGroup}
                         </span>
-                      )}
+                        {timeShort && (
+                          <span style={{ opacity: 0.85, fontSize: '0.58rem', flexShrink: 0, fontWeight: '600' }}>
+                            {timeShort}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Line 2: Activity Title */}
+                      <span style={{ 
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', 
+                        fontSize: '0.63rem', opacity: 0.9, fontWeight: '500'
+                      }}>
+                        {event.title}
+                      </span>
                     </div>
                   );
                 })}
                 {remaining > 0 && (
                   <div style={{
-                    fontSize: '0.58rem', fontWeight: '700', color: 'var(--text-secondary)',
-                    textAlign: 'center', padding: '1px 0', borderRadius: '2px', backgroundColor: 'rgba(0,0,0,0.03)'
+                    fontSize: '0.62rem', fontWeight: '700', color: 'var(--primary)',
+                    textAlign: 'center', padding: '1px 6px', borderRadius: '10px',
+                    backgroundColor: 'var(--primary-light)', alignSelf: 'center',
+                    marginTop: '1px'
                   }}>
                     +{remaining} mais
                   </div>
@@ -425,7 +477,15 @@ const CalendarView = () => {
   const renderEventCard = (event, periodLabel, periodColor, PeriodIcon) => {
     const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
     const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
-    const compName = isExt ? (event.externalCompanyName || event.companyName || 'Demanda Externa') : (event.companyName || getCompanyName(event.companyId));
+    let extName = event.externalCompanyName;
+    if (!extName && event.description) {
+      const m = event.description.match(/\[EXTERNAL_COMPANY:([^\]]+)\]/);
+      if (m) extName = m[1].trim();
+    }
+    const rawGroupName = getCompanyGroupName(event.companyId);
+    const rawCompName = event.companyName || getCompanyName(event.companyId);
+    const groupName = isExt ? extName : rawGroupName;
+    const compName = isExt ? (extName || 'Demanda Externa') : rawCompName;
     return (
       <div key={event.id} className="card" style={{ padding: '0.75rem', borderLeft: isExt ? '4px solid #8b5cf6' : `3px solid ${sc.color}`, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -475,8 +535,8 @@ const CalendarView = () => {
                   backgroundColor: isExt ? '#8b5cf6' : getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
                 }} 
               />
-              <span style={{ fontWeight: isExt ? '700' : 'normal', color: isExt ? '#7c3aed' : 'inherit' }}>
-                {isExt ? `⚡ ${compName}` : compName}
+              <span style={{ fontWeight: '700', color: isExt ? '#7c3aed' : 'var(--text-primary)' }}>
+                {isExt ? `⚡ ${compName}` : (groupName && groupName !== compName ? `${groupName} • ${compName}` : compName)}
               </span>
             </span>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -684,7 +744,7 @@ const CalendarView = () => {
   };
 
   return (
-    <div style={{ width: '100%', maxWidth: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <div style={{ width: '100%', maxWidth: '1520px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       {/* Top Header: Title, pending pill, action buttons */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
