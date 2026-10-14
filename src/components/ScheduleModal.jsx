@@ -226,12 +226,12 @@ const ScheduleModal = ({
         {/* Modal Body */}
         <div
           style={{
-            padding: '1.5rem',
+            padding: '1.15rem 1rem',
             overflowY: 'auto',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            gap: '1.25rem',
+            gap: '1rem',
             backgroundColor: 'var(--background, #f8fafc)',
           }}
         >

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2, Sunrise, Sun, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, CheckCircle, PauseCircle, XCircle, Building2, Calendar as CalendarIcon, Filter, Edit2, Trash2, Sunrise, Sun, FileText, X } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +31,13 @@ const STATUS_CONFIG = {
 
 const CalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [showModal, setShowModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -113,7 +120,12 @@ const CalendarView = () => {
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
 
   const handleDayClick = (day) => {
-    setSelectedDate(format(day, 'yyyy-MM-dd'));
+    const dateStr = format(day, 'yyyy-MM-dd');
+    if (selectedDate === dateStr) {
+      setSelectedDate(null);
+    } else {
+      setSelectedDate(dateStr);
+    }
   };
 
   if (loading) {
@@ -181,98 +193,97 @@ const CalendarView = () => {
           style={{
             backgroundColor: !isCurrentMonth ? 'var(--background)' : isSelected ? 'var(--primary-light)' : 'var(--surface)',
             color: !isCurrentMonth ? 'var(--text-secondary)' : 'var(--text-primary)',
-            opacity: isCurrentMonth ? 1 : 0.5
+            opacity: isCurrentMonth ? 1 : 0.45,
+            border: isSelected ? '2px solid var(--primary)' : undefined,
           }}
           onMouseEnter={(e) => {
-            if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--primary-light)';
+            if (!isSelected && isCurrentMonth) e.currentTarget.style.backgroundColor = 'var(--primary-light)';
           }}
           onMouseLeave={(e) => {
             if (!isSelected) e.currentTarget.style.backgroundColor = !isCurrentMonth ? 'var(--background)' : 'var(--surface)';
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {/* Day Number */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px' }}>
             <span style={{ 
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: '28px', height: '28px', borderRadius: '50%',
+              width: isMobile ? '20px' : '22px', height: isMobile ? '20px' : '22px', borderRadius: '50%',
               backgroundColor: isToday ? 'var(--primary)' : 'transparent',
               color: isToday ? 'white' : 'inherit',
-              fontWeight: isToday ? 'bold' : 'normal',
-              fontSize: '0.875rem'
+              fontWeight: isToday || isSelected ? '700' : 'normal',
+              fontSize: isMobile ? '0.7rem' : '0.75rem'
             }}>
               {format(day, 'd')}
             </span>
           </div>
           
-          {/* Day Events grouped by Manhã / Tarde */}
-          {(() => {
-            const manhaEvents = dayEvents.filter(t => getPeriod(t.time) === 'manha');
-            const tardeEvents = dayEvents.filter(t => getPeriod(t.time) === 'tarde');
+          {/* Mobile view (< 1200px or phones): colored event dots */}
+          {isMobile && dayEvents.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '3px', flexWrap: 'wrap', marginTop: 'auto', paddingBottom: '2px' }}>
+              {dayEvents.slice(0, 3).map((ev) => {
+                const isExt = ev.isExternal || ev.demandType === 'externa' || (ev.description && ev.description.includes('[EXTERNAL_COMPANY:'));
+                const sc = STATUS_CONFIG[ev.status] || STATUS_CONFIG.agendado;
+                return (
+                  <span
+                    key={ev.id}
+                    style={{
+                      width: '6px', height: '6px', borderRadius: '50%',
+                      backgroundColor: isExt ? '#8b5cf6' : sc.color,
+                      flexShrink: 0
+                    }}
+                  />
+                );
+              })}
+              {dayEvents.length > 3 && (
+                <span style={{ fontSize: '0.55rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                  +{dayEvents.length - 3}
+                </span>
+              )}
+            </div>
+          )}
 
-            if (dayEvents.length === 0) return null;
-
-            const renderEventItem = (event) => {
-              const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
-              const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
-              const compName = isExt ? (event.externalCompanyName || 'Demanda Externa') : getCompanyName(event.companyId);
-              return (
-                <div key={event.id} className="calendar-event-item" style={{
-                  backgroundColor: sc.bg, color: sc.color,
-                  borderRadius: '3px', borderLeft: `3px solid ${sc.color}`,
-                  overflow: 'hidden',
-                  fontWeight: '500'
-                }}>
-                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="calendar-event-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
-                    {event.time && <span className="calendar-event-time" style={{ opacity: 0.8, marginLeft: '0.25rem', flexShrink: 0 }}>{event.time.split(' ')[0]}</span>}
-                  </div>
-                  {((compName && compName !== 'N/A') || isExt) && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      marginTop: '1px',
-                    }}>
-                      <span className="calendar-event-dot"
-                        title={isExt ? 'Demanda Fora do TotalSafety (Externa)' : getCompanyCategory(event.companyId)}
-                        style={{
-                          width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-                          backgroundColor: isExt ? '#8b5cf6' : getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
-                        }} 
-                      />
-                      <div className="calendar-event-company" style={{
-                        opacity: 0.9,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        lineHeight: '1.1',
-                        fontSize: '0.7rem',
-                        fontWeight: isExt ? '700' : 'normal',
-                        color: isExt ? '#7c3aed' : 'inherit'
-                      }}>
-                        {isExt ? `⚡ ${compName}` : (getCompanyGroupName(event.companyId) ? `${getCompanyGroupName(event.companyId)} / ${compName}` : compName)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            };
+          {/* Desktop view (>= 1200px): Compact event chips */}
+          {!isMobile && dayEvents.length > 0 && (() => {
+            const maxVisible = 2;
+            const visibleEvents = dayEvents.slice(0, maxVisible);
+            const remaining = dayEvents.length - maxVisible;
 
             return (
-              <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {manhaEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div className="calendar-period-label" style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sunrise size={10} /> Manhã
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                {visibleEvents.map((event) => {
+                  const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
+                  const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
+                  const compName = isExt ? (event.externalCompanyName || 'Demanda Externa') : getCompanyName(event.companyId);
+                  const timeShort = event.time ? event.time.split(' ')[0] : '';
+                  return (
+                    <div 
+                      key={event.id}
+                      className="calendar-event-item"
+                      title={`${event.title} - ${compName} (${event.time || ''})`}
+                      style={{
+                        backgroundColor: sc.bg, color: sc.color,
+                        borderLeft: `2.5px solid ${isExt ? '#8b5cf6' : sc.color}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: '2px', padding: '1px 3px', borderRadius: '2px'
+                      }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '600' }}>
+                        {isExt ? `⚡ ${compName}` : event.title}
+                      </span>
+                      {timeShort && (
+                        <span style={{ opacity: 0.8, fontSize: '0.5625rem', flexShrink: 0 }}>
+                          {timeShort}
+                        </span>
+                      )}
                     </div>
-                    {manhaEvents.map(renderEventItem)}
-                  </div>
-                )}
-                {tardeEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div className="calendar-period-label" style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sun size={10} /> Tarde
-                    </div>
-                    {tardeEvents.map(renderEventItem)}
+                  );
+                })}
+                {remaining > 0 && (
+                  <div style={{
+                    fontSize: '0.58rem', fontWeight: '700', color: 'var(--text-secondary)',
+                    textAlign: 'center', padding: '1px 0', borderRadius: '2px', backgroundColor: 'rgba(0,0,0,0.03)'
+                  }}>
+                    +{remaining} mais
                   </div>
                 )}
               </div>
@@ -391,7 +402,7 @@ const CalendarView = () => {
     doc.save(`cronograma_${format(currentDate, 'MM_yyyy')}.pdf`);
   };
 
-  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const weekDays = isMobile ? ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] : ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   const selectedDayEvents = selectedDate
     ? filteredTrainings.filter(t => t.date === selectedDate).map(t => {
@@ -405,441 +416,533 @@ const CalendarView = () => {
     : [];
 
   const statusIcons = {
-    agendado: <CalendarIcon size={16} color="var(--primary)" />,
-    concluido: <CheckCircle size={16} color="var(--secondary)" />,
-    adiado: <PauseCircle size={16} color="#b45309" />,
-    nao_feito: <XCircle size={16} color="var(--danger)" />,
+    agendado: <CalendarIcon size={14} color="var(--primary)" />,
+    concluido: <CheckCircle size={14} color="var(--secondary)" />,
+    adiado: <PauseCircle size={14} color="#b45309" />,
+    nao_feito: <XCircle size={14} color="var(--danger)" />,
+  };
+
+  const renderEventCard = (event, periodLabel, periodColor, PeriodIcon) => {
+    const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
+    const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
+    const compName = isExt ? (event.externalCompanyName || event.companyName || 'Demanda Externa') : (event.companyName || getCompanyName(event.companyId));
+    return (
+      <div key={event.id} className="card" style={{ padding: '0.75rem', borderLeft: isExt ? '4px solid #8b5cf6' : `3px solid ${sc.color}`, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+          {statusIcons[event.status]}
+          <span style={{
+            fontSize: '0.6875rem', padding: '0.1rem 0.45rem', borderRadius: '1rem',
+            backgroundColor: sc.bg, color: sc.color, fontWeight: '600'
+          }}>
+            {sc.label}
+          </span>
+          <span style={{
+            fontSize: '0.6875rem', padding: '0.1rem 0.45rem', borderRadius: '1rem',
+            backgroundColor: periodColor === 'var(--primary)' ? 'var(--primary-light)' : '#fef3c7',
+            color: periodColor, fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.2rem'
+          }}>
+            <PeriodIcon size={11} /> {periodLabel}
+          </span>
+          {isExt && (
+            <span style={{
+              fontSize: '0.6875rem', padding: '0.1rem 0.45rem', borderRadius: '1rem',
+              backgroundColor: '#f3e8ff', color: '#7c3aed', border: '1px solid #d8b4fe', fontWeight: '700',
+              display: 'flex', alignItems: 'center', gap: '0.2rem'
+            }}>
+              ⚡ Fora TS
+            </span>
+          )}
+          <button 
+            onClick={() => setEditingEvent(event)}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.72rem', padding: '0.2rem' }}
+            title="Editar Agendamento"
+          >
+            <Edit2 size={13} /> Editar
+          </button>
+        </div>
+
+        <div>
+          <h4 style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>
+            {event.title}
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Building2 size={12} color={isExt ? '#7c3aed' : undefined} />
+              <span 
+                title={isExt ? 'Demanda Externa (Fora do TotalSafety)' : getCompanyCategory(event.companyId)}
+                style={{
+                  width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0,
+                  backgroundColor: isExt ? '#8b5cf6' : getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
+                }} 
+              />
+              <span style={{ fontWeight: isExt ? '700' : 'normal', color: isExt ? '#7c3aed' : 'inherit' }}>
+                {isExt ? `⚡ ${compName}` : compName}
+              </span>
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Clock size={12} /> {event.time || 'Sem horário'}
+              </span>
+              <button
+                className="btn"
+                onClick={() => setGeneratingReportFor(event)}
+                style={{
+                  padding: '0.2rem 0.45rem', fontSize: '0.65rem',
+                  backgroundColor: 'var(--info-light)', color: 'var(--info)',
+                  border: '1px solid var(--info)', borderRadius: 'var(--radius-md)',
+                  fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem'
+                }}
+                title="Gerar Relatório"
+              >
+                <FileText size={11} /> Relatório
+              </button>
+            </div>
+            {(event.responsibleId || getSecondaryResponsible(event.description)) && (
+              <span style={{ fontSize: '0.6875rem' }}>
+                Resp: {[getProfileName(event.responsibleId), getSecondaryResponsible(event.description) ? getProfileName(getSecondaryResponsible(event.description)) : null].filter(Boolean).join(' e ')}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Status Actions */}
+        <div style={{
+          display: 'flex', gap: '0.35rem', paddingTop: '0.45rem',
+          borderTop: '1px solid var(--border)', flexWrap: 'wrap'
+        }}>
+          {event.status !== 'concluido' && (
+            <button
+              className="btn"
+              onClick={() => handleStatusChange(event.id, 'concluido')}
+              style={{
+                padding: '0.25rem 0.5rem', fontSize: '0.6875rem',
+                backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
+                border: '1px solid var(--secondary)', borderRadius: 'var(--radius-sm)',
+                fontWeight: '600', gap: '0.25rem'
+              }}
+            >
+              <CheckCircle size={11} /> Concluir
+            </button>
+          )}
+          {event.status !== 'adiado' && (
+            <button
+              className="btn"
+              onClick={() => handleStatusChange(event.id, 'adiado')}
+              style={{
+                padding: '0.25rem 0.5rem', fontSize: '0.6875rem',
+                backgroundColor: '#fef3c7', color: '#b45309',
+                border: '1px solid #f59e0b', borderRadius: 'var(--radius-sm)',
+                fontWeight: '600', gap: '0.25rem'
+              }}
+            >
+              <PauseCircle size={11} /> Adiar
+            </button>
+          )}
+          {event.status !== 'nao_feito' && (
+            <button
+              className="btn"
+              onClick={() => handleStatusChange(event.id, 'nao_feito')}
+              style={{
+                padding: '0.25rem 0.5rem', fontSize: '0.6875rem',
+                backgroundColor: '#fee2e2', color: 'var(--danger)',
+                border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)',
+                fontWeight: '600', gap: '0.25rem'
+              }}
+            >
+              <XCircle size={11} /> Não Feito
+            </button>
+          )}
+          {event.status !== 'agendado' && (
+            <button
+              className="btn"
+              onClick={() => handleStatusChange(event.id, 'agendado')}
+              style={{
+                padding: '0.25rem 0.5rem', fontSize: '0.6875rem',
+                backgroundColor: 'var(--primary-light)', color: 'var(--primary)',
+                border: '1px solid var(--primary)', borderRadius: 'var(--radius-sm)',
+                fontWeight: '600', gap: '0.25rem'
+              }}
+            >
+              <CalendarIcon size={11} /> Reagendar
+            </button>
+          )}
+          <button
+            className="btn"
+            onClick={() => handleDeleteTraining(event.id)}
+            style={{
+              padding: '0.25rem 0.5rem', fontSize: '0.6875rem',
+              backgroundColor: 'transparent', color: 'var(--danger)',
+              border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)',
+              fontWeight: '600', gap: '0.25rem', marginLeft: 'auto'
+            }}
+            title="Remover do calendário"
+          >
+            <Trash2 size={11} /> Excluir
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDayDetails = () => {
+    if (!selectedDate) return null;
+
+    const manha = selectedDayEvents.filter(e => getPeriod(e.time) === 'manha');
+    const tarde = selectedDayEvents.filter(e => getPeriod(e.time) === 'tarde');
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        {/* Day Header */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)'
+        }}>
+          <div>
+            <h3 style={{ fontWeight: '700', fontSize: '0.9375rem', color: 'var(--text-primary)', margin: 0, textTransform: 'capitalize' }}>
+              {format(new Date(selectedDate + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </h3>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              {selectedDayEvents.length} atividade{selectedDayEvents.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowModal(true)}
+              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+            >
+              <Plus size={13} /> Agendar
+            </button>
+            <button
+              onClick={() => setSelectedDate(null)}
+              style={{
+                padding: '0.3rem', borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)', color: 'var(--text-secondary)',
+                backgroundColor: 'var(--surface)', cursor: 'pointer', display: 'flex', alignItems: 'center'
+              }}
+              title="Fechar painel do dia"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Day Events List */}
+        <div style={{ padding: '0.75rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          {selectedDayEvents.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-secondary)' }}>
+              <CalendarIcon size={28} style={{ marginBottom: '0.5rem', opacity: 0.35 }} />
+              <p style={{ fontSize: '0.8125rem', marginBottom: '0.75rem' }}>Nenhum treinamento neste dia.</p>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowModal(true)}
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+              >
+                <Plus size={13} /> Agendar Treinamento
+              </button>
+            </div>
+          ) : (
+            <>
+              {manha.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--primary)' }}>
+                    <Sunrise size={13} /> Turno da Manhã ({manha.length})
+                  </div>
+                  {manha.map(e => renderEventCard(e, 'Manhã', 'var(--primary)', Sunrise))}
+                </div>
+              )}
+              {tarde.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', fontWeight: '700', color: '#d97706' }}>
+                    <Sun size={13} /> Turno da Tarde ({tarde.length})
+                  </div>
+                  {tarde.map(e => renderEventCard(e, 'Tarde', '#d97706', Sun))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Day Modal Footer */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '0.65rem 1rem', borderTop: '1px solid var(--border)', backgroundColor: 'var(--surface)'
+        }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            Total: {selectedDayEvents.length} atividade{selectedDayEvents.length !== 1 ? 's' : ''}
+          </span>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setSelectedDate(null)}
+            style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <header className="header-responsive" style={{ marginBottom: '1.5rem', alignItems: 'flex-start' }}>
+    <div style={{ width: '100%', maxWidth: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {/* Top Header: Title, pending pill, action buttons */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: '0.6rem', paddingBottom: '0.25rem'
+      }}>
         <div>
-          <h1 className="text-h1">Agenda de Treinamentos</h1>
-          <p className="text-subtitle">Visão geral de todas as empresas. Acesse a empresa para agendar.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
+              Agenda de Treinamentos
+            </h1>
+            <span style={{
+              fontSize: '0.75rem', fontWeight: '600', padding: '0.15rem 0.5rem',
+              borderRadius: '1rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)'
+            }}>
+              {filteredTrainings.length} atividades
+            </span>
+          </div>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>
+            Visão geral de todas as empresas e demandas avulsas
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => setShowModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}
-            title="Agendar Treinamento para Cliente TotalSafety ou Demanda Externa"
-          >
-            <Plus size={16} /> Novo Agendamento
-          </button>
-          <button 
-            className="btn btn-primary" 
-            onClick={() => setShowScheduleModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}
-            title="Gerar Cronograma da Agenda em Formato Calendário A4 ou Tabela"
-          >
-            <CalendarIcon size={16} /> Gerar Cronograma da Agenda (A4)
-          </button>
+
+        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {pendingTrainings.length > 0 && (
             <div style={{
-              padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
-              borderRadius: 'var(--radius-md)', color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.5rem',
-              fontSize: '0.8125rem', fontWeight: '500'
-            }}>
-              <PauseCircle size={16} />
-              Você tem {pendingTrainings.length} treinamento(s) aguardando agendamento! (Vá na Empresa para agendar)
+              padding: '0.35rem 0.65rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
+              borderRadius: 'var(--radius-md)', color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.35rem',
+              fontSize: '0.75rem', fontWeight: '600'
+            }} title="Treinamentos aguardando agendamento">
+              <PauseCircle size={14} />
+              <span>{pendingTrainings.length} pendentes</span>
             </div>
           )}
-        </div>
-      </header>
-
-      {/* Legend and Filter */}
-      <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {Object.entries(STATUS_CONFIG).map(([key, val]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: val.color }} />
-              {val.label}
-            </div>
-          ))}
-          <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border)', margin: '0 0.25rem' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600' }}>
-            <Sunrise size={14} /> Manhã (&lt; 12h)
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: '#d97706', fontWeight: '600' }}>
-            <Sun size={14} /> Tarde (≥ 12h)
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Filter size={16} color="var(--text-secondary)" />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            style={{
-              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)', fontSize: '0.8125rem',
-              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer'
-            }}
+          <button 
+            className="btn btn-primary" 
+            onClick={() => setShowModal(true)}
+            style={{ padding: '0.38rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            title="Agendar Treinamento para Cliente TotalSafety ou Demanda Externa"
           >
-            <option value="all">Todos os Status</option>
-            <option value="agendado">Agendados</option>
-            <option value="concluido">Concluídos</option>
-            <option value="adiado">Adiados</option>
-            <option value="nao_feito">Não Feitos</option>
-          </select>
-          
-          <select
-            value={calendarScope}
-            onChange={(e) => {
-              setCalendarScope(e.target.value);
-              if (e.target.value === 'empresa' && companies.length > 0 && !calendarCompanyId) {
-                setCalendarCompanyId(companies[0].id);
-              }
-              if (e.target.value === 'responsavel' && profiles.length > 0 && !calendarResponsibleId) {
-                setCalendarResponsibleId(profiles[0].id);
-              }
-            }}
-            style={{
-              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)', fontSize: '0.8125rem',
-              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer'
-            }}
+            <Plus size={15} /> Novo Agendamento
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => setShowScheduleModal(true)}
+            style={{ padding: '0.38rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            title="Gerar Cronograma da Agenda em Formato Calendário A4 ou Tabela"
           >
-            <option value="geral">Agenda Geral</option>
-            <option value="minha_agenda">Minha Agenda</option>
-            <option value="externas">⚡ Demandas Fora do TotalSafety</option>
-            <option value="empresa">Por Empresa</option>
-            <option value="responsavel">Por Responsável</option>
-          </select>
-
-          <select
-            value={filterRegion}
-            onChange={(e) => setFilterRegion(e.target.value)}
-            style={{
-              padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)', fontSize: '0.8125rem',
-              backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-              fontFamily: 'inherit', cursor: 'pointer'
-            }}
-          >
-            <option value="all">Todas as Regiões</option>
-            <option value="Natal">Natal</option>
-            <option value="Mossoró">Mossoró</option>
-          </select>
-
-          {calendarScope === 'empresa' && (
-            <select
-              value={calendarCompanyId}
-              onChange={(e) => setCalendarCompanyId(e.target.value)}
-              style={{
-                padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)', fontSize: '0.8125rem',
-                backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                fontFamily: 'inherit', cursor: 'pointer', maxWidth: '200px'
-              }}
-            >
-              <option value="" disabled>Selecione a Empresa</option>
-              {companies.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          )}
-
-          {calendarScope === 'responsavel' && (
-            <select
-              value={calendarResponsibleId}
-              onChange={(e) => setCalendarResponsibleId(e.target.value)}
-              style={{
-                padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)', fontSize: '0.8125rem',
-                backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
-                fontFamily: 'inherit', cursor: 'pointer', maxWidth: '200px'
-              }}
-            >
-              <option value="" disabled>Selecione o Responsável</option>
-              {profiles.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          )}
+            <CalendarIcon size={15} /> Cronograma (A4)
+          </button>
         </div>
       </div>
 
-      <div className={selectedDate ? "grid-responsive-calendar" : ""} style={{ display: 'grid', gridTemplateColumns: selectedDate ? undefined : '1fr', gap: '1.5rem', flex: 1 }}>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-          {/* Calendar Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.5rem', borderBottom: '1px solid var(--border)' }}>
-            <h2 className="text-h2" style={{ textTransform: 'capitalize' }}>
-              {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-            </h2>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={prevMonth} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
-                <ChevronLeft size={20} />
+      {/* Main Calendar Card - Always 100% Full Width */}
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', width: '100%' }}>
+          
+          {/* Calendar Toolbar: Month Nav & Filters */}
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
+            gap: '0.6rem', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)'
+          }}>
+            {/* Month Navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <button onClick={prevMonth} className="btn btn-secondary" style={{ padding: '0.3rem 0.45rem' }} title="Mês anterior">
+                <ChevronLeft size={16} />
               </button>
-              <button onClick={() => setCurrentDate(new Date())} className="btn btn-secondary">
+              <h2 style={{ fontSize: '1.05rem', fontWeight: '700', textTransform: 'capitalize', minWidth: '135px', textAlign: 'center', margin: 0 }}>
+                {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
+              </h2>
+              <button onClick={nextMonth} className="btn btn-secondary" style={{ padding: '0.3rem 0.45rem' }} title="Próximo mês">
+                <ChevronRight size={16} />
+              </button>
+              <button onClick={() => setCurrentDate(new Date())} className="btn btn-secondary" style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}>
                 Hoje
               </button>
-              <button onClick={nextMonth} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
-                <ChevronRight size={20} />
-              </button>
+            </div>
+
+            {/* Filters */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <Filter size={14} color="var(--text-secondary)" />
+              <select
+                value={calendarScope}
+                onChange={(e) => {
+                  setCalendarScope(e.target.value);
+                  if (e.target.value === 'empresa' && companies.length > 0 && !calendarCompanyId) {
+                    setCalendarCompanyId(companies[0].id);
+                  }
+                  if (e.target.value === 'responsavel' && profiles.length > 0 && !calendarResponsibleId) {
+                    setCalendarResponsibleId(profiles[0].id);
+                  }
+                }}
+                style={{
+                  padding: '0.28rem 0.5rem', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)', fontSize: '0.75rem',
+                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                  fontFamily: 'inherit', cursor: 'pointer'
+                }}
+              >
+                <option value="geral">Agenda Geral</option>
+                <option value="minha_agenda">Minha Agenda</option>
+                <option value="externas">⚡ Demandas Fora TS</option>
+                <option value="empresa">Por Empresa</option>
+                <option value="responsavel">Por Responsável</option>
+              </select>
+
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                style={{
+                  padding: '0.28rem 0.5rem', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)', fontSize: '0.75rem',
+                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                  fontFamily: 'inherit', cursor: 'pointer'
+                }}
+              >
+                <option value="all">Todos Status</option>
+                <option value="agendado">Agendados</option>
+                <option value="concluido">Concluídos</option>
+                <option value="adiado">Adiados</option>
+                <option value="nao_feito">Não Feitos</option>
+              </select>
+
+              <select
+                value={filterRegion}
+                onChange={(e) => setFilterRegion(e.target.value)}
+                style={{
+                  padding: '0.28rem 0.5rem', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)', fontSize: '0.75rem',
+                  backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                  fontFamily: 'inherit', cursor: 'pointer'
+                }}
+              >
+                <option value="all">Todas Regiões</option>
+                <option value="Natal">Natal</option>
+                <option value="Mossoró">Mossoró</option>
+              </select>
+
+              {calendarScope === 'empresa' && (
+                <select
+                  value={calendarCompanyId}
+                  onChange={(e) => setCalendarCompanyId(e.target.value)}
+                  style={{
+                    padding: '0.28rem 0.5rem', borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)', fontSize: '0.75rem',
+                    backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                    fontFamily: 'inherit', cursor: 'pointer', maxWidth: '160px'
+                  }}
+                >
+                  <option value="" disabled>Selecione a Empresa</option>
+                  {companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
+
+              {calendarScope === 'responsavel' && (
+                <select
+                  value={calendarResponsibleId}
+                  onChange={(e) => setCalendarResponsibleId(e.target.value)}
+                  style={{
+                    padding: '0.28rem 0.5rem', borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)', fontSize: '0.75rem',
+                    backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                    fontFamily: 'inherit', cursor: 'pointer', maxWidth: '160px'
+                  }}
+                >
+                  <option value="" disabled>Selecione o Responsável</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
-          {/* Calendar Scroll Area */}
+          {/* Compact Legend Sub-bar */}
+          <div style={{
+            display: 'flex', gap: '0.75rem', padding: '0.35rem 0.85rem', backgroundColor: 'var(--background)',
+            borderBottom: '1px solid var(--border)', overflowX: 'auto', whiteSpace: 'nowrap', alignItems: 'center',
+            fontSize: '0.6875rem', color: 'var(--text-secondary)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--primary)' }} />
+              <span>Agendado</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--secondary)' }} />
+              <span>Concluído</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#d97706' }} />
+              <span>Adiado</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--danger)' }} />
+              <span>Não Feito</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#8b5cf6' }} />
+              <span>⚡ Fora TS</span>
+            </div>
+            <span style={{ width: '1px', height: '10px', backgroundColor: 'var(--border)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: 'var(--primary)', fontWeight: '600' }}>
+              <Sunrise size={12} /> Manhã
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: '#d97706', fontWeight: '600' }}>
+              <Sun size={12} /> Tarde
+            </div>
+          </div>
+
+          {/* Calendar Grid Container */}
           <div className="calendar-scroll-area">
             <div className="calendar-scroll-inner">
               {/* Weekday Headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--background)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}>
                 {weekDays.map(d => (
-                  <div key={d} style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  <div key={d} style={{ padding: '0.45rem 0.25rem', textAlign: 'center', fontWeight: '600', fontSize: isMobile ? '0.72rem' : '0.8125rem', color: 'var(--text-secondary)' }}>
                     {d}
                   </div>
                 ))}
               </div>
 
-              {/* Calendar Grid */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {/* Days Grid */}
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {rows}
               </div>
             </div>
           </div>
         </div>
-
-        {/* Side Panel */}
-        {selectedDate && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', animation: 'fadeIn 0.2s ease' }}>
-            <div className="card" style={{ padding: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <h3 style={{ fontWeight: '600', fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                    {format(new Date(selectedDate + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
-                  </h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    {selectedDayEvents.length} treinamento{selectedDayEvents.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setShowModal(true)}
-                  style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-                >
-                  <Plus size={14} /> Agendar
-                </button>
-              </div>
-            </div>
-
-            {selectedDayEvents.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                <CalendarIcon size={28} style={{ marginBottom: '0.5rem', opacity: 0.4 }} />
-                <p style={{ fontSize: '0.8125rem' }}>Nenhum treinamento neste dia.</p>
-              </div>
-            ) : (
-              (() => {
-                const manha = selectedDayEvents.filter(e => getPeriod(e.time) === 'manha');
-                const tarde = selectedDayEvents.filter(e => getPeriod(e.time) === 'tarde');
-
-                const renderCard = (event, periodLabel, periodColor, PeriodIcon) => {
-                  const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
-                  const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
-                  const compName = isExt ? (event.externalCompanyName || event.companyName || 'Demanda Externa') : (event.companyName || getCompanyName(event.companyId));
-                  return (
-                    <div key={event.id} className="card" style={{ padding: '1rem', borderLeft: isExt ? '4px solid #8b5cf6' : undefined }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                        {statusIcons[event.status]}
-                        <span style={{
-                          fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                          backgroundColor: sc.bg, color: sc.color, fontWeight: '600'
-                        }}>
-                          {sc.label}
-                        </span>
-                        <span style={{
-                          fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                          backgroundColor: periodColor === 'var(--primary)' ? 'var(--primary-light)' : '#fef3c7',
-                          color: periodColor, fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem'
-                        }}>
-                          <PeriodIcon size={12} /> {periodLabel}
-                        </span>
-                        {isExt && (
-                          <span style={{
-                            fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                            backgroundColor: '#f3e8ff', color: '#7c3aed', border: '1px solid #d8b4fe', fontWeight: '700',
-                            display: 'flex', alignItems: 'center', gap: '0.25rem'
-                          }}>
-                            ⚡ Fora do TotalSafety
-                          </span>
-                        )}
-                        <button 
-                          onClick={() => setEditingEvent(event)}
-                          style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.25rem' }}
-                          title="Editar Agendamento"
-                        >
-                          <Edit2 size={14} /> Editar
-                        </button>
-                      </div>
-                      <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: '0.375rem' }}>
-                        {event.title}
-                      </h4>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <Building2 size={12} color={isExt ? '#7c3aed' : undefined} />
-                            <span 
-                              title={isExt ? 'Demanda Externa (Fora do TotalSafety)' : getCompanyCategory(event.companyId)}
-                              style={{
-                                width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                                backgroundColor: isExt ? '#8b5cf6' : getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
-                              }} 
-                            />
-                            <span style={{ fontWeight: isExt ? '700' : 'normal', color: isExt ? '#7c3aed' : 'inherit' }}>
-                              {isExt ? `⚡ ${compName}` : compName}
-                            </span>
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <Clock size={12} /> {event.time}
-                          </span>
-                          {(event.responsibleId || getSecondaryResponsible(event.description)) && (
-                            <span>Responsável: {[getProfileName(event.responsibleId), getSecondaryResponsible(event.description) ? getProfileName(getSecondaryResponsible(event.description)) : null].filter(Boolean).join(' e ')}</span>
-                          )}
-                        </div>
-                        <button
-                          className="btn"
-                          onClick={() => setGeneratingReportFor(event)}
-                          style={{
-                            padding: '0.375rem 0.5rem', fontSize: '0.65rem',
-                            backgroundColor: 'var(--info-light)', color: 'var(--info)',
-                            border: '1px solid var(--info)', borderRadius: 'var(--radius-md)',
-                            fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem',
-                            flexShrink: 0
-                          }}
-                          title="Gerar Relatório"
-                        >
-                          <FileText size={12} /> Gerar Relatório
-                        </button>
-                      </div>
-                      {/* Status Actions */}
-                      <div style={{
-                        display: 'flex', gap: '0.5rem', paddingTop: '0.75rem', marginTop: '1rem',
-                        borderTop: '1px solid var(--border)', flexWrap: 'wrap'
-                      }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', alignSelf: 'center', marginRight: '0.25rem' }}>
-                          Ações:
-                        </span>
-                        {event.status !== 'concluido' && (
-                          <button
-                            className="btn"
-                            onClick={() => handleStatusChange(event.id, 'concluido')}
-                            style={{
-                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                              backgroundColor: 'var(--secondary-light)', color: 'var(--secondary-hover)',
-                              border: '1px solid var(--secondary)', borderRadius: 'var(--radius-md)',
-                              fontWeight: '600', gap: '0.375rem'
-                            }}
-                          >
-                            <CheckCircle size={12} /> Concluir
-                          </button>
-                        )}
-                        {event.status !== 'adiado' && (
-                          <button
-                            className="btn"
-                            onClick={() => handleStatusChange(event.id, 'adiado')}
-                            style={{
-                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                              backgroundColor: '#fef3c7', color: '#b45309',
-                              border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
-                              fontWeight: '600', gap: '0.375rem'
-                            }}
-                          >
-                            <PauseCircle size={12} /> Adiar
-                          </button>
-                        )}
-                        {event.status !== 'nao_feito' && (
-                          <button
-                            className="btn"
-                            onClick={() => handleStatusChange(event.id, 'nao_feito')}
-                            style={{
-                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                              backgroundColor: '#fee2e2', color: 'var(--danger)',
-                              border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
-                              fontWeight: '600', gap: '0.375rem'
-                            }}
-                          >
-                            <XCircle size={12} /> Não Feito
-                          </button>
-                        )}
-                        {event.status !== 'agendado' && (
-                          <button
-                            className="btn"
-                            onClick={() => handleStatusChange(event.id, 'agendado')}
-                            style={{
-                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                              backgroundColor: 'var(--primary-light)', color: 'var(--primary)',
-                              border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)',
-                              fontWeight: '600', gap: '0.375rem'
-                            }}
-                          >
-                            <CalendarIcon size={12} /> Reagendar
-                          </button>
-                        )}
-                        {event.status !== 'agendado' && (
-                          <button
-                            className="btn"
-                            onClick={() => handleStatusChange(event.id, 'agendado')}
-                            style={{
-                              padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                              backgroundColor: '#fef3c7', color: '#b45309',
-                              border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)',
-                              fontWeight: '600', gap: '0.375rem'
-                            }}
-                            title="Voltar status para Agendado"
-                          >
-                            <Clock size={12} /> Tornar Agendado
-                          </button>
-                        )}
-                        <button
-                          className="btn"
-                          onClick={() => handleDeleteTraining(event.id)}
-                          style={{
-                            padding: '0.375rem 0.75rem', fontSize: '0.75rem',
-                            backgroundColor: 'transparent', color: 'var(--danger)',
-                            border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
-                            fontWeight: '600', gap: '0.375rem', marginLeft: 'auto'
-                          }}
-                          title="Remover do calendário e voltar para pendentes"
-                        >
-                          <Trash2 size={12} /> Cancelar Agendamento
-                        </button>
-                      </div>
-                    </div>
-                  );
-                };
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {manha.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', fontWeight: '700', color: 'var(--primary)', borderBottom: '2px solid var(--primary-light)', paddingBottom: '0.25rem' }}>
-                          <Sunrise size={16} /> Turno da Manhã ({manha.length})
-                        </div>
-                        {manha.map(e => renderCard(e, 'Manhã', 'var(--primary)', Sunrise))}
-                      </div>
-                    )}
-                    {tarde.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', fontWeight: '700', color: '#d97706', borderBottom: '2px solid #fef3c7', paddingBottom: '0.25rem' }}>
-                          <Sun size={16} /> Turno da Tarde ({tarde.length})
-                        </div>
-                        {tarde.map(e => renderCard(e, 'Tarde', '#d97706', Sun))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Day Details Pop-up Modal when clicking any day */}
+      {selectedDate && (
+        <div className="modal-overlay" onClick={() => setSelectedDate(null)}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '560px',
+              width: '95%',
+              maxHeight: '88vh',
+              padding: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              borderRadius: 'var(--radius-xl)'
+            }}
+          >
+            {renderDayDetails()}
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <AddTrainingModal
           defaultDate={selectedDate || format(new Date(), 'yyyy-MM-dd')}
-          companyId={null} // Global calendar doesn't have a specific company
+          companyId={null}
           onClose={() => setShowModal(false)}
           onSave={handleAddTraining}
         />

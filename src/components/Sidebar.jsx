@@ -9,7 +9,18 @@ const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
   const { signOut, userProfile, activeLink, setActiveLink } = useAuth();
   const { unreadCount } = useAI();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Always keep sidebar collapsed by default as requested
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar_collapsed', 'true');
+    } catch {}
+  }, []);
+
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => !prev);
+  };
   const [expandedMenus, setExpandedMenus] = useState({});
   const [pendingTeamCount, setPendingTeamCount] = useState(0);
 
@@ -100,9 +111,9 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`} style={{ 
-      width: isCollapsed ? '88px' : '300px', 
-      transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s',
-      padding: isCollapsed ? '1.5rem 0.75rem' : '1.5rem',
+      width: isCollapsed ? '70px' : '260px', 
+      transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s',
+      padding: isCollapsed ? '1.25rem 0.35rem' : '1.5rem',
       display: 'flex',
       flexDirection: 'column'
     }}>
@@ -111,47 +122,49 @@ const Sidebar = ({ isOpen, onClose }) => {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        marginBottom: '2.5rem', 
+        marginBottom: '2rem', 
         width: '100%',
-        minHeight: '48px'
+        minHeight: '44px'
       }}>
         
         {!isCollapsed ? (
-          <img src="/logo-totalsafety.png" alt="TotalSafety" style={{ width: '100%', maxWidth: '240px', height: 'auto', maxHeight: '120px', objectFit: 'contain', transform: 'scale(1.5)' }} />
+          <img src="/logo-totalsafety.png" alt="TotalSafety" style={{ width: '100%', maxWidth: '200px', height: 'auto', maxHeight: '100px', objectFit: 'contain' }} />
         ) : (
           <div style={{ 
-            width: '40px', height: '40px', backgroundColor: 'var(--primary-light)', 
+            width: '38px', height: '38px', backgroundColor: 'var(--primary-light)', 
             borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-            color: 'var(--primary)', fontWeight: '900', fontSize: '1.25rem' 
+            color: 'var(--primary)', fontWeight: '900', fontSize: '1.125rem' 
           }}>
             TS
           </div>
         )}
 
         <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={toggleCollapse}
           className="hide-on-mobile"
           style={{ 
             position: 'absolute', 
-            right: isCollapsed ? '-24px' : '-36px', 
+            right: '-14px', 
             top: '50%', 
             transform: 'translateY(-50%)', 
             backgroundColor: 'var(--surface)', 
             border: '1px solid var(--border)', 
             borderRadius: '50%', 
-            padding: '6px', 
+            width: '26px',
+            height: '26px',
+            padding: 0,
             cursor: 'pointer', 
             zIndex: 100, 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
             color: 'var(--text-secondary)', 
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-            transition: 'right 0.3s'
+            boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+            transition: 'all 0.2s ease'
           }}
           title={isCollapsed ? "Expandir menu" : "Recolher menu"}
         >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
 
         {!isCollapsed && (
@@ -190,6 +203,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     onClick={() => {
                       if (isCollapsed) {
                         setIsCollapsed(false);
+                        try { localStorage.setItem('sidebar_collapsed', 'false'); } catch {}
                         if (!isExpanded) toggleMenu(item.name);
                       } else {
                         toggleMenu(item.name);

@@ -103,7 +103,7 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
           <div style={{ padding: '3rem', textAlign: 'center' }}>Carregando dados...</div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="modal-body">
 
               {/* Demand Type Choice if not locked by deliverable */}
               {!training.deliverableId && (
@@ -113,7 +113,8 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--border)',
                   display: 'flex',
-                  gap: '0.75rem',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
                 }}>
                   <label style={{
                     flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem',

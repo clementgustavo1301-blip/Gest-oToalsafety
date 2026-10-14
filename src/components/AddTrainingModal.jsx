@@ -219,23 +219,23 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
           <div style={{ padding: '3rem', textAlign: 'center' }}>Carregando dados...</div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="modal-body">
 
               {/* Demand Type Choice (TotalSafety vs Fora do TotalSafety) */}
               {!companyId && (
                 <div style={{
-                  padding: '0.875rem 1rem',
+                  padding: '0.75rem',
                   backgroundColor: 'var(--background)',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--border)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.5rem',
+                  gap: '0.4rem',
                 }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
                     Tipo de Demanda:
                   </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
                     <label style={{
                       display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.75rem',
                       borderRadius: 'var(--radius-sm)',
