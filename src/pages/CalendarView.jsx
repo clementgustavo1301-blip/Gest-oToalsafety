@@ -238,12 +238,13 @@ const CalendarView = () => {
                 const rawGroupName = getCompanyGroupName(ev.companyId);
                 const rawCompName = getCompanyName(ev.companyId);
                 const displayGroup = isExt ? (extName || 'Ext') : (rawGroupName || rawCompName);
+                const catColor = isExt ? '#8b5cf6' : getCompanyCategory(ev.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e';
 
                 return (
                   <div
                     key={ev.id}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '2px',
+                      display: 'flex', alignItems: 'center', gap: '3px',
                       backgroundColor: sc.bg, color: sc.color,
                       borderLeft: `2px solid ${isExt ? '#8b5cf6' : sc.color}`,
                       padding: '1px 3px', borderRadius: '2px',
@@ -252,6 +253,12 @@ const CalendarView = () => {
                       lineHeight: 1.15
                     }}
                   >
+                    <span 
+                      style={{
+                        width: '4px', height: '4px', borderRadius: '50%', flexShrink: 0,
+                        backgroundColor: catColor
+                      }} 
+                    />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {displayGroup}
                     </span>
@@ -266,7 +273,7 @@ const CalendarView = () => {
             </div>
           )}
 
-          {/* Desktop view (>= 768px): Group Name prominent + Activity Title + Time */}
+          {/* Desktop view (>= 768px): Category Dot + Group Name prominent + Activity Title + Time */}
           {!isMobile && dayEvents.length > 0 && (() => {
             const maxVisible = 3;
             const visibleEvents = dayEvents.slice(0, maxVisible);
@@ -287,13 +294,23 @@ const CalendarView = () => {
                   const displayGroup = isExt 
                     ? (extName || 'Demanda Externa') 
                     : (rawGroupName || rawCompName);
+                  const categoryColor = isExt 
+                    ? '#8b5cf6' 
+                    : getCompanyCategory(event.companyId) === 'Consultoria Fixa' 
+                    ? '#f97316' 
+                    : '#22c55e';
+                  const categoryTitle = isExt 
+                    ? 'Demanda Externa (Fora do TotalSafety)' 
+                    : getCompanyCategory(event.companyId) === 'Consultoria Fixa' 
+                    ? 'Consultoria Fixa' 
+                    : 'TotalSafety';
                   const timeShort = event.time ? event.time.split(' ')[0] : '';
 
                   return (
                     <div 
                       key={event.id}
                       className="calendar-event-item"
-                      title={`${displayGroup} • ${event.title} (${event.time || ''})`}
+                      title={`${displayGroup} • ${event.title} (${categoryTitle}) (${event.time || ''})`}
                       style={{
                         backgroundColor: sc.bg, color: sc.color,
                         borderLeft: `3px solid ${isExt ? '#8b5cf6' : sc.color}`,
@@ -302,15 +319,25 @@ const CalendarView = () => {
                         boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                       }}
                     >
-                      {/* Line 1: Group Name (Prominent & Uppercase) + Time */}
+                      {/* Line 1: Category Dot + Group Name (Prominent & Uppercase) + Time */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '3px' }}>
-                        <span style={{ 
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', 
-                          fontWeight: '700', fontSize: '0.67rem', letterSpacing: '0.01em',
-                          color: isExt ? '#7c3aed' : sc.color
-                        }}>
-                          {isExt ? `⚡ ${displayGroup}` : displayGroup}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flex: 1 }}>
+                          <span 
+                            title={categoryTitle}
+                            style={{
+                              width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                              backgroundColor: categoryColor,
+                              boxShadow: `0 0 0 1px ${categoryColor}40`
+                            }} 
+                          />
+                          <span style={{ 
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', 
+                            fontWeight: '700', fontSize: '0.67rem', letterSpacing: '0.01em',
+                            color: isExt ? '#7c3aed' : sc.color
+                          }}>
+                            {isExt ? `⚡ ${displayGroup}` : displayGroup}
+                          </span>
+                        </div>
                         {timeShort && (
                           <span style={{ opacity: 0.85, fontSize: '0.58rem', flexShrink: 0, fontWeight: '600' }}>
                             {timeShort}
@@ -321,7 +348,8 @@ const CalendarView = () => {
                       {/* Line 2: Activity Title */}
                       <span style={{ 
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', 
-                        fontSize: '0.63rem', opacity: 0.9, fontWeight: '500'
+                        fontSize: '0.63rem', opacity: 0.9, fontWeight: '500',
+                        paddingLeft: '10px'
                       }}>
                         {event.title}
                       </span>
@@ -945,6 +973,15 @@ const CalendarView = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#8b5cf6' }} />
               <span>⚡ Fora TS</span>
+            </div>
+            <span style={{ width: '1px', height: '10px', backgroundColor: 'var(--border)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Cliente com plano TotalSafety">
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 0 1px rgba(34,197,94,0.4)' }} />
+              <span>TotalSafety</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Cliente com plano Consultoria Fixa">
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#f97316', boxShadow: '0 0 0 1px rgba(249,115,22,0.4)' }} />
+              <span>Consultoria Fixa</span>
             </div>
             <span style={{ width: '1px', height: '10px', backgroundColor: 'var(--border)' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: 'var(--primary)', fontWeight: '600' }}>
