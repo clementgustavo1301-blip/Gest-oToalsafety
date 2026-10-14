@@ -4,6 +4,8 @@ import { getCompanies, updateTraining, getProfiles } from '../services/storageSe
 
 const EditTrainingModal = ({ training, onClose, onSave }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState(training.companyId || '');
+  const [isExternalDemand, setIsExternalDemand] = useState(training.isExternal || Boolean(training.externalCompanyName));
+  const [externalCompanyName, setExternalCompanyName] = useState(training.externalCompanyName || '');
   const [companies, setCompanies] = useState([]);
   
   const [title, setTitle] = useState(training.title || '');
@@ -45,7 +47,7 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!date || !selectedCompanyId || !title.trim()) return;
+    if (!date || (!isExternalDemand && !selectedCompanyId) || (isExternalDemand && !externalCompanyName.trim()) || !title.trim()) return;
     
     setSaving(true);
     
@@ -65,8 +67,11 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
       time,
       instructor: instructor.trim(),
       description: finalDescription.trim(),
-      companyId: selectedCompanyId,
-      responsibleId: responsibleId || null
+      companyId: isExternalDemand ? null : selectedCompanyId,
+      responsibleId: responsibleId || null,
+      isExternal: isExternalDemand,
+      externalCompanyName: isExternalDemand ? externalCompanyName.trim() : null,
+      demandType: isExternalDemand ? 'externa' : 'totalsafety',
     };
 
     await updateTraining(training.id, updatedData);
@@ -100,30 +105,94 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
           <form onSubmit={handleSubmit}>
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-              {/* Company Selection */}
-              <div>
-                <label className="modal-label" htmlFor="edit-company">Empresa</label>
-                <select
-                  id="edit-company"
-                  value={selectedCompanyId}
-                  onChange={(e) => setSelectedCompanyId(e.target.value)}
-                  className="modal-input"
-                  required
-                  disabled={saving || training.deliverableId}
-                  title={training.deliverableId ? "Não é possível alterar a empresa de um treinamento vinculado a uma pendência" : ""}
-                >
-                  <option value="" disabled>Selecione a empresa...</option>
-                  {[...companies]
-                    .sort((a,b) => {
-                      const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
-                      const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
-                      return nameA.localeCompare(nameB);
-                    })
-                    .map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Demand Type Choice if not locked by deliverable */}
+              {!training.deliverableId && (
+                <div style={{
+                  padding: '0.75rem',
+                  backgroundColor: 'var(--background)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  gap: '0.75rem',
+                }}>
+                  <label style={{
+                    flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem',
+                    borderRadius: 'var(--radius-sm)', border: `2px solid ${!isExternalDemand ? 'var(--primary)' : 'var(--border)'}`,
+                    backgroundColor: !isExternalDemand ? 'var(--primary-light)' : 'var(--surface)',
+                    cursor: 'pointer', fontSize: '0.8125rem', fontWeight: !isExternalDemand ? '600' : 'normal'
+                  }}>
+                    <input
+                      type="radio"
+                      name="edit_demand_type"
+                      checked={!isExternalDemand}
+                      onChange={() => setIsExternalDemand(false)}
+                      style={{ margin: 0 }}
+                    />
+                    🏢 Cliente TotalSafety
+                  </label>
+
+                  <label style={{
+                    flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem',
+                    borderRadius: 'var(--radius-sm)', border: `2px solid ${isExternalDemand ? '#8b5cf6' : 'var(--border)'}`,
+                    backgroundColor: isExternalDemand ? '#f3e8ff' : 'var(--surface)',
+                    cursor: 'pointer', fontSize: '0.8125rem', fontWeight: isExternalDemand ? '600' : 'normal',
+                    color: isExternalDemand ? '#6b21a8' : 'inherit'
+                  }}>
+                    <input
+                      type="radio"
+                      name="edit_demand_type"
+                      checked={isExternalDemand}
+                      onChange={() => setIsExternalDemand(true)}
+                      style={{ margin: 0 }}
+                    />
+                    ⚡ Demanda Fora do TS
+                  </label>
+                </div>
+              )}
+
+              {/* Company Selection or External Company Input */}
+              {isExternalDemand ? (
+                <div>
+                  <label className="modal-label" htmlFor="edit-external-company">Nome da Empresa (Demanda Externa)</label>
+                  <input
+                    id="edit-external-company"
+                    type="text"
+                    value={externalCompanyName}
+                    onChange={(e) => setExternalCompanyName(e.target.value)}
+                    placeholder="Digite o nome da empresa solicitante..."
+                    className="modal-input"
+                    required
+                    disabled={saving}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: '#7c3aed', display: 'block', marginTop: '0.25rem' }}>
+                    ⚡ Demanda avulsa/externa fora do contrato TotalSafety
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <label className="modal-label" htmlFor="edit-company">Empresa TotalSafety</label>
+                  <select
+                    id="edit-company"
+                    value={selectedCompanyId}
+                    onChange={(e) => setSelectedCompanyId(e.target.value)}
+                    className="modal-input"
+                    required
+                    disabled={saving || training.deliverableId}
+                    title={training.deliverableId ? "Não é possível alterar a empresa de um treinamento vinculado a uma pendência" : ""}
+                  >
+                    <option value="" disabled>Selecione a empresa...</option>
+                    {[...companies]
+                      .sort((a,b) => {
+                        const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
+                        const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
+                        return nameA.localeCompare(nameB);
+                      })
+                      .map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               {/* Title */}
               <div>

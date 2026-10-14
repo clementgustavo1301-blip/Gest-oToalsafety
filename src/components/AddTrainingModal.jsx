@@ -26,6 +26,11 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
   const [isStandalone, setIsStandalone] = useState(false);
   const [hasTravel, setHasTravel] = useState(null);
 
+  // Demanda externa (fora do TotalSafety)
+  const [isExternalDemand, setIsExternalDemand] = useState(false);
+  const [externalCompanyName, setExternalCompanyName] = useState('');
+  const [externalSuggestions, setExternalSuggestions] = useState([]);
+
   const [pendingTrainings, setPendingTrainings] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -50,28 +55,47 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       }
       setProfiles(profs);
       
-      if (selectedCompanyId) {
+      if (selectedCompanyId && !isExternalDemand) {
         const deliverables = await getDeliverablesByCompany(selectedCompanyId);
         const pTrainings = deliverables.filter(d => d.type === 'treinamento' && d.status === 'pendente');
         setPendingTrainings(pTrainings);
         if (pTrainings.length === 0) setIsStandalone(true);
       } else {
         setPendingTrainings([]);
-        setIsStandalone(true);
+        if (isExternalDemand) setIsStandalone(true);
       }
+
+      // Buscar sugestões de nomes de empresas externas já utilizadas
+      try {
+        const { data: extRows } = await supabase.from('trainings').select('external_company_name, description');
+        if (extRows) {
+          const names = new Set();
+          extRows.forEach(r => {
+            if (r.external_company_name) names.add(r.external_company_name.trim());
+            if (r.description) {
+              const m = r.description.match(/\[EXTERNAL_COMPANY:([^\]]+)\]/);
+              if (m) names.add(m[1].trim());
+            }
+          });
+          setExternalSuggestions(Array.from(names).filter(Boolean));
+        }
+      } catch (err) {}
+
       setLoadingData(false);
     }
     load();
-  }, [companyId, selectedCompanyId]);
+  }, [companyId, selectedCompanyId, isExternalDemand]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!date || !selectedCompanyId) return;
-    if (isStandalone && !customTitle.trim()) return;
-    if (!isStandalone && !selectedDeliverableId) return;
+    if (!date) return;
+    if (!isExternalDemand && !selectedCompanyId) return;
+    if (isExternalDemand && !externalCompanyName.trim()) return;
+    if ((isStandalone || isExternalDemand) && !customTitle.trim()) return;
+    if (!isStandalone && !isExternalDemand && !selectedDeliverableId) return;
     if (hasTravel === null) return;
 
-    if (!collisionDetected) {
+    if (!collisionDetected && !isExternalDemand && selectedCompanyId) {
       setCheckingCollision(true);
       const { data: existing } = await supabase
         .from('trainings')
@@ -95,10 +119,12 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
     let title = customTitle.trim();
     let deliverableId = null;
 
-    if (!isStandalone) {
+    if (!isStandalone && !isExternalDemand) {
       const selectedDeliv = pendingTrainings.find(d => d.id === selectedDeliverableId);
-      title = selectedDeliv.title;
-      deliverableId = selectedDeliverableId;
+      if (selectedDeliv) {
+        title = selectedDeliv.title;
+        deliverableId = selectedDeliverableId;
+      }
     }
     
     let finalDescription = description.trim();
@@ -117,9 +143,12 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
       instructor: instructor.trim(),
       description: finalDescription,
       status: 'agendado',
-      deliverableId,
-      companyId: selectedCompanyId,
-      responsibleId: responsibleId || null
+      deliverableId: isExternalDemand ? null : deliverableId,
+      companyId: isExternalDemand ? null : selectedCompanyId,
+      responsibleId: responsibleId || null,
+      isExternal: isExternalDemand,
+      externalCompanyName: isExternalDemand ? externalCompanyName.trim() : null,
+      demandType: isExternalDemand ? 'externa' : 'totalsafety',
     };
 
     const itemsToSave = [];
@@ -192,72 +221,166 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
           <form onSubmit={handleSubmit}>
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-              {/* Group Selection if global */}
+              {/* Demand Type Choice (TotalSafety vs Fora do TotalSafety) */}
               {!companyId && (
-                <div>
-                  <label className="modal-label" htmlFor="training-group">Grupo Econômico</label>
-                  <select
-                    id="training-group"
-                    value={selectedGroupId}
-                    onChange={(e) => {
-                      setSelectedGroupId(e.target.value);
-                      setSelectedCompanyId(''); // reset company when group changes
-                    }}
-                    className="modal-input"
-                    disabled={saving}
-                  >
-                    <option value="">Todos os Grupos</option>
-                    {[...groups]
-                      .sort((a,b) => {
-                        const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
-                        const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
-                        return nameA.localeCompare(nameB);
-                      })
-                      .map(g => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
+                <div style={{
+                  padding: '0.875rem 1rem',
+                  backgroundColor: 'var(--background)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    Tipo de Demanda:
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: `2px solid ${!isExternalDemand ? 'var(--primary)' : 'var(--border)'}`,
+                      backgroundColor: !isExternalDemand ? 'var(--primary-light)' : 'var(--surface)',
+                      cursor: 'pointer', fontWeight: !isExternalDemand ? '700' : '500', fontSize: '0.8125rem',
+                      color: !isExternalDemand ? 'var(--primary)' : 'var(--text-primary)',
+                      transition: 'all 0.15s ease'
+                    }}>
+                      <input
+                        type="radio"
+                        name="demand_type_choice"
+                        checked={!isExternalDemand}
+                        onChange={() => {
+                          setIsExternalDemand(false);
+                        }}
+                        style={{ margin: 0 }}
+                      />
+                      🏢 Cliente TotalSafety
+                    </label>
+
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: `2px solid ${isExternalDemand ? '#8b5cf6' : 'var(--border)'}`,
+                      backgroundColor: isExternalDemand ? '#f3e8ff' : 'var(--surface)',
+                      cursor: 'pointer', fontWeight: isExternalDemand ? '700' : '500', fontSize: '0.8125rem',
+                      color: isExternalDemand ? '#6b21a8' : 'var(--text-primary)',
+                      transition: 'all 0.15s ease'
+                    }}>
+                      <input
+                        type="radio"
+                        name="demand_type_choice"
+                        checked={isExternalDemand}
+                        onChange={() => {
+                          setIsExternalDemand(true);
+                          setIsStandalone(true);
+                        }}
+                        style={{ margin: 0 }}
+                      />
+                      ⚡ Demanda Fora do TotalSafety
+                    </label>
+                  </div>
                 </div>
               )}
 
-              {/* Company Selection if global */}
-              {!companyId && (
-                <div>
-                  <label className="modal-label" htmlFor="training-company">Empresa</label>
-                  <select
-                    id="training-company"
-                    value={selectedCompanyId}
-                    onChange={(e) => setSelectedCompanyId(e.target.value)}
+              {/* Se for Demanda Externa, exibe o campo para digitar o nome da empresa */}
+              {isExternalDemand ? (
+                <div style={{ animation: 'fadeIn 0.2s ease' }}>
+                  <label className="modal-label" htmlFor="external-company-name">
+                    Nome da Empresa (Demanda Fora do TotalSafety)
+                  </label>
+                  <input
+                    id="external-company-name"
+                    type="text"
+                    list="external-company-list"
+                    value={externalCompanyName}
+                    onChange={(e) => setExternalCompanyName(e.target.value)}
+                    placeholder="Ex: Construtora Horizonte, Mineradora ABC, Hospital São Lucas..."
                     className="modal-input"
                     required
                     disabled={saving}
-                  >
-                    <option value="" disabled>Selecione a empresa...</option>
-                    {companies
-                      .filter(c => !selectedGroupId || c.groupId === selectedGroupId)
-                      .sort((a,b) => {
-                        const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
-                        const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
-                        return nameA.localeCompare(nameB);
-                      })
-                      .map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                    autoFocus
+                  />
+                  {externalSuggestions.length > 0 && (
+                    <datalist id="external-company-list">
+                      {externalSuggestions.map((name, idx) => (
+                        <option key={idx} value={name} />
+                      ))}
+                    </datalist>
+                  )}
+                  <p style={{ margin: '0.375rem 0 0 0', fontSize: '0.75rem', color: '#7c3aed', fontWeight: '500' }}>
+                    ⚡ Esta empresa não precisa ter contrato no TotalSafety. O treinamento aparecerá identificado com tag roxa no calendário e em relatórios/cronogramas.
+                  </p>
                 </div>
+              ) : (
+                <>
+                  {/* Group Selection if global */}
+                  {!companyId && (
+                    <div>
+                      <label className="modal-label" htmlFor="training-group">Grupo Econômico</label>
+                      <select
+                        id="training-group"
+                        value={selectedGroupId}
+                        onChange={(e) => {
+                          setSelectedGroupId(e.target.value);
+                          setSelectedCompanyId(''); // reset company when group changes
+                        }}
+                        className="modal-input"
+                        disabled={saving}
+                      >
+                        <option value="">Todos os Grupos</option>
+                        {[...groups]
+                          .sort((a,b) => {
+                            const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
+                            const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
+                            return nameA.localeCompare(nameB);
+                          })
+                          .map(g => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Company Selection if global */}
+                  {!companyId && (
+                    <div>
+                      <label className="modal-label" htmlFor="training-company">Empresa TotalSafety</label>
+                      <select
+                        id="training-company"
+                        value={selectedCompanyId}
+                        onChange={(e) => setSelectedCompanyId(e.target.value)}
+                        className="modal-input"
+                        required
+                        disabled={saving}
+                      >
+                        <option value="" disabled>Selecione a empresa...</option>
+                        {companies
+                          .filter(c => !selectedGroupId || c.groupId === selectedGroupId)
+                          .sort((a,b) => {
+                            const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
+                            const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
+                            return nameA.localeCompare(nameB);
+                          })
+                          .map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  {/* Type Selection */}
+                  <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.25rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                      <input type="radio" checked={!isStandalone} onChange={() => setIsStandalone(false)} disabled={pendingTrainings.length === 0} />
+                      Vincular a Pendência
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                      <input type="radio" checked={isStandalone} onChange={() => setIsStandalone(true)} />
+                      Treinamento Avulso (Novo)
+                    </label>
+                  </div>
+                </>
               )}
-              
-              {/* Type Selection */}
-              <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.25rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                  <input type="radio" checked={!isStandalone} onChange={() => setIsStandalone(false)} disabled={pendingTrainings.length === 0} />
-                  Vincular a Pendência
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                  <input type="radio" checked={isStandalone} onChange={() => setIsStandalone(true)} />
-                  Treinamento Avulso (Novo)
-                </label>
-              </div>
 
               {/* Select Pending Training or Custom Title */}
               {!isStandalone ? (

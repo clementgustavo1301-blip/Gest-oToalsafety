@@ -6,12 +6,13 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  CalendarDays, Plus, Filter, Users, Building2, Clock, Eye
+  CalendarDays, Plus, Filter, Users, Building2, Clock, Eye, FileText
 } from 'lucide-react';
 import type { Campaign, PartnerAppointment, ToastType } from '../types';
 import { EVENT_TYPE_LABELS } from '../types';
 import { fmtDate, fmtLongDate, fmtCurrency } from '../utils/format';
 import { DayDetailsModal } from '../components/DayDetailsModal';
+import { IpaScheduleModal } from '../components/IpaScheduleModal';
 
 // Setup localizer
 const locales = { 'pt-BR': ptBR };
@@ -51,6 +52,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [activeDateSummary, setActiveDateSummary] = useState<string>('2026-10-23');
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // Filter campaigns & partners
   const filteredCampaigns = useMemo(() => {
@@ -244,7 +246,15 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
           </button>
         </div>
 
-        <div className="cal-actions-right">
+        <div className="cal-actions-right" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setIsScheduleModalOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+            title="Gerar Cronograma da Operação IPA em Formato Calendário A4 ou Tabela"
+          >
+            <FileText size={15} /> Gerar Cronograma (A4)
+          </button>
           <button
             className="btn btn-primary btn-sm"
             onClick={() => onNewCampaign(activeDateSummary)}
@@ -393,6 +403,16 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
           onAddCampaignForDate={date => onNewCampaign(date)}
           onAddPartnerForDate={date => onNewPartner(date)}
           showToast={showToast}
+        />
+      )}
+
+      {/* IPA Schedule Modal */}
+      {isScheduleModalOpen && (
+        <IpaScheduleModal
+          onClose={() => setIsScheduleModalOpen(false)}
+          initialDate={currentDate}
+          campaigns={campaigns}
+          partners={partners}
         />
       )}
     </div>

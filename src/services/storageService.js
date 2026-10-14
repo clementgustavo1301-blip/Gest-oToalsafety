@@ -60,6 +60,20 @@ function mapDeliverable(row) {
 
 function mapTraining(row) {
   if (!row) return null;
+
+  let isExternal = row.is_external === true;
+  let externalCompanyName = row.external_company_name || null;
+  let demandType = row.demand_type || (isExternal ? 'externa' : 'totalsafety');
+
+  if (row.description) {
+    const extMatch = row.description.match(/\[EXTERNAL_COMPANY:([^\]]+)\]/);
+    if (extMatch) {
+      externalCompanyName = externalCompanyName || extMatch[1].trim();
+      isExternal = true;
+      demandType = 'externa';
+    }
+  }
+
   return {
     id: row.id,
     companyId: row.company_id,
@@ -72,6 +86,9 @@ function mapTraining(row) {
     participants: row.participants,
     description: row.description,
     responsibleId: row.responsible_id,
+    isExternal,
+    externalCompanyName,
+    demandType,
   };
 }
 
@@ -201,18 +218,47 @@ export async function getTrainingsByCompany(companyId) {
 }
 
 export async function addTraining(training) {
-  const { data, error } = await supabase.from('trainings').insert([{
-    company_id: training.companyId,
-    deliverable_id: training.deliverableId,
+  let finalDescription = training.description || '';
+  if (training.isExternal && training.externalCompanyName) {
+    if (!finalDescription.includes('[EXTERNAL_COMPANY:')) {
+      finalDescription = `${finalDescription}\n[EXTERNAL_COMPANY:${training.externalCompanyName}]`.trim();
+    }
+  }
+
+  const basePayload = {
+    company_id: training.companyId || null,
+    deliverable_id: training.deliverableId || null,
     title: training.title,
     date: training.date,
     time: training.time,
-    status: training.status,
+    status: training.status || 'agendado',
     instructor: training.instructor,
     participants: training.participants,
-    description: training.description,
+    description: finalDescription,
     responsible_id: training.responsibleId || null,
-  }]).select().single();
+  };
+
+  const extendedPayload = {
+    ...basePayload,
+    is_external: training.isExternal || false,
+    external_company_name: training.externalCompanyName || null,
+    demand_type: training.demandType || (training.isExternal ? 'externa' : 'totalsafety'),
+  };
+
+  let data = null;
+  let error = null;
+
+  // Tenta inserir com colunas dedicadas primeiro; se ainda não existirem no Supabase, cai para o fallback com a tag na descrição
+  const res1 = await supabase.from('trainings').insert([extendedPayload]).select().single();
+  if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.message.includes('does not exist'))) {
+    const res2 = await supabase.from('trainings').insert([basePayload]).select().single();
+    data = res2.data;
+    error = res2.error;
+  } else {
+    data = res1.data;
+    error = res1.error;
+  }
+
   if (error) { console.error('Error adding training:', error); return null; }
 
   if (training.deliverableId) {
@@ -227,14 +273,42 @@ export async function updateTraining(trainingId, updates) {
   if (updates.status !== undefined) snakeUpdates.status = updates.status;
   if (updates.instructor !== undefined) snakeUpdates.instructor = updates.instructor;
   if (updates.participants !== undefined) snakeUpdates.participants = updates.participants;
-  if (updates.description !== undefined) snakeUpdates.description = updates.description;
   if (updates.date !== undefined) snakeUpdates.date = updates.date;
   if (updates.time !== undefined) snakeUpdates.time = updates.time;
   if (updates.title !== undefined) snakeUpdates.title = updates.title;
-  if (updates.companyId !== undefined) snakeUpdates.company_id = updates.companyId;
+  if (updates.companyId !== undefined) snakeUpdates.company_id = updates.companyId || null;
   if (updates.responsibleId !== undefined) snakeUpdates.responsible_id = updates.responsibleId;
 
-  const { data, error } = await supabase.from('trainings').update(snakeUpdates).eq('id', trainingId).select().single();
+  let finalDescription = updates.description !== undefined ? updates.description : undefined;
+  if (updates.isExternal && updates.externalCompanyName) {
+    if (finalDescription !== undefined && !finalDescription.includes('[EXTERNAL_COMPANY:')) {
+      finalDescription = `${finalDescription}\n[EXTERNAL_COMPANY:${updates.externalCompanyName}]`.trim();
+    }
+  } else if (updates.isExternal === false && finalDescription !== undefined) {
+    finalDescription = finalDescription.replace(/\[EXTERNAL_COMPANY:[^\]]+\]/g, '').trim();
+  }
+  if (finalDescription !== undefined) snakeUpdates.description = finalDescription;
+
+  const extendedUpdates = {
+    ...snakeUpdates,
+  };
+  if (updates.isExternal !== undefined) extendedUpdates.is_external = updates.isExternal;
+  if (updates.externalCompanyName !== undefined) extendedUpdates.external_company_name = updates.externalCompanyName;
+  if (updates.demandType !== undefined) extendedUpdates.demand_type = updates.demandType;
+
+  let data = null;
+  let error = null;
+
+  const res1 = await supabase.from('trainings').update(extendedUpdates).eq('id', trainingId).select().single();
+  if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.message.includes('does not exist'))) {
+    const res2 = await supabase.from('trainings').update(snakeUpdates).eq('id', trainingId).select().single();
+    data = res2.data;
+    error = res2.error;
+  } else {
+    data = res1.data;
+    error = res1.error;
+  }
+
   if (error) { console.error('Error updating training:', error); return null; }
 
   // Sincronizar com deliverables

@@ -10,6 +10,7 @@ import { logoBase64 } from '../assets/logoBase64';
 import AddTrainingModal from '../components/AddTrainingModal';
 import EditTrainingModal from '../components/EditTrainingModal';
 import ReportGeneratorModal from '../components/ReportGeneratorModal';
+import ScheduleModal from '../components/ScheduleModal';
 
 const getPeriod = (timeStr) => {
   if (!timeStr) return 'manha';
@@ -31,6 +32,7 @@ const STATUS_CONFIG = {
 const CalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [generatingReportFor, setGeneratingReportFor] = useState(null);
@@ -41,8 +43,6 @@ const CalendarView = () => {
   const [calendarCompanyId, setCalendarCompanyId] = useState('');
   const [calendarResponsibleId, setCalendarResponsibleId] = useState('');
   const { userProfile, activeLink } = useAuth();
-
-  const canGenerateSchedule = (activeLink?.sector === 'Diretoria' && activeLink?.role === 'Admin') || activeLink?.sector === 'IPA';
 
   const [trainings, setTrainings] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -95,7 +95,11 @@ const CalendarView = () => {
     }
   };
 
-  const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
+  const getCompanyName = (companyId, event = null) => {
+    if (event?.externalCompanyName) return event.externalCompanyName;
+    if (event?.isExternal || event?.demandType === 'externa') return 'Demanda Externa';
+    return companies.find(c => c.id === companyId)?.name || 'N/A';
+  };
   const getCompanyGroupName = (companyId) => {
     const comp = companies.find(c => c.id === companyId);
     if (!comp || !comp.groupId) return '';
@@ -118,7 +122,12 @@ const CalendarView = () => {
 
   const cleanDescription = (desc) => {
     if (!desc) return '';
-    return desc.replace(/\[NO_TRAVEL\]/g, '').replace(/\[SHARED_TRIP\]/g, '').replace(/\[RESP2_ID:[^\]]+\]/g, '').trim();
+    return desc
+      .replace(/\[NO_TRAVEL\]/g, '')
+      .replace(/\[SHARED_TRIP\]/g, '')
+      .replace(/\[RESP2_ID:[^\]]+\]/g, '')
+      .replace(/\[EXTERNAL_COMPANY:[^\]]+\]/g, '')
+      .trim();
   };
   const getSecondaryResponsible = (desc) => {
     if (!desc) return null;
@@ -134,8 +143,9 @@ const CalendarView = () => {
   const getCompanyRegion = (companyId) => companies.find(c => c.id === companyId)?.region || 'Natal';
 
   const filteredTrainings = trainings.filter(t => {
+    const isExt = t.isExternal || t.demandType === 'externa' || (t.description && t.description.includes('[EXTERNAL_COMPANY:'));
     const matchStatus = filterStatus === 'all' || t.status === filterStatus;
-    const matchRegion = filterRegion === 'all' || getCompanyRegion(t.companyId) === filterRegion;
+    const matchRegion = filterRegion === 'all' || (isExt ? true : getCompanyRegion(t.companyId) === filterRegion);
     const matchScope = calendarScope === 'geral' 
       ? true 
       : calendarScope === 'minha_agenda'
@@ -144,6 +154,8 @@ const CalendarView = () => {
       ? t.companyId === calendarCompanyId
       : calendarScope === 'responsavel'
       ? t.responsibleId === calendarResponsibleId || getSecondaryResponsible(t.description) === calendarResponsibleId
+      : calendarScope === 'externas'
+      ? isExt
       : true;
     return matchStatus && matchRegion && matchScope;
   });
@@ -200,7 +212,8 @@ const CalendarView = () => {
 
             const renderEventItem = (event) => {
               const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
-              const compName = getCompanyName(event.companyId);
+              const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
+              const compName = isExt ? (event.externalCompanyName || 'Demanda Externa') : getCompanyName(event.companyId);
               return (
                 <div key={event.id} className="calendar-event-item" style={{
                   backgroundColor: sc.bg, color: sc.color,
@@ -212,7 +225,7 @@ const CalendarView = () => {
                     <span className="calendar-event-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
                     {event.time && <span className="calendar-event-time" style={{ opacity: 0.8, marginLeft: '0.25rem', flexShrink: 0 }}>{event.time.split(' ')[0]}</span>}
                   </div>
-                  {compName && compName !== 'N/A' && (
+                  {((compName && compName !== 'N/A') || isExt) && (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -220,21 +233,23 @@ const CalendarView = () => {
                       marginTop: '1px',
                     }}>
                       <span className="calendar-event-dot"
-                        title={getCompanyCategory(event.companyId)}
+                        title={isExt ? 'Demanda Fora do TotalSafety (Externa)' : getCompanyCategory(event.companyId)}
                         style={{
                           width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-                          backgroundColor: getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
+                          backgroundColor: isExt ? '#8b5cf6' : getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
                         }} 
                       />
                       <div className="calendar-event-company" style={{
-                        opacity: 0.85,
+                        opacity: 0.9,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         lineHeight: '1.1',
-                        fontSize: '0.7rem'
+                        fontSize: '0.7rem',
+                        fontWeight: isExt ? '700' : 'normal',
+                        color: isExt ? '#7c3aed' : 'inherit'
                       }}>
-                        {getCompanyGroupName(event.companyId) ? `${getCompanyGroupName(event.companyId)} / ${compName}` : compName}
+                        {isExt ? `⚡ ${compName}` : (getCompanyGroupName(event.companyId) ? `${getCompanyGroupName(event.companyId)} / ${compName}` : compName)}
                       </div>
                     </div>
                   )}
@@ -325,11 +340,14 @@ const CalendarView = () => {
         const resp2Id = getSecondaryResponsible(t.description);
         const resp2 = resp2Id ? getProfileName(resp2Id) : '';
         const responsible = [resp1, resp2].filter(Boolean).join(' e ');
-        const dateFormatted = format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy');
+        const isExt = t.isExternal || t.demandType === 'externa' || (t.description && t.description.includes('[EXTERNAL_COMPANY:'));
+        const compDisplay = isExt 
+          ? `⚡ ${t.externalCompanyName || 'Demanda Externa'} (Fora TotalSafety)` 
+          : getCompanyName(t.companyId);
         return [
           dateFormatted,
           t.time || '',
-          getCompanyName(t.companyId),
+          compDisplay,
           t.title,
           STATUS_CONFIG[t.status]?.label || t.status,
           responsible
@@ -376,7 +394,14 @@ const CalendarView = () => {
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   const selectedDayEvents = selectedDate
-    ? filteredTrainings.filter(t => t.date === selectedDate).map(t => ({ ...t, companyName: getCompanyName(t.companyId) }))
+    ? filteredTrainings.filter(t => t.date === selectedDate).map(t => {
+        const isExt = t.isExternal || t.demandType === 'externa' || (t.description && t.description.includes('[EXTERNAL_COMPANY:'));
+        return {
+          ...t,
+          isExternal: isExt,
+          companyName: isExt ? (t.externalCompanyName || 'Demanda Externa') : getCompanyName(t.companyId)
+        };
+      })
     : [];
 
   const statusIcons = {
@@ -393,16 +418,23 @@ const CalendarView = () => {
           <h1 className="text-h1">Agenda de Treinamentos</h1>
           <p className="text-subtitle">Visão geral de todas as empresas. Acesse a empresa para agendar.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {canGenerateSchedule && (
-             <button 
-               className="btn btn-primary" 
-               onClick={handleGenerateMonthlySchedule}
-               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}
-             >
-               <FileText size={16} /> Gerar Cronograma (Mês)
-             </button>
-          )}
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => setShowModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}
+            title="Agendar Treinamento para Cliente TotalSafety ou Demanda Externa"
+          >
+            <Plus size={16} /> Novo Agendamento
+          </button>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => setShowScheduleModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}
+            title="Gerar Cronograma da Agenda em Formato Calendário A4 ou Tabela"
+          >
+            <CalendarIcon size={16} /> Gerar Cronograma da Agenda (A4)
+          </button>
           {pendingTrainings.length > 0 && (
             <div style={{
               padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a',
@@ -472,6 +504,7 @@ const CalendarView = () => {
           >
             <option value="geral">Agenda Geral</option>
             <option value="minha_agenda">Minha Agenda</option>
+            <option value="externas">⚡ Demandas Fora do TotalSafety</option>
             <option value="empresa">Por Empresa</option>
             <option value="responsavel">Por Responsável</option>
           </select>
@@ -604,9 +637,11 @@ const CalendarView = () => {
 
                 const renderCard = (event, periodLabel, periodColor, PeriodIcon) => {
                   const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
+                  const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
+                  const compName = isExt ? (event.externalCompanyName || event.companyName || 'Demanda Externa') : (event.companyName || getCompanyName(event.companyId));
                   return (
-                    <div key={event.id} className="card" style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div key={event.id} className="card" style={{ padding: '1rem', borderLeft: isExt ? '4px solid #8b5cf6' : undefined }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                         {statusIcons[event.status]}
                         <span style={{
                           fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
@@ -621,6 +656,15 @@ const CalendarView = () => {
                         }}>
                           <PeriodIcon size={12} /> {periodLabel}
                         </span>
+                        {isExt && (
+                          <span style={{
+                            fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                            backgroundColor: '#f3e8ff', color: '#7c3aed', border: '1px solid #d8b4fe', fontWeight: '700',
+                            display: 'flex', alignItems: 'center', gap: '0.25rem'
+                          }}>
+                            ⚡ Fora do TotalSafety
+                          </span>
+                        )}
                         <button 
                           onClick={() => setEditingEvent(event)}
                           style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.25rem' }}
@@ -635,15 +679,17 @@ const CalendarView = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <Building2 size={12} />
+                            <Building2 size={12} color={isExt ? '#7c3aed' : undefined} />
                             <span 
-                              title={getCompanyCategory(event.companyId)}
+                              title={isExt ? 'Demanda Externa (Fora do TotalSafety)' : getCompanyCategory(event.companyId)}
                               style={{
                                 width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                                backgroundColor: getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
+                                backgroundColor: isExt ? '#8b5cf6' : getCompanyCategory(event.companyId) === 'Consultoria Fixa' ? '#f97316' : '#22c55e'
                               }} 
                             />
-                            {event.companyName}
+                            <span style={{ fontWeight: isExt ? '700' : 'normal', color: isExt ? '#7c3aed' : 'inherit' }}>
+                              {isExt ? `⚡ ${compName}` : compName}
+                            </span>
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                             <Clock size={12} /> {event.time}
@@ -811,6 +857,23 @@ const CalendarView = () => {
         <ReportGeneratorModal
           event={generatingReportFor}
           onClose={() => setGeneratingReportFor(null)}
+          userProfile={userProfile}
+        />
+      )}
+
+      {showScheduleModal && (
+        <ScheduleModal
+          onClose={() => setShowScheduleModal(false)}
+          initialDate={currentDate}
+          trainings={trainings}
+          companies={companies}
+          groups={groups}
+          profiles={profiles}
+          initialScope={calendarScope}
+          initialCompanyId={calendarCompanyId}
+          initialResponsibleId={calendarResponsibleId}
+          initialRegion={filterRegion}
+          initialStatus={filterStatus}
           userProfile={userProfile}
         />
       )}

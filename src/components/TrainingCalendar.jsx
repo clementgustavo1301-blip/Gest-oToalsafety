@@ -6,9 +6,10 @@ import {
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getTrainingsByCompany, addTraining, updateTraining, deleteTraining, getProfiles } from '../services/storageService';
+import { getTrainingsByCompany, addTraining, updateTraining, deleteTraining, getProfiles, getCompanies } from '../services/storageService';
 import AddTrainingModal from './AddTrainingModal';
 import EditTrainingModal from './EditTrainingModal';
+import ScheduleModal from './ScheduleModal';
 
 const getPeriod = (timeStr) => {
   if (!timeStr) return 'manha';
@@ -30,22 +31,26 @@ const STATUS_CONFIG = {
 const TrainingCalendar = ({ companyId, onUpdate }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEvents, setSelectedEvents] = useState([]);
   
   const [trainings, setTrainings] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
     setLoading(true);
-    const [tData, pData] = await Promise.all([
+    const [tData, pData, cData] = await Promise.all([
       getTrainingsByCompany(companyId),
-      getProfiles()
+      getProfiles(),
+      getCompanies()
     ]);
     setTrainings(tData || []);
     setProfiles(pData || []);
+    setCompanies(cData || []);
     setLoading(false);
     if (selectedDate) {
       setSelectedEvents(tData.filter(t => t.date === selectedDate));
@@ -257,6 +262,14 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
             </button>
             <button onClick={nextMonth} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
               <ChevronRight size={20} />
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowScheduleModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem' }}
+              title="Gerar Cronograma desta Empresa em Formato Calendário A4 ou Tabela"
+            >
+              <FileText size={15} /> Gerar Cronograma (A4)
             </button>
             <button
               className="btn btn-primary"
@@ -518,6 +531,19 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
           training={editingEvent}
           onClose={() => setEditingEvent(null)}
           onSave={() => { setEditingEvent(null); loadData(); if (onUpdate) onUpdate(); }}
+        />
+      )}
+
+      {showScheduleModal && (
+        <ScheduleModal
+          onClose={() => setShowScheduleModal(false)}
+          initialDate={currentDate}
+          trainings={trainings}
+          companies={companies}
+          groups={[]}
+          profiles={profiles}
+          initialScope="empresa"
+          initialCompanyId={companyId}
         />
       )}
     </div>
