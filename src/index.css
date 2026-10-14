@@ -439,12 +439,12 @@ select.modal-input {
 
 /* --- Sidebar (Drawer on mobile, Fixed on Desktop) --- */
 .sidebar {
-  width: 70px;
+  width: 68px;
   background-color: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 0.35rem;
+  padding: 0.85rem 0.35rem;
   height: 100%;
   position: fixed;
   top: 0;
@@ -456,8 +456,22 @@ select.modal-input {
 
 .sidebar.sidebar-open {
   transform: translateX(0);
-  width: 270px !important;
-  padding: 1.5rem 1rem !important;
+  width: 230px !important;
+  padding: 0.85rem 0.65rem !important;
+}
+
+.sidebar nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+.sidebar nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar nav::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.3);
+  border-radius: 4px;
 }
 
 @media (min-width: 1024px) {
