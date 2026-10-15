@@ -58,7 +58,11 @@ const Sidebar = ({ isOpen, onClose }) => {
     }));
   };
 
-  const navItems = [
+  const isTreinamento = activeLink?.sector === 'Treinamento';
+
+  const navItems = isTreinamento ? [
+    { name: 'Certificados', path: '/certificates', icon: <FileText size={17} /> }
+  ] : [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={17} /> },
     ...(activeLink?.sector === 'IPA' ? [
       { 

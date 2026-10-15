@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MobileTopBar from './components/MobileTopBar';
 import Dashboard from './pages/Dashboard';
@@ -52,24 +52,70 @@ const AppLayout = () => {
         />
         <main className="main-content">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/calendar" element={<CalendarView />} />
-            <Route path="/companies" element={<CompaniesPage />} />
-            <Route path="/company/:companyId" element={<CompanyDetailsPage />} />
+            <Route path="/" element={
+              activeLink?.sector === 'Treinamento' ? <Navigate to="/certificates" replace /> : <Dashboard />
+            } />
+            <Route path="/calendar" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <CalendarView />
+              </ProtectedRoute>
+            } />
+            <Route path="/companies" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <CompaniesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/company/:companyId" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <CompanyDetailsPage />
+              </ProtectedRoute>
+            } />
 
-            <Route path="/deliverables" element={<DeliverablesPage />} />
-            <Route path="/inventory" element={<InventoryPage />} />
-            <Route path="/ai-assistant" element={<AIAssistant />} />
-            <Route path="/convocations" element={<ConvocationsPage />} />
-            <Route path="/contacts" element={<ContactsPage />} />
-            <Route path="/schedule-generator" element={<ScheduleGeneratorPage />} />
+            <Route path="/deliverables" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <DeliverablesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/inventory" element={
+              <ProtectedRoute allowedSectors={['SST', 'Diretoria', 'Admin']}>
+                <InventoryPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-assistant" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <AIAssistant />
+              </ProtectedRoute>
+            } />
+            <Route path="/convocations" element={
+              <ProtectedRoute allowedSectors={['Diretoria', 'Admin']}>
+                <ConvocationsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/contacts" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <ContactsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/schedule-generator" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <ScheduleGeneratorPage />
+              </ProtectedRoute>
+            } />
             <Route path="/exams-budget" element={
               <ProtectedRoute allowedSectors={['Clínica', 'Diretoria']}>
                 <ExamsBudgetPage />
               </ProtectedRoute>
             } />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/reports" element={
+              <ProtectedRoute allowedSectors={['Diretoria', 'Admin']}>
+                <ReportsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
+                <SettingsPage />
+              </ProtectedRoute>
+            } />
             <Route path="/team" element={
               <ProtectedRoute allowedRoles={['Admin']}>
                 <TeamPage />
