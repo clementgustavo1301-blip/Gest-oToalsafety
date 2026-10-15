@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, MessageSquare, Map, Tv } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, MessageSquare, Map, Tv, Award } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
@@ -27,7 +27,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const isAdminDiretoria = (activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria') || activeLink?.sector === 'IPA';
   const isClinicaOrAdmin = activeLink?.sector === 'Clínica' || isAdminDiretoria;
   const isSSTOrAdmin = activeLink?.sector === 'SST' || isAdminDiretoria;
-  const canAccessCertificates = activeLink?.sector === 'Treinamento' || isSSTOrAdmin;
+  const canAccessCertificates = isSSTOrAdmin;
 
   useEffect(() => {
     if (isAdminDiretoria) {
@@ -61,7 +61,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const isTreinamento = activeLink?.sector === 'Treinamento';
 
   const navItems = isTreinamento ? [
-    { name: 'Certificados', path: '/certificates', icon: <FileText size={17} /> }
+    { name: 'Certificados', path: '/training-certificates', icon: <FileText size={17} /> }
   ] : [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={17} /> },
     ...(activeLink?.sector === 'IPA' ? [
@@ -100,7 +100,10 @@ const Sidebar = ({ isOpen, onClose }) => {
           { name: 'Gestão de CATs', path: '/cat', icon: <ClipboardList size={15} /> }
         ] : []),
         ...(canAccessCertificates ? [
-          { name: 'Certificados', path: '/certificates', icon: <FileText size={15} /> }
+          { name: 'Certificados SST', path: '/certificates', icon: <FileText size={15} /> }
+        ] : []),
+        ...(isAdminDiretoria ? [
+          { name: 'Certificados Treinamento', path: '/training-certificates', icon: <Award size={15} /> }
         ] : []),
         ...(isSSTOrAdmin ? [
           { name: 'Estoque', path: '/inventory', icon: <Package size={15} /> }

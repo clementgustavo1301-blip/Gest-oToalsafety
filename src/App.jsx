@@ -22,6 +22,7 @@ import ExamsBudgetPage from './pages/ExamsBudgetPage';
 import PublicCATPage from './pages/PublicCATPage';
 import CATPage from './pages/CATPage';
 import CertificatesPage from './pages/CertificatesPage';
+import TrainingCertificatesPage from './pages/TrainingCertificatesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -53,7 +54,7 @@ const AppLayout = () => {
         <main className="main-content">
           <Routes>
             <Route path="/" element={
-              activeLink?.sector === 'Treinamento' ? <Navigate to="/certificates" replace /> : <Dashboard />
+              activeLink?.sector === 'Treinamento' ? <Navigate to="/training-certificates" replace /> : <Dashboard />
             } />
             <Route path="/calendar" element={
               <ProtectedRoute allowedSectors={['SST', 'Clínica', 'Administrativo', 'Diretoria', 'Admin', 'IPA']}>
@@ -132,8 +133,17 @@ const AppLayout = () => {
               </ProtectedRoute>
             } />
             <Route path="/certificates" element={
-              <ProtectedRoute allowedSectors={['SST', 'Treinamento', 'Diretoria', 'Admin']}>
-                <CertificatesPage />
+              activeLink?.sector === 'Treinamento' ? (
+                <Navigate to="/training-certificates" replace />
+              ) : (
+                <ProtectedRoute allowedSectors={['SST', 'Diretoria', 'Admin']}>
+                  <CertificatesPage />
+                </ProtectedRoute>
+              )
+            } />
+            <Route path="/training-certificates" element={
+              <ProtectedRoute allowedSectors={['Treinamento', 'Diretoria', 'Admin']}>
+                <TrainingCertificatesPage />
               </ProtectedRoute>
             } />
             <Route path="/ipa/*" element={
