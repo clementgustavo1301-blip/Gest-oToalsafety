@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, Stethoscope, MessageSquare, Map, Tv } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Settings, ShieldCheck, Building2, FileText, LogOut, Sparkles, Bell, Package, X, ClipboardCheck, Users, ChevronLeft, ChevronRight, Wrench, ChevronDown, ChevronUp, Wand2, BarChart3, Database, MessageSquare, Map, Tv } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const { signOut, userProfile, activeLink, setActiveLink } = useAuth();
+  const { signOut, activeLink, setActiveLink } = useAuth();
   const { unreadCount } = useAI();
   // Always keep sidebar collapsed by default as requested
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -27,6 +27,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const isAdminDiretoria = (activeLink?.role === 'Admin' && activeLink?.sector === 'Diretoria') || activeLink?.sector === 'IPA';
   const isClinicaOrAdmin = activeLink?.sector === 'Clínica' || isAdminDiretoria;
   const isSSTOrAdmin = activeLink?.sector === 'SST' || isAdminDiretoria;
+  const canAccessCertificates = activeLink?.sector === 'Treinamento' || isSSTOrAdmin;
 
   useEffect(() => {
     if (isAdminDiretoria) {
@@ -92,8 +93,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           { name: 'Modelos de Mensagem', path: '/exams-budget', icon: <MessageSquare size={15} /> }
         ] : []),
         ...(isSSTOrAdmin ? [
-          { name: 'Gestão de CATs', path: '/cat', icon: <ClipboardList size={15} /> },
-          { name: 'Certificados', path: '/certificates', icon: <FileText size={15} /> },
+          { name: 'Gestão de CATs', path: '/cat', icon: <ClipboardList size={15} /> }
+        ] : []),
+        ...(canAccessCertificates ? [
+          { name: 'Certificados', path: '/certificates', icon: <FileText size={15} /> }
+        ] : []),
+        ...(isSSTOrAdmin ? [
           { name: 'Estoque', path: '/inventory', icon: <Package size={15} /> }
         ] : []),
         ...(isAdminDiretoria ? [

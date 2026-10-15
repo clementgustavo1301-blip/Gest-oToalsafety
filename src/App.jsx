@@ -31,7 +31,7 @@ import IPASystem from './App.tsx';
 // Novo componente para proteger o layout dependendo do perfil
 const AppLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { userProfile, activeLink } = useAuth();
+  const { activeLink } = useAuth();
 
   if (!activeLink) {
     return (
@@ -86,7 +86,7 @@ const AppLayout = () => {
               </ProtectedRoute>
             } />
             <Route path="/certificates" element={
-              <ProtectedRoute allowedSectors={['SST', 'Diretoria', 'Admin']}>
+              <ProtectedRoute allowedSectors={['SST', 'Treinamento', 'Diretoria', 'Admin']}>
                 <CertificatesPage />
               </ProtectedRoute>
             } />

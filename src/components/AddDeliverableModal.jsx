@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
+import { STANDARD_DELIVERABLES } from '../data/deliverables';
 
 const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
+  const [selectedDeliverable, setSelectedDeliverable] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState('programa');
@@ -125,21 +127,56 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
           <form onSubmit={handleSubmit}>
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
-              {/* Title */}
+              {/* Deliverable Select */}
               <div>
-                <label className="modal-label" htmlFor="dlv-title">Título do Documento</label>
-                <input
-                  id="dlv-title"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ex: PGR - Programa de Gerenciamento..."
+                <label className="modal-label" htmlFor="dlv-select">Entregável</label>
+                <select
+                  id="dlv-select"
+                  value={selectedDeliverable}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedDeliverable(val);
+                    if (val === 'outro') {
+                      setTitle('');
+                    } else {
+                      setTitle(val);
+                      const match = STANDARD_DELIVERABLES.find((d) => d.value === val);
+                      if (match) {
+                        setType(match.defaultType);
+                      }
+                    }
+                  }}
                   className="modal-input"
-                  autoFocus
                   required
                   disabled={saving}
-                />
+                >
+                  <option value="" disabled>Selecione o entregável...</option>
+                  {STANDARD_DELIVERABLES.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
+                  <option value="outro">Outro (Digitar manualmente)</option>
+                </select>
               </div>
+
+              {/* Title (if 'outro') */}
+              {selectedDeliverable === 'outro' && (
+                <div>
+                  <label className="modal-label" htmlFor="dlv-title">Título do Documento</label>
+                  <input
+                    id="dlv-title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Digite o título do entregável..."
+                    className="modal-input"
+                    autoFocus
+                    required
+                    disabled={saving}
+                  />
+                </div>
+              )}
 
               {/* Description */}
               <div>

@@ -329,11 +329,7 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                       >
                         <option value="">Todos os Grupos</option>
                         {[...groups]
-                          .sort((a,b) => {
-                            const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
-                            const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
-                            return nameA.localeCompare(nameB);
-                          })
+                          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
                           .map(g => (
                           <option key={g.id} value={g.id}>{g.name}</option>
                         ))}
@@ -356,14 +352,27 @@ const AddTrainingModal = ({ defaultDate, companyId, onClose, onSave }) => {
                         <option value="" disabled>Selecione a empresa...</option>
                         {companies
                           .filter(c => !selectedGroupId || c.groupId === selectedGroupId)
-                          .sort((a,b) => {
-                            const nameA = a.name.replace(/^\d+\s*-\s*/, '').trim();
-                            const nameB = b.name.replace(/^\d+\s*-\s*/, '').trim();
-                            return nameA.localeCompare(nameB);
+                          .sort((a, b) => {
+                            if (!selectedGroupId && groups.length > 0) {
+                              const grpA = groups.find(g => g.id === a.groupId)?.name || '';
+                              const grpB = groups.find(g => g.id === b.groupId)?.name || '';
+                              if (grpA && grpB && grpA !== grpB) {
+                                return grpA.localeCompare(grpB, undefined, { numeric: true });
+                              }
+                            }
+                            return a.name.localeCompare(b.name, undefined, { numeric: true });
                           })
-                          .map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
+                          .map(c => {
+                            const grp = groups.find(g => g.id === c.groupId);
+                            const grpNum = grp ? grp.name.match(/^\d+/)?.[0] : null;
+                            const hasNumPrefix = /^\d+/.test(c.name);
+                            const label = !selectedGroupId && grpNum && !hasNumPrefix
+                              ? `${grpNum} - ${c.name}`
+                              : c.name;
+                            return (
+                              <option key={c.id} value={c.id}>{label}</option>
+                            );
+                          })}
                       </select>
                     </div>
                   )}

@@ -344,11 +344,30 @@ const ScheduleModal = ({
                     className="modal-input"
                     style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
                   >
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
+                    {[...companies]
+                      .sort((a, b) => {
+                        if (groups.length > 0) {
+                          const grpA = groups.find(g => g.id === a.groupId)?.name || '';
+                          const grpB = groups.find(g => g.id === b.groupId)?.name || '';
+                          if (grpA && grpB && grpA !== grpB) {
+                            return grpA.localeCompare(grpB, undefined, { numeric: true });
+                          }
+                        }
+                        return a.name.localeCompare(b.name, undefined, { numeric: true });
+                      })
+                      .map((c) => {
+                        const grp = groups.find(g => g.id === c.groupId);
+                        const grpNum = grp ? grp.name.match(/^\d+/)?.[0] : null;
+                        const hasNumPrefix = /^\d+/.test(c.name);
+                        const label = grpNum && !hasNumPrefix
+                          ? `${grpNum} - ${c.name}`
+                          : c.name;
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {label}
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
               )}

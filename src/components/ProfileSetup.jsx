@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { RefreshCw, Plus, ChevronRight, User, Building2, Trash2, Edit2, Search, X, LogOut } from 'lucide-react';
+import { RefreshCw, Plus, ChevronRight, User, Building2, X, LogOut } from 'lucide-react';
 
 const SECTORS_AND_ROLES = {
   'SST': ['Técnico', 'Supervisor'],
   'Clínica': ['Enfermagem', 'Médico', 'Recepcionista'],
+  'Treinamento': ['Administrativo'],
   'Administrativo': ['Financeiro', 'RH', 'Gerente'],
   'Diretoria': ['Admin'],
   'IPA': ['Analista']
 };
 
 const ProfileSetup = () => {
-  const { session, userProfile, userLinks, refreshProfile, setActiveLink } = useAuth();
+  const { session, userProfile, userLinks, refreshProfile, setActiveLink, signOut } = useAuth();
   
   const [loading, setLoading] = useState(false);
   const [showNewLinkModal, setShowNewLinkModal] = useState(false);
@@ -117,7 +118,7 @@ const ProfileSetup = () => {
           </div>
           <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border)' }}></div>
           <button 
-            onClick={() => useAuth().signOut()}
+            onClick={signOut}
             style={{ 
               display: 'flex', alignItems: 'center', gap: '0.5rem', 
               background: 'transparent', border: 'none', color: 'var(--text-secondary)',

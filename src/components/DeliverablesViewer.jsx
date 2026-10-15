@@ -230,7 +230,9 @@ const DeliverablesViewer = ({ companyId }) => {
               className="filter-select"
             >
               <option value="all">Todas as empresas</option>
-              {companies.map(c => (
+              {[...companies]
+                .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+                .map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
