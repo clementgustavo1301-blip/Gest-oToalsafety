@@ -551,6 +551,20 @@ export async function deleteDeliverable(deliverableId) {
   return true;
 }
 
+export async function deleteDeliverables(deliverableIds) {
+  if (!deliverableIds || deliverableIds.length === 0) return true;
+  const { error } = await supabase
+    .from('deliverables')
+    .delete()
+    .in('id', deliverableIds);
+
+  if (error) {
+    console.error('Error bulk deleting deliverables:', error);
+    throw error;
+  }
+  return true;
+}
+
 export async function getAllDeliverablesSummary() {
   // To avoid multiple queries, we can fetch all and map
   const deliverables = await getDeliverables();

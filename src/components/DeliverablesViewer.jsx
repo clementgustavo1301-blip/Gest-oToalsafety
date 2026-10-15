@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import {
   getDeliverablesByCompany, getContractsByCompany, addDeliverable, updateDeliverable,
-  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable
+  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable,
+  deleteDeliverables
 } from '../services/storageService';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
@@ -46,6 +47,8 @@ const DeliverablesViewer = ({ companyId }) => {
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState(null);
   const [editingDeliverable, setEditingDeliverable] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deletingBulk, setDeletingBulk] = useState(false);
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -116,7 +119,44 @@ const DeliverablesViewer = ({ companyId }) => {
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este entregável?')) {
       await deleteDeliverable(id);
+      setSelectedIds(prev => prev.filter(x => x !== id));
       await loadData(false);
+    }
+  };
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const visibleIds = filtered.map(d => d.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    if (!window.confirm(`Tem certeza que deseja excluir ${count} entregável(is) selecionado(s)? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    setDeletingBulk(true);
+    try {
+      await deleteDeliverables(selectedIds);
+      setSelectedIds([]);
+      await loadData(false);
+    } catch (err) {
+      console.error('Erro ao excluir entregáveis:', err);
+      alert('Erro ao excluir os entregáveis selecionados.');
+    } finally {
+      setDeletingBulk(false);
     }
   };
 
@@ -291,6 +331,100 @@ const DeliverablesViewer = ({ companyId }) => {
         </div>
       </div>
 
+      {/* Selection & Bulk Actions Bar */}
+      {filtered.length > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          padding: '0.625rem 1rem',
+          marginBottom: '1rem',
+          backgroundColor: selectedIds.length > 0 ? '#fef2f2' : 'var(--surface)',
+          border: selectedIds.length > 0 ? '1px solid #fecaca' : '1px solid var(--border)',
+          borderRadius: 'var(--radius-md)',
+          transition: 'all 0.2s ease'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '0.8125rem',
+              color: 'var(--text-primary)',
+              userSelect: 'none'
+            }}>
+              <input
+                type="checkbox"
+                checked={filtered.length > 0 && filtered.every(d => selectedIds.includes(d.id))}
+                onChange={handleToggleSelectAll}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+              />
+              Selecionar Todos ({filtered.length})
+            </label>
+
+            {selectedIds.length > 0 && (
+              <span style={{
+                fontSize: '0.75rem',
+                color: 'var(--danger)',
+                fontWeight: '600',
+                backgroundColor: '#fee2e2',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '1rem'
+              }}>
+                {selectedIds.length} selecionado{selectedIds.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
+            {selectedIds.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Desmarcar seleção
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleBulkDelete}
+                  disabled={deletingBulk}
+                  style={{
+                    backgroundColor: 'var(--danger)',
+                    color: '#fff',
+                    padding: '0.375rem 0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: 'none',
+                    cursor: deletingBulk ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Trash2 size={14} />
+                  {deletingBulk ? 'Excluindo...' : `Excluir Selecionados (${selectedIds.length})`}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Deliverables Grid/List */}
       <div style={
         viewMode === 'grid' 
@@ -307,23 +441,36 @@ const DeliverablesViewer = ({ companyId }) => {
               padding: '1.25rem', display: 'flex', 
               flexDirection: viewMode === 'grid' ? 'column' : 'row', 
               gap: viewMode === 'grid' ? '0.75rem' : '1.5rem',
-              alignItems: viewMode === 'grid' ? 'stretch' : 'center'
+              alignItems: viewMode === 'grid' ? 'stretch' : 'center',
+              border: selectedIds.includes(d.id) ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+              backgroundColor: selectedIds.includes(d.id) ? 'rgba(14, 165, 233, 0.04)' : 'var(--surface)',
+              transition: 'all 0.2s ease'
             }}>
               {/* Header (Type & Status for Grid, Just Type for List) */}
               <div style={{ 
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'flex-start',
-                width: viewMode === 'grid' ? 'auto' : '150px',
+                width: viewMode === 'grid' ? 'auto' : '160px',
                 flexShrink: 0
               }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  padding: '0.25rem 0.625rem', borderRadius: '1rem',
-                  backgroundColor: typeConf.bg, color: typeConf.color,
-                  fontSize: '0.75rem', fontWeight: '600'
-                }}>
-                  {typeConf.icon} {typeConf.label}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(d.id)}
+                    onChange={() => handleToggleSelect(d.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }}
+                    title="Selecionar este entregável"
+                  />
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.25rem 0.625rem', borderRadius: '1rem',
+                    backgroundColor: typeConf.bg, color: typeConf.color,
+                    fontSize: '0.75rem', fontWeight: '600'
+                  }}>
+                    {typeConf.icon} {typeConf.label}
+                  </div>
                 </div>
                 {viewMode === 'grid' && (
                   <div style={{
