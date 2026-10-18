@@ -4,10 +4,11 @@ import {
   Upload, CheckCircle2, AlertCircle, Users, Sparkles, 
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
-  Edit, Key, ShieldCheck, ChevronRight, UserCheck, X
+  Edit, Key, ShieldCheck, ChevronRight, UserCheck, X, User
 } from 'lucide-react';
 import { generateTrainingPPTX } from '../utils/trainingPptxGenerator';
 import { formatCpf } from '../services/cpfService';
+import { getProfiles } from '../services/storageService';
 import { 
   getTrainingClasses, saveTrainingClass, deleteTrainingClass,
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments 
@@ -15,9 +16,28 @@ import {
 
 const DEFAULT_API_TOKEN = '5ae973d7a997af13f0aaf2bf60e65803';
 
+// Lista de usuários padrão do sistema (fallback resiliente)
+const FALLBACK_PROFILES = [
+  { id: '1', name: 'Adeylton', role: 'Técnico em Segurança do Trabalho' },
+  { id: '2', name: 'Gustavo Onraed', role: 'Diretoria / Admin' },
+  { id: '3', name: 'Lucas Paiva', role: 'Diretoria / Admin' },
+  { id: '4', name: 'Caio Vinicius', role: 'Técnico em Segurança do Trabalho' },
+  { id: '5', name: 'Pedro Praxedes', role: 'Supervisor SST' },
+  { id: '6', name: 'Nailton Soares', role: 'Técnico em Segurança do Trabalho' },
+  { id: '7', name: 'Fernanda', role: 'Técnico em Segurança do Trabalho' },
+  { id: '8', name: 'luzian teixeira', role: 'Técnico em Segurança do Trabalho' },
+  { id: '9', name: 'Raul Campelo', role: 'Supervisor SST' },
+  { id: '10', name: 'Cadu', role: 'Técnico em Segurança do Trabalho' },
+  { id: '11', name: 'Katty Marinho', role: 'Enfermagem' },
+  { id: '12', name: 'leiliana nunes', role: 'Enfermagem' }
+];
+
 const TrainingCertificatesPage = () => {
   // Controle de Abas: 'turmas' | 'generator'
   const [activeTab, setActiveTab] = useState('turmas');
+
+  // Usuários do Sistema para seleção de instrutores
+  const [profiles, setProfiles] = useState(FALLBACK_PROFILES);
 
   // Estados das Turmas e Inscrições
   const [turmas, setTurmas] = useState([]);
@@ -36,7 +56,7 @@ const TrainingCertificatesPage = () => {
     start_date: new Date().toISOString().split('T')[0],
     location: 'Mossoró - RN',
     company: 'TotalSafety',
-    instructor_name: 'Adeylton da Silva Araújo',
+    instructor_name: 'Adeylton',
     instructor_role: 'Instrutor e Responsável Técnico',
     instructor_registration: 'SRTE N° 0009823/RN',
     content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
@@ -62,7 +82,7 @@ const TrainingCertificatesPage = () => {
     duracao: '8 horas',
     local: 'Mossoró - RN',
     empresa: 'TotalSafety',
-    instrutorNome: 'Adeylton da Silva Araújo',
+    instrutorNome: 'Adeylton',
     instrutorCargo: 'Instrutor e Responsável Técnico',
     instrutorRegistro: 'SRTE N° 0009823/RN',
     conteudo: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem'
@@ -80,22 +100,25 @@ const TrainingCertificatesPage = () => {
   const [feedback, setFeedback] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchText, setBatchText] = useState('');
-  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // ----------------------------------------------------
-  // Carregamento de Dados (Turmas e Inscrições)
+  // Carregamento de Dados (Turmas, Inscrições e Usuários)
   // ----------------------------------------------------
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [classList, studentList] = await Promise.all([
+      const [classList, studentList, profileList] = await Promise.all([
         getTrainingClasses(),
-        getTrainingEnrollments()
+        getTrainingEnrollments(),
+        getProfiles()
       ]);
       setTurmas(classList || []);
       setEnrollments(studentList || []);
+      if (profileList && profileList.length > 0) {
+        setProfiles(profileList);
+      }
     } catch (e) {
-      console.error('Erro ao carregar turmas e inscrições:', e);
+      console.error('Erro ao carregar turmas, inscrições e instrutores:', e);
     } finally {
       setLoadingData(false);
     }
@@ -134,7 +157,7 @@ const TrainingCertificatesPage = () => {
       start_date: new Date().toISOString().split('T')[0],
       location: 'Mossoró - RN',
       company: 'TotalSafety',
-      instructor_name: 'Adeylton da Silva Araújo',
+      instructor_name: profiles[0]?.name || 'Adeylton',
       instructor_role: 'Instrutor e Responsável Técnico',
       instructor_registration: 'SRTE N° 0009823/RN',
       content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
@@ -152,7 +175,7 @@ const TrainingCertificatesPage = () => {
       start_date: turma.start_date || new Date().toISOString().split('T')[0],
       location: turma.location || 'Mossoró - RN',
       company: turma.company || '',
-      instructor_name: turma.instructor_name || 'Adeylton da Silva Araújo',
+      instructor_name: turma.instructor_name || profiles[0]?.name || 'Adeylton',
       instructor_role: turma.instructor_role || 'Instrutor e Responsável Técnico',
       instructor_registration: turma.instructor_registration || 'SRTE N° 0009823/RN',
       content: turma.content || '',
@@ -690,7 +713,7 @@ const TrainingCertificatesPage = () => {
                   Turmas Cadastradas ({turmas.length})
                 </h2>
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  Organize seus treinamentos em turmas com datas, empresas e links exclusivos.
+                  Organize seus treinamentos em turmas com instrutores do sistema, datas, empresas e links exclusivos.
                 </p>
               </div>
 
@@ -723,7 +746,7 @@ const TrainingCertificatesPage = () => {
                   Nenhuma turma criada ainda
                 </h3>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem', marginBottom: '1rem' }}>
-                  Crie sua primeira turma para gerar links de inscrição específicos e emitir certificados em lote.
+                  Crie sua primeira turma selecionando um instrutor do sistema para gerar links de inscrição específicos e emitir certificados em lote.
                 </p>
                 <button
                   type="button"
@@ -799,14 +822,17 @@ const TrainingCertificatesPage = () => {
                         )}
 
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          {turma.instructor_name && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <User size={13} style={{ color: '#0284c7' }} />
+                              <span><strong>Instrutor:</strong> {turma.instructor_name}</span>
+                            </div>
+                          )}
                           {turma.company && (
                             <div><strong>Empresa:</strong> {turma.company}</div>
                           )}
                           {turma.start_date && (
                             <div><strong>Data:</strong> {new Date(turma.start_date).toLocaleDateString('pt-BR')} • {turma.duration || '8h'}</div>
-                          )}
-                          {turma.instructor_name && (
-                            <div><strong>Instrutor:</strong> {turma.instructor_name}</div>
                           )}
                         </div>
                       </div>
@@ -948,7 +974,6 @@ const TrainingCertificatesPage = () => {
                     </thead>
                     <tbody>
                       {filteredEnrollments.map(student => {
-                        const assignedTurma = turmas.find(t => t.id === student.turma_id);
                         return (
                           <tr key={student.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.15s' }}>
                             <td style={{ padding: '0.75rem 1rem' }}>
@@ -1242,10 +1267,39 @@ const TrainingCertificatesPage = () => {
               </div>
 
               <div style={{ paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <User size={14} style={{ color: '#0284c7' }} />
                   Dados do Instrutor Responsável
                 </div>
                 
+                {/* Seleção do Instrutor entre os Usuários do Sistema */}
+                <div style={{ marginBottom: '0.65rem' }}>
+                  <label className="modal-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
+                    Selecionar dos Usuários do Sistema:
+                  </label>
+                  <select
+                    className="input"
+                    value={profiles.some(p => p.name.trim() === formData.instrutorNome?.trim()) ? formData.instrutorNome : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const sel = profiles.find(p => p.name === e.target.value);
+                        setFormData(prev => ({
+                          ...prev,
+                          instrutorNome: sel ? sel.name : e.target.value
+                        }));
+                      }
+                    }}
+                    style={{ width: '100%', fontSize: '0.8125rem' }}
+                  >
+                    <option value="">Selecione um usuário com acesso ao sistema...</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.name}>
+                        {p.name} {p.role ? `(${p.role})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem' }}>
                   <input
                     type="text"
@@ -1525,10 +1579,43 @@ const TrainingCertificatesPage = () => {
                 </div>
               </div>
 
+              {/* Seleção do Instrutor entre os Usuários do Sistema */}
               <div>
-                <label className="modal-label" style={{ fontWeight: '600' }}>Instrutor Responsável</label>
+                <label className="modal-label" style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <User size={14} style={{ color: '#0284c7' }} />
+                  Instrutor Responsável (Usuário com Acesso ao Sistema) *
+                </label>
+                
+                <select
+                  className="input"
+                  value={profiles.some(p => p.name.trim() === turmaFormData.instructor_name?.trim()) ? turmaFormData.instructor_name : (turmaFormData.instructor_name ? 'custom' : '')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'custom') {
+                      // Permite digitar manualmente
+                    } else if (val) {
+                      const sel = profiles.find(p => p.name === val);
+                      setTurmaFormData(prev => ({
+                        ...prev,
+                        instructor_name: sel ? sel.name : val,
+                        instructor_role: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instructor_role)
+                      }));
+                    }
+                  }}
+                  style={{ marginBottom: '0.4rem', width: '100%' }}
+                >
+                  <option value="">Selecione um instrutor dos usuários do sistema...</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.name}>
+                      {p.name} {p.role ? `— ${p.role}` : ''}
+                    </option>
+                  ))}
+                  <option value="custom">Outro / Digitar manualmente</option>
+                </select>
+
                 <input
                   type="text"
+                  required
                   className="input"
                   placeholder="Nome do Instrutor"
                   value={turmaFormData.instructor_name}
