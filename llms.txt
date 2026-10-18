@@ -1,0 +1,315 @@
+# CPF.CNPJ API
+
+> API REST para consulta de dados cadastrais brasileiros em tempo real (D+0), direto da Receita Federal e demais fontes oficiais: CPF, CNPJ, Notas Fiscais (NFe), Certidões CGU, verificação de WhatsApp, análise de crédito e leitura de QR Code de documentos. Sem captcha e sem data de nascimento. As consultas são HTTP via método **GET** (exceto a leitura de QR Code, pacote 600, que é **POST** com corpo JSON), com o token de autenticação embutido no próprio caminho da URL, e as respostas são sempre **JSON** (`application/json; charset=UTF-8`). Há ainda um modo **assíncrono** opcional por **Webhooks** (API `/v1`, em `POST`), que não altera em nada as consultas síncronas. Tempo médio de resposta em torno de 2 segundos. Qualquer linguagem que faça uma requisição HTTP é compatível: não há SDK obrigatório.
+
+A consulta segue sempre o formato `https://api.cpfcnpj.com.br/{token}/{pacote}/{documento}`, onde `{pacote}` é o ID numérico do tipo de consulta (ex.: `9` para CPF E, `6` para CNPJ D) e `{documento}` é o CPF, CNPJ, telefone, chave ou placa informado **apenas com dígitos e letras** (sem pontos, traços ou barras). A maioria das consultas é **síncrona** (resposta imediata, sem polling). As de **Análise de Crédito (pacotes 300 a 340)**, **Imóveis e Vínculos (400 e 401)** e **Veicular (500 a 515)** são **assíncronas**: a 1ª requisição inicia a consulta e responde `estado: "processando"`; **repita a MESMA requisição** (mesma URL) após cerca de 1 minuto para obter o resultado. O resultado fica em **cache por 1 hora**: repetir dentro desse período devolve o resultado **sem cobrar de novo**, e o crédito é debitado **uma única vez**, na conclusão. Os dados são **100% em tempo real (D+0)** e refletem a Receita Federal no instante da consulta, sem bases antigas, incompletas ou vazadas.
+
+- **Base URL**: `https://api.cpfcnpj.com.br`
+- **Método**: `GET` nas consultas síncronas; **exceção: pacote 600 (leitura de QR Code de documento) é `POST /{token}/600` com corpo JSON** (`imagem` ou `qrcode` em base64); a API de Webhooks (`/v1`) usa `POST` e `GET` (modo assíncrono opcional)
+- **Autenticação**: token de integração como **1º segmento da URL** (não é cabeçalho HTTP), atrelado ao IP de origem. Obtenha em [Painel → API → Tokens](https://www.cpfcnpj.com.br/admin/tokens.html).
+- **Token de testes** (retorna apenas dados fictícios, sem custo): `5ae973d7a997af13f0aaf2bf60e65803`
+- **Content-Type das respostas**: `application/json; charset=UTF-8`
+- **TLS mínimo**: 1.3 (todo o tráfego passa pela Cloudflare; libere os [IPs da Cloudflare](https://www.cloudflare.com/ips/) no firewall).
+- **Timeout recomendado**: 60 segundos.
+- **Rate limit**: por conta (soma de todos os tokens e IPs), conforme o plano: sem plano 20 req/s até 30/10/2026 e 2 req/s a partir de 31/10/2026; Start 10; Pro 20; Business 50; Enterprise conforme contrato (contratos com limite próprio continuam valendo). Toda resposta com token traz `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (segundos) e `X-RateLimit-Scope` (`conta`). Excedido → HTTP 429, `Retry-After: 1`, erro `1007`, sem cobrança.
+
+## OpenAPI (especificação completa)
+
+A especificação OpenAPI **3.1** é a fonte canônica do contrato da API: descreve todos os paths, parâmetros, schemas de resposta, exemplos, campos e códigos de erro. Use-a para integrar sem ler documentação manualmente.
+
+- [openapi.json (download)](https://api.cpfcnpj.com.br/doc/openapi.json): especificação OpenAPI 3.1 completa, em JSON.
+- **Gerar SDK/client**: rode um gerador sobre o arquivo, por exemplo `npx @openapitools/openapi-generator-cli generate -i https://api.cpfcnpj.com.br/doc/openapi.json -g <linguagem> -o ./sdk` (suporta TypeScript, Python, Go, Java, PHP, C#, etc.). Também funciona com `openapi-typescript`, `oapi-codegen`, `swagger-codegen` e similares.
+- **Validar contratos**: use a spec em testes de contrato (Schemathesis, Dredd, Prism mock server) para garantir que sua integração bate com os schemas reais.
+- **Importar em ferramentas**: Postman, Insomnia, Stoplight, Swagger UI e VS Code (REST Client / extensões OpenAPI) importam o arquivo diretamente e montam as requisições para você.
+- Toda a referência de campos, exemplos e erros está dentro da própria spec: não há contrato paralelo a manter.
+
+## Postman
+
+A maneira mais rápida de testar e explorar a API:
+
+1. No Postman, clique em **Import**.
+2. Escolha a aba **Link** e cole `https://api.cpfcnpj.com.br/doc/openapi.json`.
+3. Confirme: o Postman gera **automaticamente** a collection com todas as operações (CPF, CNPJ, WhatsApp, NFe, Análise de Crédito, Certidões, Saldo), já com os parâmetros de caminho.
+4. Defina a variável `{token}` com o token de testes `5ae973d7a997af13f0aaf2bf60e65803` e dispare qualquer requisição para ver respostas fictícias de exemplo.
+
+Uma collection Postman pronta também está disponível em [/doc/postman_collection.json](https://api.cpfcnpj.com.br/doc/postman_collection.json) (com environment em [/doc/postman_environment.json](https://api.cpfcnpj.com.br/doc/postman_environment.json)). O mesmo arquivo OpenAPI importa em Insomnia (Import → URL) e em qualquer cliente compatível.
+
+## Servidor MCP
+
+- [mcp.cpfcnpj.com.br](https://mcp.cpfcnpj.com.br): servidor **MCP (Model Context Protocol)** para consumir a API diretamente de agentes e assistentes de IA (Claude, ChatGPT e outros compatíveis), **sem implementar a chamada HTTP manualmente**. O agente passa a "enxergar" as ferramentas de consulta de CPF, CNPJ e demais serviços e executá-las com o seu token.
+
+## Como consultar
+
+- **Formato**: `GET https://api.cpfcnpj.com.br/{token}/{pacote}/{documento}`
+- O `{documento}` deve conter **somente dígitos** (sem máscara). CNPJ aceita também o novo formato **alfanumérico** (IN RFB 2.229/2024, vigência jul/2026): envie sem pontuação e compare em maiúsculas; CNPJs numéricos atuais continuam válidos.
+- **Exemplo (CPF E, pacote 9)** com o token de testes:
+
+  ```
+  curl 'https://api.cpfcnpj.com.br/5ae973d7a997af13f0aaf2bf60e65803/9/00000000000'
+  ```
+
+- **Exemplo (CNPJ D, pacote 6)**:
+
+  ```
+  curl 'https://api.cpfcnpj.com.br/5ae973d7a997af13f0aaf2bf60e65803/6/11222333000181'
+  ```
+
+- **Consulta por Razão Social** (lista empresas), pacote 4, via query string `razao_social`:
+
+  ```
+  curl 'https://api.cpfcnpj.com.br/5ae973d7a997af13f0aaf2bf60e65803/4?razao_social=GOOGLE BRASIL'
+  ```
+
+## Pacotes de CPF
+
+Consultas de pessoa física pelo número do CPF: `GET /{token}/{id}/{cpf}`. **Exceção, pacote 30 (CPF OFAC)**: screening mundial na lista de sanções, consultado por parâmetro de query `GET /{token}/30?documento=` | `?nome=` | `?passaporte=` (apenas UM filtro por consulta).
+
+- `1` **CPF A**: Nome Completo.
+- `7` **CPF B**: Nome Completo, Data de Nascimento.
+- `2` **CPF C**: Nome Completo, Data de Nascimento, Nome Completo da Mãe, Gênero.
+- `8` **CPF D**: Nome Completo, Nome Social, Data de Nascimento, Situação Cadastral na Receita Federal, Óbito e Data, Número de Comprovante da Consulta, PDF Comprovante da Consulta.
+- `9` **CPF E**: Nome Completo, Nome Social, Nome Completo da Mãe, Data de Nascimento, Gênero, Situação Cadastral na Receita Federal, Óbito e Data, Número de Comprovante da Consulta, PDF Comprovante da Consulta.
+- `3` **CPF F**: Nome Completo, Data de Nascimento, Gênero, Endereço Completo.
+- `14` **CPF H**: Nome Completo, Pessoa Politicamente Exposta e Relacionados (PPE / PEP).
+- `15` **CPF I**: Empresas no Nome.
+- `17` **CPF Estrangeiro**: Nome Completo, Estrangeiro (true/false), Residente no exterior (true/false), País de residência (quando diferente do Brasil).
+- `18` **CPF K**: Nome Completo, Data de Nascimento, Endereço Completo, Situação Cadastral na Receita Federal.
+- `21` **CPF Lookalike**: Nome Completo, E-mails, Telefones, WhatsApp.
+- `20` **CPF Family**: Mandados de Prisão (BNMP/CNJ).
+- `22` **CPF Programas Sociais**: Nome Completo, Lista dos Programas Sociais em que o titular é participante no atual ano.
+- `23` **CPF Mandados de Busca e Apreensão**: Mandados de Busca e Apreensão BNMP, Lista INTERPOL.
+- `26` **CPF D Simplificado**: Nome Completo, Data de Nascimento, Situação Cadastral na Receita Federal.
+- `27` **CPF CAC/SINIC**: Certidão de Antecedentes Criminais (PF), PDF + Número de Controle + Nada Consta.
+- `24` **CPF CNS**: Cartão Nacional de Saúde (CNS).
+- `29` **CPF CNH**: Nome, CPF, Número da CNH, UF da CNH, Data da primeira CNH.
+- `30` **CPF OFAC**: Indicação de sanção (true/false), Nome, Programas de sanção, Documentos (CPF/passaporte), Data da lista.
+
+## Pacotes de CNPJ
+
+Consultas de pessoa jurídica pelo número do CNPJ: `GET /{token}/{id}/{cnpj}`.
+
+- `4` **CNPJ A**: Razão Social.
+- `4` **CNPJ Pesquisa**: lista de empresas pela Razão Social: `GET /{token}/4?razao_social=...` (query string, sem documento no caminho).
+- `5` **CNPJ B**: Razão Social, Nome Fantasia, Endereço Completo.
+- `10` **CNPJ C**: Razão Social, Nome Fantasia, Endereço Completo, Início das Atividades, Telefones, Faxes, E-mail, Situação Cadastral na Receita Federal.
+- `6` **CNPJ D**: Razão Social, Nome Fantasia, Endereço Completo, Início das Atividades, Telefones, Faxes, E-mail, Código e Descrição da Atividade Econômica Principal, Código e Descrição da Natureza Jurídica, Nome do Responsável pela Empresa, Porte da Empresa, Quadro de Sócios e Administradores (QSA), Situação Cadastral na Receita Federal, Informações sobre Simples Nacional, CPF do Responsável Legal e Sócios.
+- `11` **CNPJ F**: Razão Social, Informações sobre Simples Nacional, Informações sobre SIMEI, Informações sobre Suframa.
+- `16` **CNPJ H**: Inscrições Estaduais, Razão Social.
+- `19` **CNPJ Lookalike**: Razão Social, E-mails dos Sócios, Telefones dos Sócios, WhatsApp dos Sócios.
+- `25` **CNPJ QsA Detalhado**: Porcentagem Societária de cada Sócio.
+
+## Pacotes de WhatsApp
+
+Verificação de número de telefone (formato E.164, com DDI): `GET /{token}/{id}/{telefone}`. Vale o rate limit do plano da conta; excedido → erro `1007` (HTTP 429). Precisa de mais? Fale com o comercial.
+
+- `200` **WhatsApp Número Ativo**: Verifica número ativo.
+- `201` **WhatsApp Número Ativo + Avatar**: Verifica número ativo + avatar.
+- `202` **WhatsApp Número Ativo + Conta Business**: Verifica número ativo + conta business.
+- `203` **WhatsApp Completo**: Número ativo, avatar, business, empresa (site, e-mail, endereço) e catálogo de produtos.
+
+## Notas Fiscais
+
+Consulta de nota fiscal pela chave de acesso de 44 dígitos: `GET /{token}/{id}/{chave}`. O **modelo** da nota está nas posições 21-22 da chave e define o pacote: **55 = NF-e → pacote 100**, **65 = NFC-e → pacote 102**. Chave no pacote errado retorna o erro `203` indicando o correto, sem cobrar. **NFC-e (102) tem cobertura por estado**: os 2 primeiros dígitos da chave são o código IBGE da UF: **São Paulo (35) e Minas Gerais (31) on-line**; demais estados sob demanda, retornando o erro `204` sem cobrar (fale com o comercial para habilitar). A UF de emissão volta na resposta em `nfe.dadosDaNfe.uf`. Vale o rate limit do plano da conta; excedido → erro `1007` (HTTP 429).
+
+- `100` **NFe Unificada PF e PJ**: Consulta em tempo real de notas fiscais NFe PF e PJ.
+- `102` **NFCe Consumidor**: Chave de acesso, Dados da NFC-e (layout SEFAZ), Eventos vinculados.
+
+## Análise de Crédito
+
+Consultas de crédito: `GET /{token}/{id}/{documento}`, com CPF, CNPJ ou qualquer um dos dois conforme o pacote (a entrada aceita está na descrição de cada um; PF = CPF, PJ = CNPJ). **Assíncronas**: repita a MESMA requisição até `estado: concluido` (resultado em cache 1h; cobra 1×). **300 a 340 exigem liberação comercial** (sem ela: erro `1009`, HTTP 403) e seguem o rate limit do plano da conta (erro `1007`, HTTP 429). **Os pacotes com "das 7h às 23h" na descrição só atendem nesse horário (Brasília)**: fora disso, erro `1007` com HTTP 503 e `Retry-After`. Cobra só `status: 1` ("nada consta" é cobrado); `1006` (fonte indisponível) e `102` (sem informação) não cobram. O objeto `data` varia conforme o produto.
+
+- `300` **Dívidas e Negativações**: Score, renda presumida, débitos, protestos e ações cíveis (CPF); risco, pendências, protestos e cheques sem fundo (CNPJ), em tempo real. Entrada: CPF ou CNPJ.
+- `301` **SCR Banco Central**: Operações de crédito registradas no SCR do Banco Central. Entrada: CPF ou CNPJ.
+- `302` **Análise de Crédito Nacional**: Registros de inadimplência em base nacional, em tempo real. Entrada: CPF.
+- `303` **Protestos em Cartório Nacional**: Protestos em cartórios de todo o país, com visão 360. Entrada: CPF ou CNPJ; das 7h às 23h.
+- `304` **CADIN**: Pendências no CADIN, em tempo real. Entrada: CPF ou CNPJ.
+- `305` **PGFN**: Dívida Ativa da União (PGFN), Valor total da dívida, Razão Social, Detalhamento por natureza (débitos e convênios), UF, Município e CNAE.
+- `309` **Dívidas Multi Pro PJ**: Versão ampliada da consulta de dívidas e negativações. Entrada: CNPJ; das 7h às 23h.
+- `314` **Crédito Mais PF + Cadastro Positivo**: Análise de crédito ampliada de pessoa física com Cadastro Positivo, em tempo real. Entrada: CPF.
+- `315` **Crédito Completo PF + Cadastro Positivo**: Análise de crédito completa de pessoa física com Cadastro Positivo, em tempo real. Entrada: CPF.
+- `317` **Negócios PJ + Cadastro Positivo**: Análise de crédito completa de empresa com Cadastro Positivo, em tempo real. Entrada: CNPJ.
+- `318` **Limite de Crédito PJ + Cadastro Positivo**: Análise de crédito de empresa com sugestão de limite e Cadastro Positivo, em tempo real. Entrada: CNPJ.
+- `322` **Birô Oficial B PF**: Consulta oficial em birô de crédito nacional. Entrada: CPF.
+- `323` **Birô Oficial B PJ**: Consulta oficial em birô de crédito nacional. Entrada: CNPJ.
+- `326` **Rating Bancário PF**: Classificação de risco no padrão bancário. Entrada: CPF.
+- `327` **Rating Bancário PJ**: Classificação de risco no padrão bancário. Entrada: CNPJ.
+- `332` **Rating Nacional**: Rating consolidado dos 3 maiores birôs de crédito e do Banco Central. Entrada: CPF ou CNPJ.
+- `333` **Processos Judiciais**: Processos judiciais em base nacional. Entrada: CPF ou CNPJ.
+- `334` **CADIN Semanal**: Pendências no CADIN, com atualização de até 7 dias. Entrada: CPF ou CNPJ.
+- `337` **Protestos Regional**: Protestos em cartórios que cobrem cerca de 1/3 do Brasil. Entrada: CPF ou CNPJ; das 7h às 23h.
+
+## Imóveis e Vínculos
+
+Imóveis (400, por CPF ou CNPJ) e vínculos societários (401, por CNPJ): `GET /{token}/{id}/{documento}`. Mesmo fluxo assíncrono, liberação comercial (`1009`), rate limit (`1007`) e regra de cobrança da Análise de Crédito.
+
+- `400` **Imóveis (Capitais)**: Imóveis vinculados a CPF ou CNPJ nas capitais dos estados. Entrada: CPF ou CNPJ.
+
+## Veicular
+
+Consultas veiculares pela placa, sem hífen, no padrão antigo (`ABC1234`) ou Mercosul (`ABC1D23`): `GET /{token}/{id}/{placa}`. **Exceção: 502 (Condutor) recebe CPF.** Mesmo fluxo assíncrono, rate limit (`1007`) e regra de cobrança da Análise de Crédito. **Contratação livre**, sem liberação comercial.
+
+- `500` **Agregados**: Dados agregados do veículo. Entrada: placa.
+- `501` **Bin Nacional**: Dados do veículo na base nacional (BIN). Entrada: placa.
+- `502` **Condutor**: Dados do condutor em base nacional. Entrada: CPF.
+- `503` **Bin Nacional Completa**: Dados completos do veículo na base nacional (BIN). Entrada: placa.
+- `508` **Roubo e Furto**: Registros de roubo e furto em base nacional. Entrada: placa.
+- `511` **Sinistro**: Histórico de sinistros em base nacional. Entrada: placa.
+- `512` **Leilão**: Histórico de leilão em base nacional. Entrada: placa.
+- `513` **Leilão Plus**: Histórico de leilão em base nacional, base ampliada. Entrada: placa.
+
+## Documentos
+
+Leitura do **QR Code de documentos** (padrão QR Code VIO do governo federal, presente em 195 tipos de documento de 83 órgãos emissores: CNH, CRLV, CRV, ATPV, carteiras de conselho profissional, identidades funcionais e militares, certidões e outros), com conferência offline da assinatura digital do órgão emissor. **Única rota por `POST`**: `POST /{token}/600` com `Content-Type: application/json` e o corpo `{"imagem": "<base64 de JPG, PNG, WEBP, GIF ou BMP, até 5 MB>"}` **ou** `{"qrcode": "<base64 dos bytes crus do QR, até 8 KB>"}` (exatamente um dos dois; aceita o prefixo `data:image/...;base64,`). Query opcional `?foto=1` inclui a foto do titular em base64. Síncrono, em poucos segundos (o campo `qrcode` é o mais rápido); até 3 leituras simultâneas por conta (acima disso, `1007`, HTTP 429 com `Retry-After`, sem cobrança). `qrcode.tipo` = `documento` (QR VIO), `url` ou `texto` (qualquer outro QR, mesmo preço, com `qrcode.conteudo`). `assinatura.valida: false` é resposta válida e cobrada (documento adulterado ou emissor fora da base). Cobra cada leitura com `status: 1`; erros `120` a `126` não cobram. Nada da imagem, do conteúdo lido ou do resultado é gravado.
+
+- `600` **QR Code Documento**: Tipo de QR (documento, link ou texto), Modelo do documento, Órgão emissor, Data de emissão do QR, Assinatura válida, Certificado revogado, Dados do titular, Todos os campos do documento, Foto do titular (quando houver), Conteúdo do QR comum.
+
+## Outros
+
+- `101` **CGU Certidões PF e PJ**: CEIS, CEPIM, CNEP, CGU-PJ, ePAD e CEAF + PDF.
+
+## Conta
+
+- **Consulta de saldo** (sem custo): saldo disponível de um pacote: `GET /{token}/saldo/{pacote}`. Retorna um objeto `pacote{}` com `id` (int), `nome` (string) e `saldo` (int).
+
+## Webhooks
+
+- Gerenciamento por API REST própria em `/v1/webhook-endpoints`, `/v1/requests` e `/v1/deliveries`, com auth por header `Authorization: Bearer <token>` (não por segmento de URL). Erros no envelope `{ error: { type, code, message } }`.
+- `POST /v1/webhook-endpoints` cadastra uma URL HTTPS e devolve o `secret` de assinatura em texto puro **uma única vez**; `POST /v1/webhook-endpoints/{id}/test` verifica a posse da URL.
+- Entrega planejada (despachante ainda não em produção): `POST` assinado no formato Standard Webhooks v1.0.0 (`webhook-signature: v1,<base64 HMAC-SHA256>`), corpo igual ao da consulta síncrona, retry com backoff, idempotência via `webhook-id`.
+- A defesa é a assinatura HMAC: **não há lista de IPs fixos** para liberar em firewall.
+- Guia completo com exemplos de código (PHP/Node): seção "Webhooks" da documentação (`doc/`).
+
+## Formato das respostas
+
+Toda resposta traz o campo `status`: **1** em caso de sucesso, **0** em caso de falha. Em falhas, vêm também `erro` (mensagem) e `erroCodigo` (código numérico). Campos comuns:
+
+- `pacoteUsado`: ID do pacote utilizado na consulta.
+- `saldo`: saldo do pacote após a consulta.
+- `consultaID`: ID da consulta (16 dígitos).
+- `delay`: tempo total da consulta, em segundos.
+- `status`: `1` sucesso, `0` falha.
+- `erro` / `erroCodigo`: presentes somente em falha.
+
+Nos pacotes assíncronos (Análise de Crédito 300 a 340, Imóveis e Vínculos 400 e 401, Veicular 500 a 515), a resposta traz `estado` (`processando`, `concluido` ou `erro`), `documento`, `situacao` e, quando pronta, o objeto `data` com o resultado, cujo conteúdo varia conforme o produto.
+
+## Códigos de erro
+
+Em sucesso, `status: 1`; em falha, `status: 0` acompanhado de `erro` e `erroCodigo`.
+
+- `100` (CPF): `CPF inválido!` Número digitado não é um CPF válido.
+- `101` (CPF): `Informe um CPF com 11 dígitos!` CPF com menos de 11 dígitos.
+- `102` (CPF): `O documento informado não foi encontrado. Confira o número e tente novamente.` CPF válido, mas não encontrado.
+- `110` (WhatsApp): `Número de telefone inválido (informe com DDI).`
+- `111` (WhatsApp): `Não foi possível verificar o número no WhatsApp.`
+- `120` (QR Code, pacote 600): `Envie a imagem do QR Code (campo imagem) ou o conteúdo lido (campo qrcode) em base64.` HTTP 400, sem cobrança.
+- `121` (QR Code): `Formato de imagem não aceito. Envie JPG, PNG, WEBP, GIF ou BMP.` HTTP 400 (PDF ainda não é aceito), sem cobrança.
+- `122` (QR Code): `Arquivo acima do limite (imagem até 5 MB e 16 megapixels, conteúdo do QR até 8 KB).` HTTP 413, sem cobrança; vale também para imagem com mais de 8000 px de lado.
+- `123` (QR Code): `Nenhum QR Code encontrado na imagem. Envie uma foto nítida, com o QR inteiro e sem reflexo.` Sem cobrança.
+- `124` (QR Code): `QR Code ilegível ou incompleto.` Também para QR Code VIO de modelo de documento fora do catálogo. Sem cobrança.
+- `125` (QR Code): `Use POST com corpo JSON.` HTTP 405; o pacote 600 só aceita `POST` com `Content-Type: application/json`.
+- `126` (QR Code): `QR Code VIO em formato antigo (versão 1), ainda não suportado.` Sem cobrança.
+- `1007` (QR Code): mais de 3 leituras simultâneas na conta. HTTP 429 com `Retry-After`, sem cobrança.
+- `200` (CNPJ): `CNPJ inválido!` Número digitado não é um CNPJ válido.
+- `201` (CNPJ): `Informe um CNPJ com 14 dígitos!` CNPJ com menos de 14 dígitos.
+- `202` (CNPJ): `O CNPJ informado não existe` CNPJ válido, mas ausente nas bases da Receita.
+- `400` (CPF/CNPJ): `Incorrect parameters.` A formatação da URI está incorreta.
+- `1000` (transversal): `Token inválido!` Token não pertence ao IP de origem.
+- `1001` (transversal): `Créditos insuficientes!` Sem créditos no pacote selecionado.
+- `1002` (transversal): `Conta suspensa e/ou inativa!` Vale para todas as rotas, inclusive `/saldo`, assíncronas e `/v1`. Contate o suporte.
+- `1003` (transversal): `Blacklist até *DATA*`: bloqueio temporário. Consultar o mesmo documento 3 vezes em menos de 1 minuto no mesmo pacote bloqueia só esse documento nesse pacote por 1 minuto.
+- `1004` (transversal): `Pacote indisponível para consultas!` ID do pacote inválido ou indisponível.
+- `1005` (transversal): `Não é possível consultar *CPF/CNPJ* neste pacote!` Erro temporário; tente novamente.
+- `1006` (transversal): `Não foi possível concluir a consulta agora. Tente novamente em instantes.` Erro temporário; tente novamente, sem cobrança. Assim como no `1005`, o corpo traz o campo `rastreio` (igual ao cabeçalho `X-Request-Id`) para o suporte localizar a ocorrência.
+- `1007` (transversal): `Limite de requisições (N) por segundo excedido` HTTP 429 com `Retry-After: 1`; N é o limite do plano da conta (sem plano 20 até 30/10/2026, 2 a partir de 31/10/2026; Start 10, Pro 20, Business 50). Aguarde o próximo segundo e tente novamente; não cobra.
+- `1008` (transversal): `Limite de requisições por IP (N/s) excedido. Aguarde 1 segundo.` HTTP 429 com `Retry-After`; proteção por IP de origem nas rotas síncronas, independente do plano (também pode vir como `Limite de burst (...) excedido.` ou `IP temporariamente bloqueado por excesso de requisições.`). Aguarde o `Retry-After` e tente novamente; não cobra.
+- `1009` (Análise de Crédito, Imóveis e Vínculos): `Pacote requer liberação` Pacote restrito; fale com o comercial para habilitar.
+- `1010` (transversal): `Não foi possível consultar este documento.` HTTP 403; documento indisponível para consulta, sem cobrança.
+- `1007` (pacotes 300 a 340, 400, 401 e 500 a 515): também indica consulta fora do horário de atendimento (HTTP 503 com `Retry-After`, nos pacotes que atendem só das 7h às 23h de Brasília) ou acima do limite do plano da conta (HTTP 429).
+
+## Regras anti-abuso
+
+- 30 respostas de token inválido em 60 segundos → bloqueio do IP por 1 minuto.
+- 3 consultas do mesmo documento no mesmo pacote em menos de 1 minuto → só esse documento nesse pacote fica bloqueado por 1 minuto.
+- 30 respostas sem créditos em 60 segundos → bloqueio do IP por 1 minuto.
+- Teto de proteção de 100 requisições por segundo por IP.
+- Limite de requisições por segundo por conta conforme o plano (erro `1007`, HTTP 429, `Retry-After: 1`); não há limite próprio por pacote. Aumento sob contrato com o comercial.
+
+## Webhooks (modo assíncrono)
+
+Modo assíncrono **opcional**. Não altera em nada as consultas síncronas (`GET /{token}/{pacote}/{documento}`): quem usa o modo síncrono continua igual. No modo assíncrono você submete a consulta, recebe `202` na hora e o resultado chega por `POST` no seu endpoint quando fica pronto.
+
+**Autenticação do `/v1`** (diferente das consultas): header `Authorization: Bearer <token>`. Nas consultas síncronas o token vai na URL; no `/v1` vai no cabeçalho. Erros vêm no envelope `{ "error": { "type": ..., "code": ..., "message": ... } }`.
+
+### Fluxo
+
+1. **Cadastrar endpoint**: `POST /v1/webhook-endpoints`. A resposta devolve o `secret` **uma única vez** (guarde-o; não é recuperável depois). O endpoint nasce no estado `pending`.
+2. **Verificar posse**: `POST /v1/webhook-endpoints/{id}/test`. Envia um `POST` **assinado** ao seu endpoint, com o cabeçalho `x-event: endpoint.verification` e o corpo:
+
+   ```
+   {"type":"endpoint.verification","challenge":"chl_...","endpoint_id":"whe_..."}
+   ```
+
+   Seu endpoint precisa responder `2xx` **devolvendo o mesmo valor de `challenge`**, seja como JSON `{"challenge":"..."}`, seja como texto puro. Só então o endpoint passa de `pending` para `active`. Responder `2xx` sem ecoar o `challenge` **não** ativa.
+3. **Submeter consulta**: `POST /v1/requests` com o corpo `{"package": N, "document": "..."}`. Responde `202` com `request_id`. Aceita o cabeçalho `Idempotency-Key`: reenviar com a mesma chave não duplica a consulta.
+4. **Receber entrega**: quando a consulta conclui, chega um `POST` **assinado** no seu endpoint. O corpo é **o mesmo JSON da consulta síncrona, puro na raiz** (sem envelope, sem wrapper).
+
+### Cabeçalhos da entrega
+
+- `webhook-id`: identificador estável da mensagem (use para deduplicação).
+- `webhook-timestamp`: timestamp Unix, em segundos, do envio.
+- `webhook-signature`: assinatura HMAC (ver abaixo).
+- `x-request-id`: o `request_id` da submissão.
+- `x-package`: ID do pacote consultado.
+- `x-event`: um de `query.completed`, `query.failed`, `endpoint.verification`.
+
+### Assinatura (Standard Webhooks v1.0.0)
+
+- Padrão aberto **Standard Webhooks v1.0.0**.
+- HMAC-SHA256 sobre a string `{webhook-id}.{webhook-timestamp}.{corpo bruto}` (o corpo exatamente como recebido, sem reserializar).
+- Compare a assinatura em **tempo constante**.
+- **Rejeite** quando o `webhook-timestamp` estiver a mais de **5 minutos** do horário atual (proteção contra replay).
+- **Não há lista de IPs fixos publicada**; a defesa é a verificação da assinatura.
+
+### Retentativas
+
+- Até cerca de **5 tentativas** ao longo de cerca de **40 minutos**, com espera crescente entre elas.
+- `410 Gone`: **desativa o endpoint imediatamente**, sem nova tentativa.
+- `429`, `502` e `504`: **dobram** o intervalo até a próxima tentativa.
+
+### Deduplicação
+
+- `webhook-id` é estável entre as retentativas da mesma mensagem.
+- Guarde os `webhook-id` já processados e ignore os repetidos.
+
+### Estados da requisição
+
+`queued`, `processing`, `completed`, `delivered`, `delivery_failed`, `failed`, `expired`.
+
+### Consulta de estado
+
+- `GET /v1/requests`: lista as requisições.
+- `GET /v1/requests/{id}`: estado de uma requisição.
+- `GET /v1/deliveries`: lista as entregas.
+- `GET /v1/deliveries/{id}`: estado de uma entrega.
+- Essas rotas devolvem **apenas estado**. O resultado da consulta **não fica armazenado** após a entrega: elas nunca retornam o dado consultado.
+
+### Rotação do secret
+
+- `POST /v1/webhook-endpoints/{id}/rotate-secret`.
+- Por **24h** o secret antigo e o novo convivem: nesse período o cabeçalho `webhook-signature` traz **duas assinaturas**, separadas por espaço. Valide aceitando qualquer uma das duas durante a transição.
+
+## Recursos
+
+- [Documentação interativa](https://api.cpfcnpj.com.br/doc): portal de referência com exemplos de código, painel "Testar" e todos os pacotes.
+- [Especificação OpenAPI 3.1](https://api.cpfcnpj.com.br/doc/openapi.json): contrato completo (paths, schemas, exemplos, erros) em JSON.
+- [Servidor MCP](https://mcp.cpfcnpj.com.br): Model Context Protocol para consumir a API a partir de agentes de IA.
+- **Webhooks (API `/v1`)**: modo assíncrono opcional. Submissão via `POST /v1/requests`, entrega por callback assinado (Standard Webhooks v1.0.0). Ver a seção Webhooks acima; o contrato completo do `/v1` está na spec OpenAPI.
+- [Página de status](https://status.cpfcnpj.com.br): disponibilidade e latência dos pacotes em tempo real.
+- [Painel de Controle](https://www.cpfcnpj.com.br/admin): cadastro, créditos e gestão de tokens.
+- [API → Tokens](https://www.cpfcnpj.com.br/admin/tokens.html): criação e gestão de tokens (vinculados ao IP).
+
+## Optional
+
+- [Segurança e TLS 1.3](https://www.cloudflare.com/ips/): todo o tráfego passa pela Cloudflare; TLS mínimo 1.3 e liberação dos IPs da Cloudflare no firewall.
+- **CNPJ Alfanumérico** (IN RFB 2.229/2024, jul/2026): 12 posições alfanuméricas (`0-9`, `A-Z`) + 2 dígitos verificadores numéricos; sem breaking changes, CNPJs numéricos coexistem. Exemplo válido: `12ABC34501DE35`.
+- **Certificações ISO (2025)**: ISO/IEC 27001:2022 (Segurança da Informação), ISO/IEC 27701:2025 (Privacidade, LGPD/GDPR) e ISO 37301:2021 (Compliance).

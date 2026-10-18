@@ -61,7 +61,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const isTreinamento = activeLink?.sector === 'Treinamento';
 
   const navItems = isTreinamento ? [
-    { name: 'Certificados', path: '/training-certificates', icon: <FileText size={17} /> }
+    { name: 'Treinamentos & Turmas', path: '/training-certificates', icon: <Award size={17} /> }
   ] : [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={17} /> },
     ...(activeLink?.sector === 'IPA' ? [
@@ -101,9 +101,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         ] : []),
         ...(canAccessCertificates ? [
           { name: 'Certificados SST', path: '/certificates', icon: <FileText size={15} /> }
-        ] : []),
-        ...(isAdminDiretoria ? [
-          { name: 'Certificados Treinamento', path: '/training-certificates', icon: <Award size={15} /> }
         ] : []),
         ...(isSSTOrAdmin ? [
           { name: 'Estoque', path: '/inventory', icon: <Package size={15} /> }

@@ -23,6 +23,7 @@ import PublicCATPage from './pages/PublicCATPage';
 import CATPage from './pages/CATPage';
 import CertificatesPage from './pages/CertificatesPage';
 import TrainingCertificatesPage from './pages/TrainingCertificatesPage';
+import PublicTrainingEnrollmentPage from './pages/PublicTrainingEnrollmentPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -142,9 +143,11 @@ const AppLayout = () => {
               )
             } />
             <Route path="/training-certificates" element={
-              <ProtectedRoute allowedSectors={['Treinamento', 'Diretoria', 'Admin']}>
+              activeLink?.sector === 'Treinamento' ? (
                 <TrainingCertificatesPage />
-              </ProtectedRoute>
+              ) : (
+                <Navigate to="/" replace />
+              )
             } />
             <Route path="/ipa/*" element={
               <ProtectedRoute allowedSectors={['IPA']}>
@@ -165,6 +168,9 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/cat-form" element={<PublicCATPage />} />
+          <Route path="/inscricao" element={<PublicTrainingEnrollmentPage />} />
+          <Route path="/inscricao/:turmaId" element={<PublicTrainingEnrollmentPage />} />
+          <Route path="/inscricao-treinamento" element={<PublicTrainingEnrollmentPage />} />
 
           {/* Rotas Protegidas */}
           <Route path="/*" element={

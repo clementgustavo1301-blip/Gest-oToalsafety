@@ -10,7 +10,7 @@ const ProtectedRoute = ({ children, allowedSectors, allowedRoles }) => {
   }
 
   if ((allowedSectors || allowedRoles) && !hasAccess(allowedSectors, allowedRoles)) {
-    const redirectPath = activeLink?.sector === 'Treinamento' ? '/certificates' : '/';
+    const redirectPath = activeLink?.sector === 'Treinamento' ? '/training-certificates' : '/';
     return <Navigate to={redirectPath} replace />;
   }
 
