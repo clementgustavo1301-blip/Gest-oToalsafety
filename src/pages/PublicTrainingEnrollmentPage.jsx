@@ -14,17 +14,17 @@ export default function PublicTrainingEnrollmentPage() {
   const queryTurmaId = searchParams.get('turma');
   const targetTurmaId = paramTurmaId || queryTurmaId;
 
-  // Campos digitados pelo usuário
+  // Campos digitados pelo participante: CPF e Data de Nascimento
   const [cpf, setCpf] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
   // Nome puxado da API após informar CPF e Data de Nascimento
   const [nome, setNome] = useState('');
 
-  // Turma opcional
+  // Informações da turma se vinculada
   const [activeTurma, setActiveTurma] = useState(null);
 
-  // Estados de controle e feedback
+  // Estados de controle
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -48,7 +48,6 @@ export default function PublicTrainingEnrollmentPage() {
     const formatted = formatCpf(e.target.value);
     setCpf(formatted);
     setErrorMsg('');
-    // Se o usuário alterar o CPF após ter buscado, reseta a busca
     if (searched) {
       setSearched(false);
       setNome('');
@@ -64,7 +63,7 @@ export default function PublicTrainingEnrollmentPage() {
     }
   };
 
-  // Etapa 1: Busca o nome na API após CPF e Data de Nascimento estarem preenchidos
+  // Etapa 1: Busca o nome na API após preencher CPF e Data de Nascimento
   const handleBuscarNome = async (e) => {
     if (e) e.preventDefault();
 
@@ -88,23 +87,23 @@ export default function PublicTrainingEnrollmentPage() {
         setNome(res.nome);
         setSearched(true);
       } else {
-        setErrorMsg(res.error || 'Não foi possível localizar os dados na Receita Federal.');
+        setErrorMsg(res.error || 'Não foi possível localizar os dados do titular. Verifique os números informados.');
         setSearched(false);
         setNome('');
       }
     } catch (err) {
       console.error('Erro na consulta:', err);
-      setErrorMsg('Erro ao conectar ao serviço de busca da Receita Federal.');
+      setErrorMsg('Erro ao conectar ao serviço de consulta de CPF.');
       setSearched(false);
     } finally {
       setSearching(false);
     }
   };
 
-  // Etapa 2: Confirma e envia para o sistema
+  // Etapa 2: Confirma e envia para a lista de participação do sistema
   const handleConfirmarEnvio = async () => {
     if (!nome) {
-      setErrorMsg('Busque o nome primeiro antes de enviar.');
+      setErrorMsg('Busque o nome antes de confirmar.');
       return;
     }
 
@@ -113,7 +112,7 @@ export default function PublicTrainingEnrollmentPage() {
     setErrorMsg('');
 
     try {
-      const protocolNumber = `TRN-${Date.now().toString().slice(-6)}`;
+      const protocolNumber = `PART-${Date.now().toString().slice(-6)}`;
       const result = await registerStudent({
         turma_id: targetTurmaId || null,
         nome: nome.trim(),
@@ -126,11 +125,11 @@ export default function PublicTrainingEnrollmentPage() {
       setSuccessData({
         ...result,
         protocol: protocolNumber,
-        turmaNome: activeTurma?.course_name || activeTurma?.name || 'Treinamento TotalSafety'
+        turmaNome: activeTurma?.course_name || activeTurma?.name || 'Treinamento'
       });
     } catch (err) {
       console.error('Erro ao enviar:', err);
-      setErrorMsg('Erro ao registrar no sistema. Tente novamente.');
+      setErrorMsg('Erro ao registrar participação no sistema. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -148,170 +147,138 @@ export default function PublicTrainingEnrollmentPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#0f172a',
-      backgroundImage: 'radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.45) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(13, 148, 136, 0.3) 0px, transparent 50%)',
+      backgroundColor: '#f1f5f9',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '2rem 1rem',
-      fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-      color: '#f8fafc'
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      color: '#0f172a'
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '520px',
-        backgroundColor: '#1e293b',
-        border: '1px solid #334155',
-        borderRadius: '1.25rem',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+        maxWidth: '480px',
+        backgroundColor: '#ffffff',
+        border: '1px solid #cbd5e1',
+        borderRadius: '8px',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05)',
         overflow: 'hidden'
       }}>
         
-        {/* Cabeçalho */}
+        {/* Cabeçalho Institucional Simples */}
         <div style={{
-          padding: '2rem 2rem 1.5rem',
-          background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.98) 100%)',
-          borderBottom: '1px solid #334155',
-          textAlign: 'center'
+          padding: '1.75rem 1.75rem 1.25rem',
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <img 
-              src="/logo-totalsafety.png" 
-              alt="TotalSafety" 
-              style={{ maxHeight: '38px', objectFit: 'contain' }}
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <span style={{ 
-              backgroundColor: '#0284c7', 
-              color: '#ffffff', 
-              fontSize: '0.72rem', 
-              fontWeight: '700', 
-              padding: '0.25rem 0.65rem', 
-              borderRadius: '9999px',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase'
-            }}>
-              Lista de Presença
-            </span>
-          </div>
-
-          <h1 style={{ fontSize: '1.45rem', fontWeight: '800', color: '#ffffff', margin: 0, letterSpacing: '-0.02em' }}>
-            Inscrição no Treinamento
+          <h1 style={{ 
+            fontSize: '1.25rem', 
+            fontWeight: '700', 
+            color: '#0f172a', 
+            margin: 0,
+            lineHeight: '1.3'
+          }}>
+            Formulário de Participação
           </h1>
-          <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.4rem', marginBottom: 0 }}>
-            Coloque seu CPF e Data de Nascimento para buscar seu nome oficial na Receita Federal.
+          <p style={{ 
+            fontSize: '0.875rem', 
+            color: '#64748b', 
+            marginTop: '0.35rem', 
+            marginBottom: 0,
+            lineHeight: '1.4'
+          }}>
+            Preencha seu CPF e data de nascimento para registrar sua presença no treinamento.
           </p>
 
           {activeTurma && (
             <div style={{
-              marginTop: '1.25rem',
-              padding: '0.75rem 1rem',
-              backgroundColor: 'rgba(2, 132, 199, 0.12)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              borderRadius: '0.75rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              textAlign: 'left'
+              marginTop: '1rem',
+              padding: '0.75rem',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px'
             }}>
-              <Award size={22} style={{ color: '#38bdf8', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '0.72rem', color: '#7dd3fc', fontWeight: '700', textTransform: 'uppercase' }}>
-                  Turma
-                </div>
-                <div style={{ fontSize: '0.95rem', color: '#f0f9ff', fontWeight: '700' }}>
-                  {activeTurma.course_name || activeTurma.name}
-                </div>
-                {activeTurma.company && (
-                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                    Empresa: {activeTurma.company} {activeTurma.start_date ? `• Data: ${new Date(activeTurma.start_date).toLocaleDateString('pt-BR')}` : ''}
-                  </div>
-                )}
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>
+                Treinamento:
               </div>
+              <div style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: '600', marginTop: '2px' }}>
+                {activeTurma.course_name || activeTurma.name}
+              </div>
+              {activeTurma.company && (
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                  Empresa: {activeTurma.company}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Corpo */}
-        <div style={{ padding: '2rem' }}>
+        {/* Corpo do Formulário */}
+        <div style={{ padding: '1.75rem' }}>
           {successData ? (
             <div style={{ textAlign: 'center' }}>
               <div style={{
-                width: '64px',
-                height: '64px',
+                width: '48px',
+                height: '48px',
                 borderRadius: '50%',
-                backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                color: '#10b981',
+                backgroundColor: '#dcfce7',
+                color: '#16a34a',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 1.25rem',
-                border: '1px solid rgba(16, 185, 129, 0.3)'
+                margin: '0 auto 1rem'
               }}>
-                <CheckCircle2 size={36} />
+                <CheckCircle2 size={28} />
               </div>
 
-              <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: '#ffffff', marginBottom: '0.4rem' }}>
-                Inscrição Confirmada!
+              <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.35rem' }}>
+                Participação Registrada
               </h2>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
-                Seus dados foram enviados com sucesso para a lista de presença do setor de treinamento.
+              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>
+                Seus dados foram enviados com sucesso para a lista de presença.
               </p>
 
-              {/* Comprovante */}
+              {/* Tabela de Comprovante */}
               <div style={{
-                backgroundColor: '#0f172a',
-                border: '1px solid #334155',
-                borderRadius: '0.85rem',
-                padding: '1.25rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '1rem',
                 textAlign: 'left',
-                marginBottom: '1.5rem'
+                marginBottom: '1.25rem',
+                fontSize: '0.85rem'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '600' }}>Protocolo</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <code style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: '700' }}>{successData.protocol}</code>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ color: '#64748b' }}>Protocolo:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <strong style={{ fontFamily: 'monospace', color: '#0f172a' }}>{successData.protocol}</strong>
                     <button
                       type="button"
                       onClick={handleCopyProtocol}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: copiedProtocol ? '#10b981' : '#94a3b8',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                      title="Copiar Protocolo"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: copiedProtocol ? '#16a34a' : '#64748b' }}
+                      title="Copiar"
                     >
-                      {copiedProtocol ? <Check size={15} /> : <Copy size={15} />}
+                      {copiedProtocol ? <Check size={14} /> : <Copy size={14} />}
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.65rem', fontSize: '0.875rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div>
-                    <span style={{ color: '#64748b' }}>Nome Completo: </span>
-                    <strong style={{ color: '#f8fafc' }}>{successData.nome}</strong>
+                    <span style={{ color: '#64748b' }}>Participante: </span>
+                    <strong style={{ color: '#0f172a' }}>{successData.nome}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748b' }}>CPF: </span>
-                    <strong style={{ color: '#f8fafc' }}>{successData.cpf}</strong>
+                    <strong style={{ color: '#0f172a' }}>{successData.cpf}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748b' }}>Data de Nascimento: </span>
-                    <strong style={{ color: '#f8fafc' }}>
+                    <strong style={{ color: '#0f172a' }}>
                       {successData.data_nascimento ? new Date(successData.data_nascimento).toLocaleDateString('pt-BR') : '-'}
                     </strong>
                   </div>
-                  {successData.turmaNome && (
-                    <div>
-                      <span style={{ color: '#64748b' }}>Treinamento: </span>
-                      <strong style={{ color: '#38bdf8' }}>{successData.turmaNome}</strong>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -325,21 +292,21 @@ export default function PublicTrainingEnrollmentPage() {
                   setSearched(false);
                 }}
                 style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '0.65rem',
-                  padding: '0.75rem 1.25rem',
-                  fontSize: '0.875rem',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '0.65rem 1rem',
+                  fontSize: '0.85rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.4rem'
                 }}
               >
-                <RefreshCw size={15} />
-                Realizar Nova Inscrição
+                <RefreshCw size={14} />
+                Novo Registro
               </button>
             </div>
           ) : (
@@ -347,11 +314,15 @@ export default function PublicTrainingEnrollmentPage() {
               
               {/* CAMPO 1: CPF */}
               <div>
-                <label htmlFor="cpf-input" style={{ fontSize: '0.875rem', fontWeight: '700', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem' }}>
-                  <CreditCard size={16} style={{ color: '#38bdf8' }} />
-                  CPF *
+                <label htmlFor="cpf-input" style={{ 
+                  display: 'block',
+                  fontSize: '0.875rem', 
+                  fontWeight: '600', 
+                  color: '#334155',
+                  marginBottom: '0.35rem' 
+                }}>
+                  CPF
                 </label>
-
                 <input
                   id="cpf-input"
                   type="text"
@@ -363,25 +334,29 @@ export default function PublicTrainingEnrollmentPage() {
                   autoFocus
                   style={{
                     width: '100%',
-                    padding: '0.9rem 1rem',
-                    backgroundColor: '#0f172a',
-                    border: `1.5px solid ${searched ? '#10b981' : '#334155'}`,
-                    borderRadius: '0.75rem',
-                    color: '#f8fafc',
-                    fontSize: '1.1rem',
+                    padding: '0.75rem 0.85rem',
+                    backgroundColor: '#ffffff',
+                    border: `1px solid ${searched ? '#16a34a' : '#cbd5e1'}`,
+                    borderRadius: '6px',
+                    color: '#0f172a',
+                    fontSize: '1rem',
                     fontFamily: 'monospace',
                     boxSizing: 'border-box',
-                    outline: 'none',
-                    letterSpacing: '0.05em'
+                    outline: 'none'
                   }}
                 />
               </div>
 
               {/* CAMPO 2: DATA DE NASCIMENTO */}
               <div>
-                <label htmlFor="birthdate-input" style={{ fontSize: '0.875rem', fontWeight: '700', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem' }}>
-                  <Calendar size={16} style={{ color: '#38bdf8' }} />
-                  Data de Nascimento *
+                <label htmlFor="birthdate-input" style={{ 
+                  display: 'block',
+                  fontSize: '0.875rem', 
+                  fontWeight: '600', 
+                  color: '#334155',
+                  marginBottom: '0.35rem' 
+                }}>
+                  Data de Nascimento
                 </label>
                 <input
                   id="birthdate-input"
@@ -391,12 +366,12 @@ export default function PublicTrainingEnrollmentPage() {
                   required
                   style={{
                     width: '100%',
-                    padding: '0.9rem 1rem',
-                    backgroundColor: '#0f172a',
-                    border: '1.5px solid #334155',
-                    borderRadius: '0.75rem',
-                    color: '#f8fafc',
-                    fontSize: '1rem',
+                    padding: '0.75rem 0.85rem',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    color: '#0f172a',
+                    fontSize: '0.95rem',
                     boxSizing: 'border-box',
                     outline: 'none'
                   }}
@@ -404,72 +379,74 @@ export default function PublicTrainingEnrollmentPage() {
               </div>
 
               {errorMsg && (
-                <div style={{ fontSize: '0.8rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <AlertCircle size={14} />
-                  {errorMsg}
+                <div style={{ 
+                  padding: '0.65rem 0.75rem',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  color: '#b91c1c',
+                  fontSize: '0.8125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>{errorMsg}</span>
                 </div>
               )}
 
-              {/* RESULTADO DA BUSCA: Nome Encontrado */}
+              {/* NOME ENCONTRADO PELA API */}
               {searched && nome && (
                 <div style={{
-                  padding: '1rem',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  border: '1.5px solid rgba(16, 185, 129, 0.4)',
-                  borderRadius: '0.75rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.4rem'
+                  padding: '0.85rem',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '6px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <UserCheck size={18} style={{ color: '#10b981' }} />
-                    <span style={{ fontSize: '0.72rem', color: '#6ee7b7', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.05em' }}>
-                      Nome Identificado (Receita Federal)
-                    </span>
+                  <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: '700', textTransform: 'uppercase' }}>
+                    Nome Identificado:
                   </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', marginTop: '2px' }}>
                     {nome}
                   </div>
                   {nome === 'Test Token' && (
-                    <div style={{ fontSize: '0.72rem', color: '#cbd5e1', opacity: 0.8 }}>
-                      * Retorno da API com token de testes oficial. Em produção com seu token retornará o nome real do titular.
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
+                      (Retorno fictício do token de testes)
                     </div>
                   )}
                 </div>
               )}
 
-              {/* BOTÕES DE AÇÃO: Buscar Nome ou Confirmar Envio */}
+              {/* BOTÕES DE AÇÃO */}
               {!searched ? (
                 <button
                   type="submit"
                   disabled={!canSearch}
                   style={{
-                    marginTop: '0.5rem',
-                    padding: '0.95rem 1.5rem',
-                    backgroundColor: !canSearch ? '#334155' : '#0284c7',
-                    backgroundImage: !canSearch ? 'none' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                    color: !canSearch ? '#94a3b8' : '#ffffff',
+                    marginTop: '0.25rem',
+                    padding: '0.75rem 1rem',
+                    backgroundColor: canSearch ? '#0284c7' : '#94a3b8',
+                    color: '#ffffff',
                     border: 'none',
-                    borderRadius: '0.75rem',
-                    fontSize: '1rem',
-                    fontWeight: '700',
-                    cursor: !canSearch ? 'not-allowed' : 'pointer',
+                    borderRadius: '6px',
+                    fontSize: '0.925rem',
+                    fontWeight: '600',
+                    cursor: canSearch ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.5rem',
-                    boxShadow: !canSearch ? 'none' : '0 10px 15px -3px rgba(2, 132, 199, 0.4)',
-                    transition: 'all 0.15s'
+                    gap: '0.4rem',
+                    transition: 'background-color 0.15s'
                   }}
                 >
                   {searching ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Consultando Receita Federal...
+                      <Loader2 size={16} className="animate-spin" />
+                      Consultando...
                     </>
                   ) : (
                     <>
-                      <Search size={18} />
+                      <Search size={16} />
                       Buscar Nome
                     </>
                   )}
@@ -480,64 +457,49 @@ export default function PublicTrainingEnrollmentPage() {
                   onClick={handleConfirmarEnvio}
                   disabled={submitting}
                   style={{
-                    marginTop: '0.5rem',
-                    padding: '0.95rem 1.5rem',
-                    backgroundColor: '#10b981',
-                    backgroundImage: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    marginTop: '0.25rem',
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#16a34a',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '0.75rem',
-                    fontSize: '1rem',
-                    fontWeight: '700',
+                    borderRadius: '6px',
+                    fontSize: '0.925rem',
+                    fontWeight: '600',
                     cursor: submitting ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.5rem',
-                    boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.4)'
+                    gap: '0.4rem'
                   }}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Enviando para o Sistema...
+                      <Loader2 size={16} className="animate-spin" />
+                      Enviando...
                     </>
                   ) : (
                     <>
-                      Confirmar e Enviar para o Sistema
-                      <ArrowRight size={18} />
+                      Confirmar Participação
+                      <ArrowRight size={16} />
                     </>
                   )}
                 </button>
               )}
 
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                gap: '0.4rem', 
-                fontSize: '0.75rem', 
-                color: '#64748b', 
-                marginTop: '0.25rem' 
-              }}>
-                <ShieldCheck size={14} style={{ color: '#10b981' }} />
-                Consulta oficial de CPF A em tempo real (Receita Federal)
-              </div>
-
             </form>
           )}
         </div>
 
-        {/* Rodapé */}
+        {/* Rodapé Simples */}
         <div style={{
-          padding: '1rem 2rem',
-          backgroundColor: '#0f172a',
-          borderTop: '1px solid #1e293b',
+          padding: '0.75rem 1.75rem',
+          backgroundColor: '#f8fafc',
+          borderTop: '1px solid #e2e8f0',
           textAlign: 'center',
           fontSize: '0.75rem',
           color: '#64748b'
         }}>
-          TotalSafety Treinamentos © {new Date().getFullYear()}
+          Registro de Presença • Dados protegidos
         </div>
 
       </div>
