@@ -1,92 +1,101 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { logoBase64 } from '../assets/logoBase64';
+import { logoBase64 } from '../assets/logoBase64.js';
+
+/**
+ * Desenha o cabeçalho padrão SGST em uma página específica do documento.
+ * O cabeçalho ocupa exatamente da coordenada Y = 10mm até Y = 40mm (altura total de 30mm).
+ */
+const drawHeader = (doc, pageNum, totalPagesExp, data) => {
+  const margin = 10;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const contentWidth = pageWidth - (margin * 2); // 190mm em folha A4
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.2);
+
+  // 1. Célula do Logo (x: 10, y: 10, w: 40, h: 22)
+  doc.rect(margin, margin, 40, 22);
+  if (logoBase64) {
+    try {
+      const props = doc.getImageProperties(logoBase64);
+      const cellW = 40 - 4; // 36mm
+      const cellH = 22 - 4; // 18mm
+      const ratio = props.width / props.height;
+      let renderW = cellW;
+      let renderH = renderW / ratio;
+
+      if (renderH > cellH) {
+        renderH = cellH;
+        renderW = renderH * ratio;
+      }
+
+      const imgX = margin + (40 - renderW) / 2;
+      const imgY = margin + (22 - renderH) / 2;
+      doc.addImage(logoBase64, 'PNG', imgX, imgY, renderW, renderH, undefined, 'FAST');
+    } catch (e) {
+      console.error('Erro ao renderizar logo no cabeçalho:', e);
+    }
+  }
+
+  // 2. Célula Superior SGST (x: 50, y: 10, w: 150, h: 13)
+  const rightBoxX = margin + 40;
+  const rightBoxW = contentWidth - 40;
+  doc.rect(rightBoxX, margin, rightBoxW, 13);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(0, 0, 0);
+  const titleCenterX = rightBoxX + (rightBoxW / 2);
+  doc.text('SISTEMA DE GESTÃO DE SEGURANÇA NO TRABALHO - SGST', titleCenterX, margin + 7.5, { align: 'center', baseline: 'middle' });
+
+  // 3. Célula Inferior Título do Relatório (x: 50, y: 23, w: 150, h: 9)
+  doc.setFillColor(240, 240, 240);
+  doc.rect(rightBoxX, margin + 13, rightBoxW, 9, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(0, 0, 0);
+  const repTitle = `TÍTULO: ${data.reportTitle || 'RELATÓRIO DE AÇÕES DE SST'}`;
+  doc.text(repTitle, titleCenterX, margin + 13 + 4.5, { align: 'center', baseline: 'middle' });
+
+  // 4. Linha de Metadados (4 colunas iguais, x: 10, y: 32, w: 190, h: 8)
+  const metaY = margin + 22; // 32mm
+  const colW = contentWidth / 4; // 47.5mm
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(0, 0, 0);
+
+  const metaCols = [
+    { line1: 'Nº documento:', line2: 'SGST 001' },
+    { line1: 'Revisão:', line2: '000' },
+    { line1: 'Data Emissão / Rev.:', line2: data.date || '01/07/2025' },
+    { line1: 'Página:', line2: `${pageNum} de ${totalPagesExp}` }
+  ];
+
+  metaCols.forEach((col, index) => {
+    const colX = margin + (index * colW);
+    doc.rect(colX, metaY, colW, 8);
+    const centerX = colX + (colW / 2);
+    doc.text(col.line1, centerX, metaY + 3, { align: 'center', baseline: 'middle' });
+    doc.text(col.line2, centerX, metaY + 6.2, { align: 'center', baseline: 'middle' });
+  });
+};
 
 export const generateSSTReport = async (data) => {
   const doc = new jsPDF('p', 'mm', 'a4');
   const margin = 10;
+  const pageHeight = doc.internal.pageSize.getHeight();
   
   // Total pages placeholder
   const totalPagesExp = '{tp}';
   
-  const didDrawPage = (data_hook) => {
-    // Save current table state to restore later
-    const previousAutoTable = doc.lastAutoTable;
-    
-    autoTable(doc, {
-      startY: margin,
-      margin: { left: margin, right: margin },
-      theme: 'plain',
-      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, halign: 'center', valign: 'middle', cellPadding: 2 },
-      body: [
-        [
-          { content: '', rowSpan: 2, styles: { minCellWidth: 40 } }, // Placeholder para logo
-          { content: 'SISTEMA DE GESTÃO DE SEGURANÇA NO TRABALHO - SGST', styles: { fontStyle: 'bold', fontSize: 11, minCellHeight: 15 } }
-        ],
-        [
-          { content: `TÍTULO: ${data.reportTitle || 'RELATÓRIO DE AÇÕES DE SST'}`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
-        ]
-      ],
-      didDrawCell: (cellData) => {
-        if (cellData.row.index === 0 && cellData.column.index === 0 && logoBase64) {
-          try {
-             const props = doc.getImageProperties(logoBase64);
-             const cellW = cellData.cell.width - 4;
-             const cellH = cellData.cell.height - 4;
-             const ratio = props.width / props.height;
-             
-             let renderW = cellW;
-             let renderH = renderW / ratio;
-             
-             if(renderH > cellH) {
-                renderH = cellH;
-                renderW = renderH * ratio;
-             }
-             
-             const x = cellData.cell.x + (cellData.cell.width - renderW) / 2;
-             const y = cellData.cell.y + (cellData.cell.height - renderH) / 2;
-             
-             doc.addImage(logoBase64, 'PNG', x, y, renderW, renderH, undefined, 'FAST');
-          } catch(e) {}
-        }
-      }
-    });
+  // O conteúdo sempre começa abaixo do cabeçalho (que termina em 40mm)
+  let startY = 45;
 
-    const finalY1 = doc.lastAutoTable.finalY;
-
-    autoTable(doc, {
-      startY: finalY1,
-      margin: { left: margin, right: margin },
-      theme: 'plain',
-      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 7, halign: 'center', valign: 'middle', cellPadding: 1 },
-      body: [
-        [
-          { content: 'Nº documento:\nSGST 001' },
-          { content: 'Revisão:\n000' },
-          { content: `Data Emissão / Rev.:\n${data.date || '01/07/2025'}` },
-          { content: `Página:\n${data_hook.pageNumber} de ${totalPagesExp}` }
-        ]
-      ]
-    });
-    
-    // Restore previous autoTable state so we don't mess up Y coordinates of main tables
-    doc.lastAutoTable = previousAutoTable;
-  };
-
-  // We use a dummy table just to trigger the first page header properly and set startY
-  autoTable(doc, {
-    startY: 0,
-    margin: { top: 45 },
-    body: [],
-    didDrawPage: didDrawPage
-  });
-  
-  let startY = 45; // Approx finalY of header
-
-  // Header and initial tables (Company Info)
+  // Informações da Empresa e Relatório
   autoTable(doc, {
     startY: startY,
-    margin: { top: 45, left: margin, right: margin },
+    margin: { top: 45, bottom: 20, left: margin, right: margin },
     theme: 'plain',
     styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
     body: [
@@ -100,13 +109,12 @@ export const generateSSTReport = async (data) => {
       [
         { content: `Local: ${data.siteName || ''}`, colSpan: 2 }
       ]
-    ],
-    didDrawPage: didDrawPage
+    ]
   });
   
   startY = doc.lastAutoTable.finalY;
 
-  // Process Actions
+  // Processamento das Ações
   if (data.actions && data.actions.length > 0) {
     data.actions.forEach((action, actionIndex) => {
       
@@ -124,14 +132,13 @@ export const generateSSTReport = async (data) => {
         requiredHeight += 85 * Math.ceil(action.photos.length / maxCols);
       }
 
-      // Se a altura necessária for maior que o espaço disponível, força quebra de página
-      if (startY + requiredHeight > doc.internal.pageSize.getHeight() - margin) {
+      // Se a altura necessária for maior que o espaço disponível na página atual, quebra página
+      if (startY > 45 && startY + requiredHeight > pageHeight - 20) {
         doc.addPage();
-        didDrawPage({ pageNumber: doc.internal.getNumberOfPages() });
         startY = 45;
       }
 
-      // Actions and Justification
+      // Dados da Ação e Justificativa
       const actionBody = [];
       if (action.actionText && action.actionText.trim()) {
         actionBody.push([{ content: `Ação: ${action.actionText}` }]);
@@ -140,42 +147,40 @@ export const generateSSTReport = async (data) => {
         actionBody.push([{ content: `Justificativa da ação: ${action.justificationText}` }]);
       }
       if (action.irregularities && action.irregularities.trim()) {
-        actionBody.push([{ content: 'Irregularidades apontadas:', styles: { fontStyle: 'bold', fillColor: [240,240,240] } }]);
+        actionBody.push([{ content: 'Irregularidades apontadas:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
       }
 
       if (actionBody.length > 0) {
         autoTable(doc, {
           startY: startY + 2,
-          margin: { top: 45, left: margin, right: margin },
+          margin: { top: 45, bottom: 20, left: margin, right: margin },
           theme: 'plain',
           pageBreak: 'avoid',
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
-          body: actionBody,
-          didDrawPage: didDrawPage
+          body: actionBody
         });
         startY = doc.lastAutoTable.finalY;
       } else {
         startY += 2;
       }
 
-      // Irregularities list
+      // Lista de Irregularidades
       if (action.irregularities && action.irregularities.trim()) {
         const listBody = action.irregularities.split('\n').map(item => [{ content: `• ${item.trim()}` }]);
         if (listBody.length > 0 && listBody[0][0].content !== '• ') {
-            autoTable(doc, {
+          autoTable(doc, {
             startY: startY,
-            margin: { top: 45, left: margin, right: margin },
+            margin: { top: 45, bottom: 20, left: margin, right: margin },
             theme: 'plain',
             pageBreak: 'avoid',
             styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
-            body: listBody,
-            didDrawPage: didDrawPage
-            });
-            startY = doc.lastAutoTable.finalY;
+            body: listBody
+          });
+          startY = doc.lastAutoTable.finalY;
         }
       }
 
-      // Fotos
+      // Fotos da Ação
       if (action.photos && action.photos.length > 0) {
         const maxCols = action.photos.length > 2 ? 3 : 2;
         const padding = 2;
@@ -208,7 +213,7 @@ export const generateSSTReport = async (data) => {
         
         autoTable(doc, {
           startY: startY,
-          margin: { top: 45, left: margin, right: margin },
+          margin: { top: 45, bottom: 20, left: margin, right: margin },
           theme: 'plain',
           pageBreak: 'avoid',
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 8, cellPadding: 1, halign: 'center', valign: 'middle' },
@@ -217,47 +222,48 @@ export const generateSSTReport = async (data) => {
             if (cellData.cell.raw && cellData.cell.raw.content === '' && cellData.cell.styles.minCellHeight === photoHeight) {
               let imgRowIndex = 0;
               for (let r = 0; r < cellData.row.index; r++) {
-                 if (cellData.table.body[r].cells[0].raw.content === '') imgRowIndex++;
+                if (cellData.table.body[r].cells[0].raw.content === '') imgRowIndex++;
               }
               const imgIndex = imgRowIndex * maxCols + cellData.column.index;
               const photo = action.photos[imgIndex];
               if (photo && photo.base64) {
                 try {
-                    const props = doc.getImageProperties(photo.base64);
-                    const cellW = cellData.cell.width - (padding*2);
-                    const cellH = cellData.cell.height - (padding*2);
-                    const imgRatio = props.width / props.height;
-                    const cellRatio = cellW / cellH;
-                    
-                    let renderW, renderH, xOffset = 0, yOffset = 0;
-                    
-                    if (imgRatio > cellRatio) {
-                      renderW = cellW;
-                      renderH = cellW / imgRatio;
-                      yOffset = (cellH - renderH) / 2;
-                    } else {
-                      renderH = cellH;
-                      renderW = cellH * imgRatio;
-                      xOffset = (cellW - renderW) / 2;
-                    }
-                    
-                    const imgType = photo.base64.indexOf('image/png') > -1 ? 'PNG' : 'JPEG';
-                    
-                    doc.addImage(
-                      photo.base64, 
-                      imgType, 
-                      cellData.cell.x + padding + xOffset, 
-                      cellData.cell.y + padding + yOffset, 
-                      renderW, 
-                      renderH, 
-                      undefined, 
-                      'FAST'
-                    );
-                } catch(e) { console.error('Erro desenhando foto', e) }
+                  const props = doc.getImageProperties(photo.base64);
+                  const cellW = cellData.cell.width - (padding * 2);
+                  const cellH = cellData.cell.height - (padding * 2);
+                  const imgRatio = props.width / props.height;
+                  const cellRatio = cellW / cellH;
+                  
+                  let renderW, renderH, xOffset = 0, yOffset = 0;
+                  
+                  if (imgRatio > cellRatio) {
+                    renderW = cellW;
+                    renderH = cellW / imgRatio;
+                    yOffset = (cellH - renderH) / 2;
+                  } else {
+                    renderH = cellH;
+                    renderW = cellH * imgRatio;
+                    xOffset = (cellW - renderW) / 2;
+                  }
+                  
+                  const imgType = photo.base64.indexOf('image/png') > -1 ? 'PNG' : 'JPEG';
+                  
+                  doc.addImage(
+                    photo.base64, 
+                    imgType, 
+                    cellData.cell.x + padding + xOffset, 
+                    cellData.cell.y + padding + yOffset, 
+                    renderW, 
+                    renderH, 
+                    undefined, 
+                    'FAST'
+                  );
+                } catch(e) {
+                  console.error('Erro desenhando foto no PDF', e);
+                }
               }
             }
-          },
-          didDrawPage: didDrawPage
+          }
         });
         
         startY = doc.lastAutoTable.finalY;
@@ -267,29 +273,27 @@ export const generateSSTReport = async (data) => {
       if (action.recommendations && action.recommendations.trim()) {
         autoTable(doc, {
           startY: startY,
-          margin: { top: 45, left: margin, right: margin },
+          margin: { top: 45, bottom: 20, left: margin, right: margin },
           theme: 'plain',
           pageBreak: 'avoid',
           styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
           body: [
-            [{ content: 'Ação recomendada:', styles: { fontStyle: 'bold', fillColor: [240,240,240] } }]
-          ],
-          didDrawPage: didDrawPage
+            [{ content: 'Ação recomendada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]
+          ]
         });
         startY = doc.lastAutoTable.finalY;
         
         const listBody = action.recommendations.split('\n').map(item => [{ content: `• ${item.trim()}` }]);
         if (listBody.length > 0 && listBody[0][0].content !== '• ') {
-            autoTable(doc, {
+          autoTable(doc, {
             startY: startY,
-            margin: { top: 45, left: margin, right: margin },
+            margin: { top: 45, bottom: 20, left: margin, right: margin },
             theme: 'plain',
             pageBreak: 'avoid',
             styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 9, cellPadding: 1.5 },
-            body: listBody,
-            didDrawPage: didDrawPage
-            });
-            startY = doc.lastAutoTable.finalY;
+            body: listBody
+          });
+          startY = doc.lastAutoTable.finalY;
         }
       }
     });
@@ -297,24 +301,21 @@ export const generateSSTReport = async (data) => {
 
   // Observações 
   if (data.observation && data.observation.trim()) {
-     autoTable(doc, {
+    autoTable(doc, {
       startY: startY + 8,
-      margin: { top: 45, left: margin, right: margin },
+      margin: { top: 45, bottom: 20, left: margin, right: margin },
       theme: 'plain',
-      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 10, cellPadding: 2, fillColor: [255, 255, 255], textColor: [0,0,0] },
+      styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 10, cellPadding: 2, fillColor: [255, 255, 255], textColor: [0, 0, 0] },
       body: [
         [{ content: 'Observações:\n' + data.observation }]
-      ],
-      didDrawPage: didDrawPage
+      ]
     });
     startY = doc.lastAutoTable.finalY;
   }
 
-  // Assinatura
-  const pageHeight = doc.internal.pageSize.getHeight();
+  // Bloco de Assinatura
   if (pageHeight - startY < 50) {
     doc.addPage();
-    didDrawPage({ pageNumber: doc.internal.getNumberOfPages() });
     startY = 45;
   }
 
@@ -335,11 +336,18 @@ export const generateSSTReport = async (data) => {
   const registerText = data.technicianRegister || 'MTE / SRTE N°';
   doc.text(registerText, pageWidthCenter, startY + 13, { align: 'center' });
 
-  // Update total pages
+  // Pós-processamento: Desenha o cabeçalho idêntico e consistente em todas as páginas geradas
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    doc.setPage(pageNum);
+    drawHeader(doc, pageNum, totalPagesExp, data);
+  }
+
+  // Atualiza o total de páginas ({tp} -> totalPages)
   if (typeof doc.putTotalPages === 'function') {
     doc.putTotalPages(totalPagesExp);
   }
 
-  // Save the PDF
-  doc.save(`Relatorio_${data.reportTitle || 'SST'}_${data.companyName}_${data.date.replace(/\//g, '-')}.pdf`);
+  // Salva o PDF no navegador
+  doc.save(`Relatorio_${data.reportTitle || 'SST'}_${data.companyName || 'Empresa'}_${(data.date || '').replace(/\//g, '-')}.pdf`);
 };
