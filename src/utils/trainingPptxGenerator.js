@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { getInstructorSignatureUrl } from '../data/officialTrainingModels';
 
 /**
  * Utilitário de geração de certificados PPTX para o setor de Treinamento.
@@ -8,6 +9,7 @@ import JSZip from 'jszip';
 
 export async function generateTrainingPPTX({
   templateBuffer,
+  certModel = 'modelo2', // 'modelo1' | 'modelo2'
   curso,
   descricao,
   data,
@@ -23,10 +25,11 @@ export async function generateTrainingPPTX({
 }) {
   let buffer = templateBuffer;
 
-  // Se não foi passado buffer diretamente, tenta buscar o modelo padrão
+  // Se não foi passado buffer diretamente, busca o modelo oficial selecionado
   if (!buffer) {
+    const targetTemplate = certModel === 'modelo1' ? '/template-modelo1.pptx' : '/template-modelo2.pptx';
     try {
-      const response = await fetch('/template-treinamento.pptx');
+      const response = await fetch(targetTemplate);
       if (response.ok) {
         buffer = await response.arrayBuffer();
       }
@@ -35,10 +38,16 @@ export async function generateTrainingPPTX({
     }
   }
 
-  // Fallback para o template geral caso o de treinamento específico ainda não tenha sido colocado
+  // Fallback caso o modelo específico não carregue
   if (!buffer) {
-    const response = await fetch('/template-certificado.pptx');
-    buffer = await response.arrayBuffer();
+    try {
+      const response = await fetch('/template-certificado.pptx');
+      if (response.ok) {
+        buffer = await response.arrayBuffer();
+      }
+    } catch {
+      // Ignora
+    }
   }
 
   const templateZip = await JSZip.loadAsync(buffer);
@@ -220,9 +229,18 @@ export async function generateTrainingPPTX({
         ], instrutorRegistro);
       }
 
-      // 10. Conteúdo Programático (se houver caixa com tag ou TextBox)
+      // 10. Conteúdo Programático (suporte a coluna única e 2 colunas para Modelo 2)
       if (conteudo) {
         xml = replaceText(xml, ['{{CONTEUDO}}', '[CONTEUDO]'], conteudo);
+
+        // Divisão balanceada para o Modelo 2 (2 colunas)
+        const contentLines = conteudo.split('\n').filter(l => l.trim().length > 0);
+        const midPoint = Math.ceil(contentLines.length / 2);
+        const col1Text = contentLines.slice(0, midPoint).join('\n');
+        const col2Text = contentLines.slice(midPoint).join('\n');
+
+        xml = replaceText(xml, ['{{CONTEUDO_COL1}}', '[CONTEUDO_COL1]'], col1Text || conteudo);
+        xml = replaceText(xml, ['{{CONTEUDO_COL2}}', '[CONTEUDO_COL2]'], col2Text || '');
       }
 
       // 11. Validade do Certificado
@@ -266,6 +284,24 @@ export async function generateTrainingPPTX({
   ).join('');
   contentTypes = contentTypes.replace('</Types>', newOverrides + '</Types>');
   newZip.file('[Content_Types].xml', contentTypes);
+
+  // Injetar a assinatura oficial correspondente ao instrutor selecionado
+  if (instrutorNome) {
+    try {
+      const sigUrl = getInstructorSignatureUrl(instrutorNome);
+      const sigRes = await fetch(sigUrl);
+      if (sigRes.ok) {
+        const sigBuffer = await sigRes.arrayBuffer();
+        if (certModel === 'modelo1') {
+          newZip.file('ppt/media/image4.png', sigBuffer);
+        } else {
+          newZip.file('ppt/media/image5.png', sigBuffer);
+        }
+      }
+    } catch {
+      // Mantém a assinatura padrão do arquivo base
+    }
+  }
 
   // Gerar o blob do arquivo final
   const blob = await newZip.generateAsync({

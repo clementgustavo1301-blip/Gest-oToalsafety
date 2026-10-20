@@ -15,29 +15,15 @@ import {
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments 
 } from '../services/trainingClassesService';
 
-import { OFFICIAL_TRAINING_MODELS } from '../data/officialTrainingModels';
+import { OFFICIAL_TRAINING_MODELS, OFFICIAL_INSTRUCTORS, getInstructorSignatureUrl } from '../data/officialTrainingModels';
 
 const DEFAULT_API_TOKEN = '5ae973d7a997af13f0aaf2bf60e65803';
 
 // Catálogo Oficial de Modelos de Treinamentos e Certificados TotalSafety / EcoSafety
 const COURSE_PRESETS = OFFICIAL_TRAINING_MODELS;
 
-
-// Lista de usuários padrão do sistema (fallback resiliente)
-const FALLBACK_PROFILES = [
-  { id: '1', name: 'Adeylton', role: 'Técnico em Segurança do Trabalho' },
-  { id: '2', name: 'Gustavo Onraed', role: 'Diretoria / Admin' },
-  { id: '3', name: 'Lucas Paiva', role: 'Diretoria / Admin' },
-  { id: '4', name: 'Caio Vinicius', role: 'Técnico em Segurança do Trabalho' },
-  { id: '5', name: 'Pedro Praxedes', role: 'Supervisor SST' },
-  { id: '6', name: 'Nailton Soares', role: 'Técnico em Segurança do Trabalho' },
-  { id: '7', name: 'Fernanda', role: 'Técnico em Segurança do Trabalho' },
-  { id: '8', name: 'luzian teixeira', role: 'Técnico em Segurança do Trabalho' },
-  { id: '9', name: 'Raul Campelo', role: 'Supervisor SST' },
-  { id: '10', name: 'Cadu', role: 'Técnico em Segurança do Trabalho' },
-  { id: '11', name: 'Katty Marinho', role: 'Enfermagem' },
-  { id: '12', name: 'leiliana nunes', role: 'Enfermagem' }
-];
+// Lista de instrutores e responsáveis técnicos oficiais extraídos diretamente dos certificados
+const FALLBACK_PROFILES = OFFICIAL_INSTRUCTORS;
 
 const TrainingCertificatesPage = () => {
   // Controle de Abas: 'generator' | 'turmas'
@@ -69,9 +55,9 @@ const TrainingCertificatesPage = () => {
     start_date: new Date().toISOString().split('T')[0],
     location: 'Mossoró - RN',
     company: 'TotalSafety',
-    instructor_name: 'Adeylton',
+    instructor_name: 'Eider Gomes do Nascimento',
     instructor_role: 'Instrutor e Responsável Técnico',
-    instructor_registration: 'SRTE N° 0009823/RN',
+    instructor_registration: 'MTE0009995/RN',
     content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
     status: 'Aberta'
   });
@@ -97,14 +83,14 @@ const TrainingCertificatesPage = () => {
     validade: defaultOfficialModel ? defaultOfficialModel.validade : '24 meses',
     local: 'Mossoró - RN',
     empresa: 'TotalSafety',
-    instrutorNome: 'Adeylton',
-    instrutorCargo: 'Instrutor e Responsável Técnico',
-    instrutorRegistro: 'SRTE N° 0009823/RN',
+    instrutorNome: defaultOfficialModel?.defaultInstructor?.name || 'Eider Gomes do Nascimento',
+    instrutorCargo: defaultOfficialModel?.defaultInstructor?.role || 'Instrutor e Responsável Técnico',
+    instrutorRegistro: defaultOfficialModel?.defaultInstructor?.registration || 'MTE0009995/RN',
     conteudo: defaultOfficialModel ? defaultOfficialModel.content : '1. Conceitos, definições e requisitos da NR-35...'
   });
 
   const [colaboradores, setColaboradores] = useState([
-    { nome: '', cpf: '' }
+    { nome: '', cpf: '', matricula: '' }
   ]);
 
   const [customTemplateFile, setCustomTemplateFile] = useState(null);
@@ -116,6 +102,7 @@ const TrainingCertificatesPage = () => {
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchText, setBatchText] = useState('');
   const [previewTab, setPreviewTab] = useState('frente'); // 'frente' | 'verso'
+  const [certModel, setCertModel] = useState(defaultOfficialModel?.modelType || 'modelo1'); // 'modelo1' | 'modelo2'
 
   // ----------------------------------------------------
   // Carregamento de Dados (Turmas, Inscrições e Usuários)
@@ -133,7 +120,13 @@ const TrainingCertificatesPage = () => {
       setTurmas(classList || []);
       setEnrollments(studentList || []);
       if (profileList && profileList.length > 0) {
-        setProfiles(profileList);
+        const combined = [...OFFICIAL_INSTRUCTORS];
+        profileList.forEach(p => {
+          if (!combined.some(c => c.name.toLowerCase() === p.name.toLowerCase())) {
+            combined.push(p);
+          }
+        });
+        setProfiles(combined);
       }
       if (companyList && companyList.length > 0) {
         setCompanies(companyList);
@@ -181,9 +174,9 @@ const TrainingCertificatesPage = () => {
       start_date: new Date().toISOString().split('T')[0],
       location: 'Mossoró - RN',
       company: 'TotalSafety',
-      instructor_name: profiles[0]?.name || 'Adeylton',
-      instructor_role: 'Instrutor e Responsável Técnico',
-      instructor_registration: 'SRTE N° 0009823/RN',
+      instructor_name: profiles[0]?.name || 'Eider Gomes do Nascimento',
+      instructor_role: profiles[0]?.role || 'Instrutor e Responsável Técnico',
+      instructor_registration: profiles[0]?.registration || 'MTE0009995/RN',
       content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
       status: 'Aberta'
     });
@@ -199,9 +192,9 @@ const TrainingCertificatesPage = () => {
       start_date: turma.start_date || new Date().toISOString().split('T')[0],
       location: turma.location || 'Mossoró - RN',
       company: turma.company || '',
-      instructor_name: turma.instructor_name || profiles[0]?.name || 'Adeylton',
+      instructor_name: turma.instructor_name || profiles[0]?.name || 'Eider Gomes do Nascimento',
       instructor_role: turma.instructor_role || 'Instrutor e Responsável Técnico',
-      instructor_registration: turma.instructor_registration || 'SRTE N° 0009823/RN',
+      instructor_registration: turma.instructor_registration || 'MTE0009995/RN',
       content: turma.content || '',
       status: turma.status || 'Aberta'
     });
@@ -338,11 +331,17 @@ const TrainingCertificatesPage = () => {
       duracao: preset.duration,
       conteudo: preset.content,
       descricao: preset.description || `Projeto de treinamento com carga horária de ${preset.duration}, desenvolvido em conformidade com as diretrizes e requisitos técnicos da ${preset.name}.`,
-      validade: preset.validade || '24 meses'
+      validade: preset.validade || '24 meses',
+      instrutorNome: preset.defaultInstructor?.name || prev.instrutorNome,
+      instrutorCargo: preset.defaultInstructor?.role || prev.instrutorCargo,
+      instrutorRegistro: preset.defaultInstructor?.registration || prev.instrutorRegistro
     }));
+    if (preset.modelType) {
+      setCertModel(preset.modelType);
+    }
     setFeedback({
       type: 'success',
-      text: `Modelo oficial "${preset.name}" carregado com sucesso!`
+      text: `Modelo oficial "${preset.name}" (${preset.modelType === 'modelo1' ? 'Modelo 1 - EcoCurvas' : 'Modelo 2 - Ondas & Colmeia'}) carregado com sucesso!`
     });
     setTimeout(() => setFeedback(null), 3500);
   };
@@ -485,6 +484,7 @@ const TrainingCertificatesPage = () => {
     try {
       const blob = await generateTrainingPPTX({
         templateBuffer: customTemplateBuffer,
+        certModel: certModel,
         curso: formData.curso,
         descricao: formData.descricao,
         data: formData.data,
@@ -1625,7 +1625,8 @@ const TrainingCertificatesPage = () => {
                           setFormData(prev => ({
                             ...prev,
                             instrutorNome: sel ? sel.name : val,
-                            instrutorCargo: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instrutorCargo)
+                            instrutorCargo: sel?.role || prev.instrutorCargo,
+                            instrutorRegistro: sel?.registration || prev.instrutorRegistro
                           }));
                         }
                       }}
@@ -1871,230 +1872,407 @@ const TrainingCertificatesPage = () => {
                   </div>
                 </div>
 
-                {/* Moldura do Certificado Mockup Realista TotalSafety */}
+                {/* SELETOR INTERATIVO DOS 2 MODELOS OFICIAIS */}
                 <div style={{
-                  border: '1.5px solid rgba(147, 51, 234, 0.25)',
-                  borderRadius: '1rem',
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
-                  minHeight: '270px',
+                  marginBottom: '1rem',
+                  padding: '0.75rem',
+                  backgroundColor: 'var(--surface-hover)',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Layers size={15} style={{ color: '#8b5cf6' }} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Modelo Visual Oficial:
+                      </span>
+                    </div>
+                    <span style={{ 
+                      fontSize: '0.7rem', 
+                      fontWeight: '700', 
+                      color: certModel === 'modelo1' ? '#6d28d9' : '#ea580c',
+                      backgroundColor: certModel === 'modelo1' ? 'rgba(109, 40, 217, 0.1)' : 'rgba(234, 88, 12, 0.1)',
+                      padding: '0.15rem 0.6rem',
+                      borderRadius: '1rem'
+                    }}>
+                      {certModel === 'modelo1' ? '🟣 Modelo 1 Ativo (EcoCurvas Laterais)' : '⚡ Modelo 2 Ativo (Ondas & Colmeia Tech)'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+                    {/* Botão Modelo 1 */}
+                    <button
+                      type="button"
+                      onClick={() => setCertModel('modelo1')}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '0.6rem',
+                        border: certModel === 'modelo1' ? '2px solid #7c3aed' : '1px solid var(--border)',
+                        backgroundColor: certModel === 'modelo1' ? 'rgba(124, 58, 237, 0.08)' : 'var(--surface)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '0.2rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: '800', color: certModel === 'modelo1' ? '#6d28d9' : 'var(--text-primary)' }}>
+                          🟣 Modelo 1: EcoCurvas
+                        </span>
+                        {certModel === 'modelo1' && <CheckCircle2 size={13} style={{ color: '#7c3aed' }} />}
+                      </div>
+                      <span style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>
+                        Curvas laterais roxas, banner no topo, texto contínuo justificado, 3 assinaturas e verso em 1 coluna.
+                      </span>
+                    </button>
+
+                    {/* Botão Modelo 2 */}
+                    <button
+                      type="button"
+                      onClick={() => setCertModel('modelo2')}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '0.6rem',
+                        border: certModel === 'modelo2' ? '2px solid #ea580c' : '1px solid var(--border)',
+                        backgroundColor: certModel === 'modelo2' ? 'rgba(234, 88, 12, 0.08)' : 'var(--surface)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '0.2rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: '800', color: certModel === 'modelo2' ? '#c2410c' : 'var(--text-primary)' }}>
+                          ⚡ Modelo 2: Ondas & Colmeia
+                        </span>
+                        {certModel === 'modelo2' && <CheckCircle2 size={13} style={{ color: '#ea580c' }} />}
+                      </div>
+                      <span style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>
+                        Ondas roxo/laranja, malha hexagonal, nome em Azul Real, 4 assinaturas e verso em 2 colunas.
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* MOLDURA DO CERTIFICADO MOCKUP REALISTA (EXATAMENTE COMO O PDF SELECIONADO) */}
+                <div style={{
                   position: 'relative',
+                  width: '100%',
+                  aspectRatio: '1.414 / 1',
+                  borderRadius: '0.85rem',
                   overflow: 'hidden',
+                  backgroundColor: '#ffffff',
+                  backgroundImage: certModel === 'modelo1'
+                    ? `url(${previewTab === 'frente' ? '/certificate-templates/m1_frente_bg.jpg' : '/certificate-templates/m1_verso_bg.jpg'})`
+                    : `url(${previewTab === 'frente' ? '/certificate-templates/m2_frente_bg.png' : '/certificate-templates/m2_verso_bg.png'})`,
+                  backgroundSize: '100% 100%',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.06)',
+                  border: certModel === 'modelo1' ? '1.5px solid rgba(124, 58, 237, 0.3)' : '1.5px solid rgba(234, 88, 12, 0.3)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+                  padding: certModel === 'modelo1' ? '3.5% 9.5% 3.5% 9.5%' : '3% 7% 3% 7%',
+                  boxSizing: 'border-box',
+                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
                 }}>
-                  {/* Curvas Vetoriais Decorativas Oficiais (Roxo + Laranja) */}
-                  {/* Canto Superior Direito */}
-                  <svg
-                    style={{ position: 'absolute', top: 0, right: 0, width: '120px', height: '120px', pointerEvents: 'none', zIndex: 1 }}
-                    viewBox="0 0 100 100"
-                    fill="none"
-                  >
-                    <path d="M10 0 C 40 40, 70 50, 100 60 L 100 0 Z" fill="url(#purpleGradTop)" />
-                    <path d="M40 0 C 65 30, 85 40, 100 45 L 100 0 Z" fill="#ea580c" opacity="0.85" />
-                    <defs>
-                      <linearGradient id="purpleGradTop" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#581c87" />
-                        <stop offset="100%" stopColor="#7c3aed" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
+                  {/* ========================================================================= */}
+                  {/* RENDERIZAÇÃO: MODELO 1 (EcoCurvas Laterais - Roxo Oficial EcoSafety)       */}
+                  {/* ========================================================================= */}
+                  {certModel === 'modelo1' ? (
+                    previewTab === 'frente' ? (
+                      /* MODELO 1 - FRENTE */
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                        {/* Topo: Header Banner Oficial com Logomarca EcoSafety e Título */}
+                        <div style={{ textAlign: 'center' }}>
+                          <img 
+                            src="/certificate-templates/m1_header_transparent.png" 
+                            alt="EcoSafety Certificado de Capacitação" 
+                            style={{ width: '100%', maxHeight: '56px', objectFit: 'contain' }} 
+                          />
+                        </div>
 
-                  {/* Canto Inferior Esquerdo */}
-                  <svg
-                    style={{ position: 'absolute', bottom: 0, left: 0, width: '120px', height: '120px', pointerEvents: 'none', zIndex: 1 }}
-                    viewBox="0 0 100 100"
-                    fill="none"
-                  >
-                    <path d="M0 40 C 30 50, 60 60, 90 100 L 0 100 Z" fill="url(#purpleGradBot)" />
-                    <path d="M0 55 C 15 70, 35 85, 60 100 L 0 100 Z" fill="#ea580c" opacity="0.85" />
-                    <defs>
-                      <linearGradient id="purpleGradBot" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#581c87" />
-                        <stop offset="100%" stopColor="#7c3aed" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-
-                  {/* Marca d'água sutil de fundo */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    fontSize: '4.5rem',
-                    fontWeight: '900',
-                    color: 'rgba(109, 40, 217, 0.03)',
-                    letterSpacing: '8px',
-                    pointerEvents: 'none',
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap',
-                    zIndex: 0
-                  }}>
-                    TOTALSAFETY
-                  </div>
-
-                  {previewTab === 'frente' ? (
-                    <div style={{ position: 'relative', zIndex: 2, padding: '1.25rem 1.6rem', textAlign: 'center', display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-                      {/* Topo do Certificado */}
-                      <div>
+                        {/* Corpo: Texto Narrativo Justificado Contínuo */}
                         <div style={{ 
-                          fontSize: '0.95rem', 
-                          fontWeight: '900', 
-                          color: '#4c1d95', 
-                          letterSpacing: '1.5px', 
-                          textTransform: 'uppercase',
-                          marginBottom: '0.15rem'
+                          fontSize: '0.67rem', 
+                          lineHeight: '1.52', 
+                          textAlign: 'justify', 
+                          color: '#0f172a', 
+                          margin: '0.3rem 0' 
                         }}>
-                          CERTIFICADO DE CAPACITAÇÃO
-                        </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-                          A {formData.empresa || 'TOTALSAFETY'} certifica que:
-                        </div>
-
-                        {/* Nome do Participante em Azul Real */}
-                        <div style={{ 
-                          fontSize: '1.15rem', 
-                          fontWeight: '800', 
-                          color: '#1d4ed8', 
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px',
-                          display: 'inline-block',
-                          padding: '0.15rem 1.15rem',
-                          margin: '0.15rem auto',
-                          borderBottom: '2px solid rgba(29, 78, 216, 0.2)'
-                        }}>
-                          {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
-                        </div>
-
-                        {/* Texto de Identificação do Participante */}
-                        <div style={{ fontSize: '0.7rem', color: '#334155', marginTop: '0.25rem', lineHeight: '1.4' }}>
-                          Portador do CPF: <strong>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aproveitamento no dia{' '}
-                          <strong>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de{' '}
-                          <strong>{formData.local || 'Mossoró - RN'}</strong>, o treinamento de:
-                        </div>
-
-                        {/* Título Oficial do Treinamento */}
-                        <div style={{ 
-                          fontSize: '0.95rem', 
-                          fontWeight: '800', 
-                          color: '#1e293b', 
-                          marginTop: '0.35rem',
-                          padding: '0.2rem 0.5rem',
-                          backgroundColor: 'rgba(2, 132, 199, 0.05)',
-                          borderRadius: '0.4rem',
-                          display: 'inline-block',
-                          maxWidth: '95%'
-                        }}>
-                          {formData.curso}
-                        </div>
-
-                        {/* Descrição / Amparo Legal do Treinamento */}
-                        {formData.descricao && (
-                          <div style={{ 
-                            fontSize: '0.65rem', 
-                            color: '#475569', 
-                            marginTop: '0.35rem', 
-                            lineHeight: '1.38', 
-                            maxWidth: '92%', 
-                            margin: '0.3rem auto 0 auto',
-                            textAlign: 'justify'
-                          }}>
-                            {formData.descricao}
+                          A ECOSAFETY certifica que: <strong style={{ color: '#000000', fontWeight: '800' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong> e Matrícula: <strong>{firstStudent?.matricula || '266522'}</strong>, completou com aprovação no período de <strong>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong>{formData.local || 'Mossoró/RN'}</strong>, o treinamento de <strong style={{ color: '#000000', fontWeight: '800' }}>{formData.curso}</strong>. {formData.descricao}
+                          <div style={{ marginTop: '0.4rem', textAlign: 'left', fontWeight: '500', color: '#1e293b' }}>
+                            {formData.local || 'Mossoró/RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                           </div>
-                        )}
-                      </div>
-
-                      {/* Data / Local e Bloco de Assinaturas */}
-                      <div style={{ marginTop: '0.75rem', paddingTop: '0.4rem' }}>
-                        <div style={{ fontSize: '0.67rem', color: '#64748b', marginBottom: '0.55rem' }}>
-                          {formData.local || 'Mossoró - RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                         </div>
 
-                        {/* Grade de 3 Assinaturas */}
+                        {/* Rodapé: 3 Assinaturas com Traços e Imagens */}
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: '1fr 1fr 1fr',
-                          gap: '0.65rem',
-                          fontSize: '0.62rem',
-                          color: '#475569',
-                          alignItems: 'end'
+                          gap: '0.45rem',
+                          alignItems: 'end',
+                          textAlign: 'center',
+                          marginTop: '0.35rem'
                         }}>
-                          {/* Responsável Técnico */}
-                          <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '0.3rem' }}>
-                            <div style={{ fontSize: '0.6rem', fontWeight: '800', color: '#1e293b', textTransform: 'uppercase' }}>
-                              RESPONSÁVEL TÉCNICO
-                            </div>
-                            <div style={{ fontSize: '0.6rem', color: '#64748b' }}>Eider Gomes do Nascimento</div>
-                            <div style={{ fontSize: '0.56rem', color: '#94a3b8' }}>MTE 0009995/RN</div>
-                          </div>
-
-                          {/* Aluno */}
-                          <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '0.3rem' }}>
-                            <div style={{ fontSize: '0.6rem', fontWeight: '800', color: '#1e293b', textTransform: 'uppercase' }}>
-                              ALUNO
-                            </div>
-                            <div style={{ fontSize: '0.6rem', color: '#1d4ed8', fontWeight: '700' }}>
-                              {firstStudent?.nome ? firstStudent.nome : 'Participante'}
+                          {/* Coluna 1: Responsável Técnico */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <img src="/certificate-templates/signatures/sig_eider_gomes.png" alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
+                            <div style={{ borderTop: '1px solid #475569', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.54rem', fontWeight: '800', color: '#4c1d95', textTransform: 'uppercase' }}>RESPONSAVEL TÉCNICO</div>
+                              <div style={{ fontSize: '0.51rem', color: '#1e293b' }}>Eider Gomes do Nascimento</div>
+                              <div style={{ fontSize: '0.48rem', color: '#64748b' }}>Registro: MTE0009995/RN</div>
                             </div>
                           </div>
 
-                          {/* Instrutor */}
-                          <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '0.3rem' }}>
-                            <div style={{ fontSize: '0.6rem', fontWeight: '800', color: '#1e293b', textTransform: 'uppercase' }}>
-                              INSTRUTOR
+                          {/* Coluna 2: Aluno (PENDENTE) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.5rem', letterSpacing: '0.3px' }}>[ Assinatura Pendente ]</span>
                             </div>
-                            <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: '700' }}>
-                              {formData.instrutorNome || 'Adeylton'}
+                            <div style={{ borderTop: '1px solid #475569', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.54rem', fontWeight: '800', color: '#1e293b' }}>ALUNO:</div>
+                              <div style={{ fontSize: '0.51rem', color: '#1e293b', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE'}</div>
                             </div>
-                            <div style={{ fontSize: '0.56rem', color: '#94a3b8' }}>
-                              {formData.instrutorRegistro || 'SRTE N° 0009823/RN'}
+                          </div>
+
+                          {/* Coluna 3: Instrutor (Vinculado ao Dono) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <img src={getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
+                            <div style={{ borderTop: '1px solid #475569', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.54rem', fontWeight: '800', color: '#4c1d95', textTransform: 'uppercase' }}>INSTRUTOR:</div>
+                              <div style={{ fontSize: '0.51rem', color: '#1e293b', fontWeight: '700' }}>{formData.instrutorNome || 'Pedro Henrique Lima Padilha'}</div>
+                              <div style={{ fontSize: '0.48rem', color: '#64748b' }}>{formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP'}</div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      /* MODELO 1 - VERSO (Conteúdo em 1 Coluna Limpa) */
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                        <div>
+                          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '0.35rem', marginBottom: '0.4rem' }}>
+                            <div style={{ fontSize: '0.74rem', fontWeight: '800', color: '#1e293b' }}>
+                              Programa: <span style={{ color: '#4c1d95' }}>{formData.curso}</span>
+                            </div>
+                            <div style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>
+                              Carga horária: {formData.duracao}
+                            </div>
+                          </div>
+
+                          <div style={{ 
+                            fontSize: '0.63rem', 
+                            color: '#1e293b', 
+                            lineHeight: '1.45', 
+                            maxHeight: '190px', 
+                            overflowY: 'auto', 
+                            paddingRight: '0.4rem',
+                            whiteSpace: 'pre-line'
+                          }}>
+                            {formData.conteudo}
+                          </div>
+                        </div>
+
+                        <div style={{
+                          textAlign: 'center',
+                          fontSize: '0.56rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          letterSpacing: '0.4px',
+                          borderTop: '1px solid rgba(0,0,0,0.08)',
+                          paddingTop: '0.35rem'
+                        }}>
+                          ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
+                        </div>
+                      </div>
+                    )
                   ) : (
-                    /* Verso - Conteúdo Programático */
-                    <div style={{ position: 'relative', zIndex: 2, padding: '1.25rem 1.6rem', textAlign: 'left', display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ borderBottom: '1.5px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.5rem' }}>
-                          <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#1e293b' }}>
-                            Programa: <span style={{ color: '#4c1d95' }}>{formData.curso}</span>
+                    /* ========================================================================= */
+                    /* RENDERIZAÇÃO: MODELO 2 (Ondas Diagonais & Colmeia Tech - Roxo + Laranja)   */
+                    /* ========================================================================= */
+                    previewTab === 'frente' ? (
+                      /* MODELO 2 - FRENTE */
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                        {/* Topo do Certificado */}
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ 
+                            fontSize: '1.02rem', 
+                            fontWeight: '900', 
+                            color: '#1e293b', 
+                            letterSpacing: '1.5px', 
+                            textTransform: 'uppercase' 
+                          }}>
+                            CERTIFICADO DE CAPACITAÇÃO
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', marginTop: '0.15rem' }}>
-                            Carga horária: {formData.duracao}
+                          <div style={{ fontSize: '0.69rem', fontWeight: '600', color: '#334155', marginTop: '1px' }}>
+                            A ECOSAFETY certifica que:
+                          </div>
+
+                          {/* Destaque do Nome em Azul Real */}
+                          <div style={{ 
+                            fontSize: '1.15rem', 
+                            fontWeight: '900', 
+                            color: '#1d4ed8', 
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            margin: '0.3rem 0'
+                          }}>
+                            {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
+                          </div>
+
+                          <div style={{ fontSize: '0.65rem', color: '#334155', lineHeight: '1.4' }}>
+                            Portador do CPF: <strong>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
+                            <strong>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na ECOSAFETY TREINAMENTOS, o treinamento de:
+                          </div>
+
+                          <div style={{ 
+                            fontSize: '0.84rem', 
+                            fontWeight: '800', 
+                            color: '#1d4ed8', 
+                            margin: '0.25rem 0' 
+                          }}>
+                            {formData.curso}
+                          </div>
+
+                          {formData.descricao && (
+                            <div style={{ 
+                              fontSize: '0.6rem', 
+                              color: '#475569', 
+                              textAlign: 'justify', 
+                              lineHeight: '1.34', 
+                              maxWidth: '94%', 
+                              margin: '0.15rem auto' 
+                            }}>
+                              {formData.descricao}
+                            </div>
+                          )}
+
+                          <div style={{ fontSize: '0.63rem', color: '#1e293b', marginTop: '0.3rem' }}>
+                            {formData.local || 'Mossoró, RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                           </div>
                         </div>
 
-                        <div style={{ 
-                          fontSize: '0.68rem', 
-                          color: '#334155', 
-                          lineHeight: '1.45', 
-                          whiteSpace: 'pre-line',
-                          maxHeight: '150px',
-                          overflowY: 'auto',
-                          paddingRight: '0.4rem'
+                        {/* Rodapé: 4 Assinaturas com Traços e Imagens */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                          gap: '0.35rem',
+                          alignItems: 'end',
+                          textAlign: 'center',
+                          marginTop: '0.35rem'
                         }}>
-                          {formData.conteudo}
+                          {/* Raimundo - Responsável Técnico Geral */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <img src="/certificate-templates/signatures/sig_raimundo_fernandes.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                            <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#1e293b' }}>RESPONSAVEL TÉCNICO</div>
+                              <div style={{ fontSize: '0.45rem', color: '#334155' }}>Raimundo Fernandes de Oliveira Junior</div>
+                              <div style={{ fontSize: '0.43rem', color: '#64748b' }}>Registro CREA – 211204597-0</div>
+                            </div>
+                          </div>
+
+                          {/* Cezar Augusto ou Leiliana Nunes (se APH) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            {formData.curso?.toLowerCase().includes('aph') || formData.curso?.toLowerCase().includes('hospitalar') || formData.instrutorNome?.toLowerCase().includes('leiliana') ? (
+                              <>
+                                <img src="/certificate-templates/signatures/sig_leiliana_nunes.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
+                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#1e293b' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#334155' }}>Leiliana Nunes de Lima Fernandes</div>
+                                  <div style={{ fontSize: '0.41rem', color: '#64748b' }}>Registro Coren RN 333018</div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <img src="/certificate-templates/signatures/sig_cezar_augusto.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
+                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#1e293b' }}>RESPONSAVEL TÉCNICO / INSTRUTOR</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#334155' }}>Engenheiro Eletricista</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#334155' }}>Cezar Augusto Galvão De P. Camêlo</div>
+                                  <div style={{ fontSize: '0.41rem', color: '#64748b' }}>CREA-RN 211051104-4</div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Aluno (PENDENTE - sem imagem de assinatura falsa) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div style={{ height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: '0.42rem', color: '#94a3b8', fontStyle: 'italic' }}>[ Assinatura Pendente ]</span>
+                            </div>
+                            <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#1e293b' }}>ALUNO</div>
+                              <div style={{ fontSize: '0.45rem', color: '#1d4ed8', fontWeight: '700' }}>{firstStudent?.nome || 'Participante'}</div>
+                            </div>
+                          </div>
+
+                          {/* Instrutor (Vinculado ao Dono) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <img src={getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                            <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#1e293b' }}>INSTRUTOR</div>
+                              <div style={{ fontSize: '0.45rem', color: '#334155', fontWeight: '700' }}>{formData.instrutorNome || 'Eider Gomes do Nascimento'}</div>
+                              <div style={{ fontSize: '0.43rem', color: '#64748b' }}>{formData.instrutorRegistro || 'MTE0009995/RN'}</div>
+                            </div>
+                          </div>
                         </div>
                       </div>
+                    ) : (
+                      /* MODELO 2 - VERSO (Conteúdo em 2 Colunas Balanceadas) */
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                        <div>
+                          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '0.3rem', marginBottom: '0.4rem' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#1e293b' }}>
+                              Programa: <span style={{ color: '#1d4ed8' }}>{formData.curso}</span>
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>
+                              Carga horária: {formData.duracao}
+                            </div>
+                          </div>
 
-                      <div style={{
-                        marginTop: '0.65rem',
-                        paddingTop: '0.4rem',
-                        borderTop: '1px solid #e2e8f0',
-                        textAlign: 'center',
-                        fontSize: '0.62rem',
-                        fontWeight: '700',
-                        color: '#64748b',
-                        letterSpacing: '0.5px'
-                      }}>
-                        {formData.empresa?.toUpperCase() || 'TOTALSAFETY'} • CNPJ: 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
+                          {/* 2 Colunas de Conteúdo */}
+                          {(() => {
+                            const lines = (formData.conteudo || '').split('\n').filter(l => l.trim().length > 0);
+                            const mid = Math.ceil(lines.length / 2);
+                            const col1 = lines.slice(0, mid).join('\n');
+                            const col2 = lines.slice(mid).join('\n');
+                            return (
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '1.1rem',
+                                fontSize: '0.61rem',
+                                color: '#1e293b',
+                                lineHeight: '1.38',
+                                maxHeight: '190px',
+                                overflowY: 'auto',
+                                paddingRight: '0.35rem'
+                              }}>
+                                <div style={{ whiteSpace: 'pre-line' }}>{col1}</div>
+                                <div style={{ whiteSpace: 'pre-line' }}>{col2}</div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div style={{
+                          textAlign: 'center',
+                          fontSize: '0.56rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          letterSpacing: '0.4px',
+                          borderTop: '1px solid rgba(0,0,0,0.08)',
+                          paddingTop: '0.35rem'
+                        }}>
+                          ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
+                        </div>
                       </div>
-                    </div>
+                    )
                   )}
                 </div>
               </div>
@@ -2961,7 +3139,8 @@ const TrainingCertificatesPage = () => {
                       setTurmaFormData(prev => ({
                         ...prev,
                         instructor_name: sel ? sel.name : val,
-                        instructor_role: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instructor_role)
+                        instructor_role: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instructor_role),
+                        instructor_registration: sel?.registration || prev.instructor_registration
                       }));
                     }
                   }}

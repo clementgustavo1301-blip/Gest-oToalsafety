@@ -7,7 +7,23 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [userLinks, setUserLinks] = useState([]);
-  const [activeLink, setActiveLink] = useState(null);
+  const [activeLink, setActiveLinkState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('activeLink');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const setActiveLink = (link) => {
+    setActiveLinkState(link);
+    if (link) {
+      localStorage.setItem('activeLink', JSON.stringify(link));
+    } else {
+      localStorage.removeItem('activeLink');
+    }
+  };
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId, userMetadata = null) => {
@@ -107,7 +123,11 @@ export function AuthProvider({ children }) {
     setActiveLink,
     hasAccess,
     refreshProfile,
-    signOut: () => supabase.auth.signOut(),
+    signOut: () => {
+      localStorage.removeItem('activeLink');
+      setActiveLinkState(null);
+      return supabase.auth.signOut();
+    },
   };
 
   return (
