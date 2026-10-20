@@ -4,7 +4,8 @@ import {
   Upload, CheckCircle2, AlertCircle, Users, Sparkles, 
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
-  Edit, Key, ShieldCheck, ChevronRight, UserCheck, X, User
+  Edit, Key, ShieldCheck, ChevronRight, UserCheck, X, User,
+  Eye, CheckCircle, Clock, BookOpen, Briefcase, MapPin, Building
 } from 'lucide-react';
 import { generateTrainingPPTX } from '../utils/trainingPptxGenerator';
 import { formatCpf } from '../services/cpfService';
@@ -15,6 +16,35 @@ import {
 } from '../services/trainingClassesService';
 
 const DEFAULT_API_TOKEN = '5ae973d7a997af13f0aaf2bf60e65803';
+
+// Presets inteligentes para preenchimento com 1 clique
+const COURSE_PRESETS = [
+  {
+    name: 'NR-35 Trabalho em Altura',
+    duration: '8 horas',
+    content: '1. Normas e regulamentações aplicáveis ao trabalho em altura (NR-35)\n2. Análise de Risco e condições impeditivas\n3. Sistemas, equipamentos e procedimentos de proteção coletiva e individual\n4. EPIs para trabalho em altura: seleção, inspeção, conservação e limitação de uso\n5. Condutas em situações de emergência e noções de primeiros socorros'
+  },
+  {
+    name: 'NR-06 Equipamentos de Proteção Individual',
+    duration: '4 horas',
+    content: '1. Disposições gerais e exigências da Norma Regulamentadora NR-06\n2. Direitos e deveres do empregador e do trabalhador\n3. Tipos de EPIs e seleção adequada para cada risco operacional\n4. Procedimentos de inspeção, higienização, guarda e conservação periódica\n5. Critérios técnicos para substituição e descarte responsável'
+  },
+  {
+    name: 'NR-10 Segurança em Instalações Elétricas',
+    duration: '40 horas',
+    content: '1. Introdução à segurança com eletricidade e riscos em instalações elétricas\n2. Técnicas de Análise de Risco no setor elétrico\n3. Medidas de controle do risco elétrico (desenergização, aterramento, barreiras)\n4. Normas Técnicas Brasileiras (NBR da ABNT e NR-10)\n5. Primeiros socorros e combate a princípios de incêndios com eletricidade'
+  },
+  {
+    name: 'NR-33 Segurança em Espaços Confinados',
+    duration: '16 horas',
+    content: '1. Definições, identificação e reconhecimento de espaços confinados\n2. Critérios de indicação e uso de equipamentos de ventilação e medição de gases\n3. Procedimentos de Permissão de Entrada e Trabalho (PET)\n4. Monitoramento contínuo da atmosfera e controle dos riscos ocupacionais\n5. Técnicas de resgate e primeiros socorros em espaços confinados'
+  },
+  {
+    name: 'Brigada de Incêndio e Emergência',
+    duration: '8 horas',
+    content: '1. Teoria do fogo e métodos de propagação\n2. Classes de incêndio e agentes extintores específicos\n3. Operação prática de extintores e linha de hidrantes\n4. Rotas de fuga, sinalização e plano de abandono de área\n5. Técnicas de primeiros socorros e imobilização de vítimas'
+  }
+];
 
 // Lista de usuários padrão do sistema (fallback resiliente)
 const FALLBACK_PROFILES = [
@@ -33,8 +63,8 @@ const FALLBACK_PROFILES = [
 ];
 
 const TrainingCertificatesPage = () => {
-  // Controle de Abas: 'turmas' | 'generator'
-  const [activeTab, setActiveTab] = useState('turmas');
+  // Controle de Abas: 'generator' | 'turmas'
+  const [activeTab, setActiveTab] = useState('generator');
 
   // Usuários do Sistema para seleção de instrutores
   const [profiles, setProfiles] = useState(FALLBACK_PROFILES);
@@ -76,7 +106,7 @@ const TrainingCertificatesPage = () => {
   // Estados do Gerador de Certificados (PPTX)
   // ----------------------------------------------------
   const [formData, setFormData] = useState({
-    curso: 'Treinamento e Capacitação Profissional',
+    curso: 'NR-35 Trabalho em Altura',
     descricao: 'Certificamos que o participante concluiu com aproveitamento o treinamento com foco nas diretrizes e práticas técnicas estabelecidas.',
     data: new Date().toISOString().split('T')[0],
     duracao: '8 horas',
@@ -85,7 +115,7 @@ const TrainingCertificatesPage = () => {
     instrutorNome: 'Adeylton',
     instrutorCargo: 'Instrutor e Responsável Técnico',
     instrutorRegistro: 'SRTE N° 0009823/RN',
-    conteudo: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem'
+    conteudo: '1. Normas e regulamentações aplicáveis ao trabalho em altura (NR-35)\n2. Análise de Risco e condições impeditivas\n3. Sistemas, equipamentos e procedimentos de proteção coletiva e individual\n4. EPIs para trabalho em altura: seleção, inspeção, conservação e limitação de uso\n5. Condutas em situações de emergência e noções de primeiros socorros'
   });
 
   const [colaboradores, setColaboradores] = useState([
@@ -100,6 +130,7 @@ const TrainingCertificatesPage = () => {
   const [feedback, setFeedback] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchText, setBatchText] = useState('');
+  const [previewTab, setPreviewTab] = useState('frente'); // 'frente' | 'verso'
 
   // ----------------------------------------------------
   // Carregamento de Dados (Turmas, Inscrições e Usuários)
@@ -135,7 +166,7 @@ const TrainingCertificatesPage = () => {
       });
       setFeedback({ 
         type: 'info', 
-        text: `Nova inscrição recebida: ${newStudent.nome} (${newStudent.cpf})` 
+        text: `Nova inscrição recebida em tempo real: ${newStudent.nome} (${newStudent.cpf})` 
       });
       setTimeout(() => setFeedback(null), 5000);
     });
@@ -271,6 +302,21 @@ const TrainingCertificatesPage = () => {
     setTimeout(() => setFeedback(null), 4500);
   };
 
+  // Aplica um preset inteligente de curso
+  const applyPreset = (preset) => {
+    setFormData(prev => ({
+      ...prev,
+      curso: preset.name,
+      duracao: preset.duration,
+      conteudo: preset.content
+    }));
+    setFeedback({
+      type: 'success',
+      text: `Treinamento ${preset.name} aplicado com conteúdo programático oficial!`
+    });
+    setTimeout(() => setFeedback(null), 3500);
+  };
+
   // Alteração de turma de um aluno
   const handleStudentTurmaChange = async (studentId, newTurmaId) => {
     await updateStudent(studentId, { turma_id: newTurmaId || null });
@@ -320,6 +366,12 @@ const TrainingCertificatesPage = () => {
       return;
     }
     setColaboradores(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllColaboradores = () => {
+    if (window.confirm('Deseja limpar todos os participantes da lista?')) {
+      setColaboradores([{ nome: '', cpf: '' }]);
+    }
   };
 
   const handleTemplateUpload = (e) => {
@@ -454,266 +506,1367 @@ const TrainingCertificatesPage = () => {
     return matchTurma && matchSearch;
   });
 
+  const validCount = colaboradores.filter(c => c.nome.trim()).length;
+  const firstStudent = colaboradores.find(c => c.nome.trim());
+
   return (
-    <div className="training-certificates-page" style={{ padding: '1.5rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="training-certificates-page" style={{ padding: '1.75rem', maxWidth: '1440px', margin: '0 auto' }}>
       
-      {/* Cabeçalho Principal */}
+      {/* ========================================================================= */}
+      {/* HERO SECTION / HEADER ELEGANTE                                            */}
+      {/* ========================================================================= */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        marginBottom: '1.25rem',
-        paddingBottom: '1rem',
-        borderBottom: '1px solid var(--border)'
+        background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(99, 102, 241, 0.04) 50%, rgba(15, 23, 42, 0.02) 100%)',
+        border: '1px solid rgba(2, 132, 199, 0.18)',
+        borderRadius: '1.25rem',
+        padding: '1.5rem 1.75rem',
+        marginBottom: '1.5rem',
+        boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03)',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <div style={{ 
-            backgroundColor: '#0284c7', 
-            color: '#fff', 
-            padding: '0.7rem', 
-            borderRadius: 'var(--radius-md)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            boxShadow: '0 4px 6px -1px rgba(2, 132, 199, 0.3)'
-          }}>
-            <Award size={26} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-                Gestão de Treinamentos & Certificados
-              </h1>
-              <span style={{ 
-                backgroundColor: 'rgba(2, 132, 199, 0.12)', 
-                color: '#0284c7', 
-                fontSize: '0.7rem', 
-                fontWeight: '700', 
-                padding: '0.2rem 0.55rem', 
-                borderRadius: '1rem', 
-                textTransform: 'uppercase' 
-              }}>
-                Exclusivo Vínculo Treinamento
-              </span>
+        {/* Glow de fundo */}
+        <div style={{
+          position: 'absolute',
+          top: '-40px',
+          right: '-40px',
+          width: '220px',
+          height: '220px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(2, 132, 199, 0.15) 0%, transparent 70%)',
+          pointerEvents: 'none'
+        }} />
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1.25rem',
+          position: 'relative',
+          zIndex: 1
+        }}>
+          {/* Lado Esquerdo: Título e Identidade */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.15rem' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '1rem',
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 10px 25px -5px rgba(2, 132, 199, 0.45)',
+              flexShrink: 0
+            }}>
+              <Award size={30} />
             </div>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-              Link público de inscrição com consulta CPF A, listas de presença, gestão de turmas e emissão de certificados oficiais.
-            </p>
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                  Emissão de Certificados & Treinamentos
+                </h1>
+                <span style={{ 
+                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)',
+                  border: '1px solid rgba(2, 132, 199, 0.25)',
+                  color: '#0284c7', 
+                  fontSize: '0.72rem', 
+                  fontWeight: '700', 
+                  padding: '0.2rem 0.65rem', 
+                  borderRadius: '2rem', 
+                  textTransform: 'uppercase',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}>
+                  <ShieldCheck size={13} />
+                  Módulo Treinamento
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Ambiente integrado para geração de apresentações PowerPoint (.pptx) com 2 slides por participante, gestão de turmas e inscrição com CPF A da Receita.
+              </p>
+            </div>
+          </div>
+
+          {/* Lado Direito: Ações Rápidas de Configuração & Inscrição */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setShowTokenModal(true)}
+              style={{ 
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                fontSize: '0.8125rem',
+                fontWeight: '600',
+                padding: '0.55rem 0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}
+              title="Configurar Token da API CPF.CNPJ"
+            >
+              <Key size={14} style={{ color: '#0284c7' }} />
+              API CPF A (Receita)
+            </button>
+
+            <button
+              type="button"
+              className="btn"
+              onClick={() => copyPublicLink(null, 'general-header')}
+              style={{ 
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                fontSize: '0.8125rem',
+                fontWeight: '600',
+                padding: '0.55rem 0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}
+            >
+              {copiedKey === 'general-header' ? <Check size={14} style={{ color: '#10b981' }} /> : <LinkIcon size={14} style={{ color: '#0284c7' }} />}
+              {copiedKey === 'general-header' ? 'Link Copiado!' : 'Copiar Link Público'}
+            </button>
+
+            <a
+              href="/inscricao"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn"
+              style={{ 
+                backgroundColor: '#0284c7',
+                color: '#fff',
+                fontSize: '0.8125rem',
+                fontWeight: '600',
+                padding: '0.55rem 0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)',
+                textDecoration: 'none'
+              }}
+              title="Abrir página pública de inscrição"
+            >
+              <ExternalLink size={14} />
+              Portal de Inscrição
+            </a>
           </div>
         </div>
 
-        {/* Botões Rápidos do Cabeçalho */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setShowTokenModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem' }}
-            title="Configurar Token da API CPF.CNPJ"
-          >
-            <Key size={14} style={{ color: '#0284c7' }} />
-            API CPF A (Receita)
-          </button>
+        {/* Métricas / Estatísticas Rápidas em Pills */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '0.85rem',
+          marginTop: '1.25rem',
+          paddingTop: '1.15rem',
+          borderTop: '1px solid rgba(2, 132, 199, 0.12)'
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(2, 132, 199, 0.15)',
+            borderRadius: '0.75rem',
+            padding: '0.65rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '0.5rem',
+              backgroundColor: 'rgba(2, 132, 199, 0.12)',
+              color: '#0284c7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Award size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                Turmas Ativas
+              </div>
+              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                {turmas.length} {turmas.length === 1 ? 'turma' : 'turmas'}
+              </div>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => copyPublicLink(null, 'general-header')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem' }}
-          >
-            {copiedKey === 'general-header' ? <Check size={14} style={{ color: '#10b981' }} /> : <LinkIcon size={14} />}
-            {copiedKey === 'general-header' ? 'Link Copiado!' : 'Copiar Link Público'}
-          </button>
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(16, 185, 129, 0.18)',
+            borderRadius: '0.75rem',
+            padding: '0.65rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '0.5rem',
+              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+              color: '#10b981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Users size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                Inscrições Recebidas
+              </div>
+              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                {enrollments.length} {enrollments.length === 1 ? 'participante' : 'participantes'}
+              </div>
+            </div>
+          </div>
 
-          <a
-            href="/inscricao"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', textDecoration: 'none' }}
-            title="Abrir página pública de inscrição"
-          >
-            <ExternalLink size={14} />
-            Ver Portal de Inscrição
-          </a>
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(99, 102, 241, 0.18)',
+            borderRadius: '0.75rem',
+            padding: '0.65rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '0.5rem',
+              backgroundColor: 'rgba(99, 102, 241, 0.12)',
+              color: '#6366f1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Layers size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                Certificados no Gerador
+              </div>
+              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                {validCount} {validCount === 1 ? 'aluno pronto' : 'alunos prontos'}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Alerta de Feedback */}
+      {/* Alerta de Feedback Global */}
       {feedback && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.75rem 1rem',
+          gap: '0.65rem',
+          padding: '0.85rem 1.15rem',
           marginBottom: '1.25rem',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: '0.75rem',
           backgroundColor: feedback.type === 'success' ? '#f0fdf4' : feedback.type === 'info' ? '#f0f9ff' : '#eff6ff',
           border: feedback.type === 'success' ? '1px solid #bbf7d0' : feedback.type === 'info' ? '1px solid #bae6fd' : '1px solid #bfdbfe',
           color: feedback.type === 'success' ? '#166534' : feedback.type === 'info' ? '#0369a1' : '#1e40af',
-          fontSize: '0.875rem'
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          animation: 'fadeIn 0.2s ease-in-out'
         }}>
           <CheckCircle2 size={18} />
           <span>{feedback.text}</span>
         </div>
       )}
 
-      {/* Barra de Abas */}
+      {/* ========================================================================= */}
+      {/* SEGMENTED TAB CONTROL                                                     */}
+      {/* ========================================================================= */}
       <div style={{
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
-        gap: '0.5rem',
-        borderBottom: '2px solid var(--border)',
+        padding: '0.35rem',
+        backgroundColor: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '0.85rem',
         marginBottom: '1.5rem',
-        paddingBottom: '0.25rem'
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        gap: '0.35rem'
       }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('generator')}
+          style={{
+            padding: '0.65rem 1.35rem',
+            border: 'none',
+            borderRadius: '0.65rem',
+            backgroundColor: activeTab === 'generator' ? '#0284c7' : 'transparent',
+            color: activeTab === 'generator' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: activeTab === 'generator' ? '700' : '600',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.55rem',
+            boxShadow: activeTab === 'generator' ? '0 4px 12px rgba(2, 132, 199, 0.35)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Award size={17} />
+          Gerador de Certificados PPTX
+          {validCount > 0 && (
+            <span style={{
+              backgroundColor: activeTab === 'generator' ? 'rgba(255,255,255,0.25)' : '#10b981',
+              color: '#fff',
+              fontSize: '0.72rem',
+              padding: '2px 8px',
+              borderRadius: '1rem',
+              fontWeight: '700'
+            }}>
+              {validCount}
+            </span>
+          )}
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab('turmas')}
           style={{
-            padding: '0.65rem 1.25rem',
+            padding: '0.65rem 1.35rem',
             border: 'none',
-            borderBottom: activeTab === 'turmas' ? '3px solid #0284c7' : '3px solid transparent',
-            backgroundColor: activeTab === 'turmas' ? 'rgba(2, 132, 199, 0.08)' : 'transparent',
-            color: activeTab === 'turmas' ? '#0284c7' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'turmas' ? '700' : '500',
-            fontSize: '0.9375rem',
+            borderRadius: '0.65rem',
+            backgroundColor: activeTab === 'turmas' ? '#0284c7' : 'transparent',
+            color: activeTab === 'turmas' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: activeTab === 'turmas' ? '700' : '600',
+            fontSize: '0.9rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
-            transition: 'all 0.15s'
+            gap: '0.55rem',
+            boxShadow: activeTab === 'turmas' ? '0 4px 12px rgba(2, 132, 199, 0.35)' : 'none',
+            transition: 'all 0.2s ease'
           }}
         >
-          <Users size={18} />
-          Turmas & Inscrições
+          <Users size={17} />
+          Turmas & Inscrições Oficiais
           <span style={{
-            backgroundColor: activeTab === 'turmas' ? '#0284c7' : 'var(--border)',
+            backgroundColor: activeTab === 'turmas' ? 'rgba(255,255,255,0.25)' : 'var(--border)',
             color: activeTab === 'turmas' ? '#fff' : 'var(--text-secondary)',
             fontSize: '0.72rem',
-            padding: '1px 6px',
-            borderRadius: '10px',
+            padding: '2px 8px',
+            borderRadius: '1rem',
             fontWeight: '700'
           }}>
             {enrollments.length}
           </span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('generator')}
-          style={{
-            padding: '0.65rem 1.25rem',
-            border: 'none',
-            borderBottom: activeTab === 'generator' ? '3px solid #0284c7' : '3px solid transparent',
-            backgroundColor: activeTab === 'generator' ? 'rgba(2, 132, 199, 0.08)' : 'transparent',
-            color: activeTab === 'generator' ? '#0284c7' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'generator' ? '700' : '500',
-            fontSize: '0.9375rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
-            transition: 'all 0.15s'
-          }}
-        >
-          <Award size={18} />
-          Gerador de Certificados PPTX
-          {colaboradores.filter(c => c.nome.trim()).length > 0 && (
-            <span style={{
-              backgroundColor: '#10b981',
-              color: '#fff',
-              fontSize: '0.72rem',
-              padding: '1px 6px',
-              borderRadius: '10px',
-              fontWeight: '700'
-            }}>
-              {colaboradores.filter(c => c.nome.trim()).length} prontos
-            </span>
-          )}
-        </button>
       </div>
 
       {/* ========================================================================= */}
-      {/* ABA 1: TURMAS E INSCRIÇÕES                                                */}
+      {/* ABA 1: GERADOR DE CERTIFICADOS PPTX                                       */}
+      {/* ========================================================================= */}
+      {activeTab === 'generator' && (
+        <div>
+          
+          {/* BARRA SUPERIOR UNIFICADA: Importar Turma & Template PPTX */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+            gap: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            {/* Card: Carregador Rápido de Turma */}
+            <div style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '1rem',
+              padding: '1.15rem 1.35rem',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '0.75rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Users size={18} style={{ color: '#0284c7' }} />
+                  <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                    Importar Alunos de uma Turma
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                  {turmas.length} turmas disponíveis
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <select
+                  className="input"
+                  style={{ fontSize: '0.85rem', flex: 1, padding: '0.55rem 0.75rem' }}
+                  onChange={(e) => {
+                    const found = turmas.find(t => String(t.id) === String(e.target.value));
+                    if (found) handleLoadTurmaIntoGenerator(found);
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Selecione a turma para carregar alunos e curso...</option>
+                  {turmas.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({enrollments.filter(e => e.turma_id === t.id).length} inscritos)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Card: Arquivo de Modelo PPTX */}
+            <div style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '1rem',
+              padding: '1.15rem 1.35rem',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                  <Layers size={18} style={{ color: '#0284c7' }} />
+                  <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                    Modelo de Certificado (.pptx)
+                  </span>
+                  {customTemplateFile ? (
+                    <span style={{ 
+                      backgroundColor: '#dcfce7', 
+                      color: '#15803d', 
+                      fontSize: '0.7rem', 
+                      fontWeight: '700', 
+                      padding: '0.15rem 0.55rem', 
+                      borderRadius: '1rem' 
+                    }}>
+                      Personalizado
+                    </span>
+                  ) : (
+                    <span style={{ 
+                      backgroundColor: '#f1f5f9', 
+                      color: '#475569', 
+                      fontSize: '0.7rem', 
+                      fontWeight: '700', 
+                      padding: '0.15rem 0.55rem', 
+                      borderRadius: '1rem' 
+                    }}>
+                      Padrão TotalSafety
+                    </span>
+                  )}
+                </div>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  {customTemplateFile 
+                    ? `Arquivo: "${customTemplateFile.name}" (${(customTemplateFile.size / 1024).toFixed(1)} KB)`
+                    : 'Usando slide mestre oficial com frente e verso.'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  accept=".pptx" 
+                  onChange={handleTemplateUpload} 
+                  style={{ display: 'none' }} 
+                />
+
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ 
+                    backgroundColor: 'var(--surface-hover)', 
+                    border: '1px solid var(--border)',
+                    fontSize: '0.8rem', 
+                    fontWeight: '600',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.35rem',
+                    padding: '0.5rem 0.8rem'
+                  }}
+                >
+                  <Upload size={14} />
+                  {customTemplateFile ? 'Trocar PPTX' : 'Carregar PPTX'}
+                </button>
+
+                {customTemplateFile && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={removeCustomTemplate}
+                    title="Restaurar modelo padrão TotalSafety"
+                    style={{ 
+                      backgroundColor: 'transparent',
+                      border: '1px solid var(--border)',
+                      fontSize: '0.8rem', 
+                      color: 'var(--danger)',
+                      padding: '0.5rem 0.75rem'
+                    }}
+                  >
+                    Restaurar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* GRID PRINCIPAL: DADOS DO TREINAMENTO (ESQ) + ALUNOS & PREVIEW (DIR)      */}
+          {/* ========================================================================= */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(380px, 1.25fr) minmax(420px, 1.4fr)',
+            gap: '1.5rem',
+            alignItems: 'start'
+          }}>
+            
+            {/* ------------------------------------------------------------- */}
+            {/* COLUNA ESQUERDA: FORMULÁRIO DO TREINAMENTO & INSTRUTOR       */}
+            {/* ------------------------------------------------------------- */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Card 1: Identificação do Curso & Chips Rápidos */}
+              <div style={{
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '1rem',
+                padding: '1.4rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.15rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                  <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <BookOpen size={18} style={{ color: '#0284c7' }} />
+                    Informações do Treinamento
+                  </h2>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    Frente do Certificado
+                  </span>
+                </div>
+
+                {/* Chips de Seleção Rápida */}
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.4rem' }}>
+                    Preenchimento Rápido com 1 Clique:
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {COURSE_PRESETS.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => applyPreset(p)}
+                        style={{
+                          backgroundColor: formData.curso === p.name ? 'rgba(2, 132, 199, 0.12)' : 'var(--surface-hover)',
+                          border: formData.curso === p.name ? '1px solid #0284c7' : '1px solid var(--border)',
+                          color: formData.curso === p.name ? '#0284c7' : 'var(--text-primary)',
+                          borderRadius: '1.25rem',
+                          padding: '0.3rem 0.7rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {p.name.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nome do Curso */}
+                <div>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>
+                    Nome Oficial do Treinamento / Curso *
+                  </label>
+                  <input
+                    type="text"
+                    name="curso"
+                    className="input"
+                    value={formData.curso}
+                    onChange={handleChange}
+                    placeholder="Ex: NR-35 Trabalho em Altura / Brigada de Incêndio"
+                    style={{ width: '100%', marginTop: '0.35rem', fontSize: '0.9rem', fontWeight: '600' }}
+                  />
+                </div>
+
+                {/* Carga Horária e Data */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Clock size={14} style={{ color: '#0284c7' }} />
+                      Carga Horária *
+                    </label>
+                    <input
+                      type="text"
+                      name="duracao"
+                      className="input"
+                      value={formData.duracao}
+                      onChange={handleChange}
+                      placeholder="Ex: 8 horas, 16 horas"
+                      style={{ width: '100%', marginTop: '0.35rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Calendar size={14} style={{ color: '#0284c7' }} />
+                      Data de Conclusão *
+                    </label>
+                    <input
+                      type="date"
+                      name="data"
+                      className="input"
+                      value={formData.data}
+                      onChange={handleChange}
+                      style={{ width: '100%', marginTop: '0.35rem' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Local e Empresa Solicitante */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <MapPin size={14} style={{ color: '#0284c7' }} />
+                      Local / Cidade
+                    </label>
+                    <input
+                      type="text"
+                      name="local"
+                      className="input"
+                      value={formData.local}
+                      onChange={handleChange}
+                      placeholder="Ex: Mossoró - RN"
+                      style={{ width: '100%', marginTop: '0.35rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Building size={14} style={{ color: '#0284c7' }} />
+                      Empresa Solicitante
+                    </label>
+                    <input
+                      type="text"
+                      name="empresa"
+                      className="input"
+                      value={formData.empresa}
+                      onChange={handleChange}
+                      placeholder="Ex: Nome da Empresa / TotalSafety"
+                      style={{ width: '100%', marginTop: '0.35rem' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Descrição / Texto de Conclusão */}
+                <div>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>
+                    Texto de Certificação / Aproveitamento
+                  </label>
+                  <textarea
+                    name="descricao"
+                    className="input"
+                    value={formData.descricao}
+                    onChange={handleChange}
+                    rows={2}
+                    style={{ width: '100%', marginTop: '0.35rem', resize: 'vertical', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Card 2: Instrutor Responsável (Usuário do Sistema) */}
+              <div style={{
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '1rem',
+                padding: '1.4rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.15rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                  <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <UserCheck size={18} style={{ color: '#0284c7' }} />
+                    Instrutor Responsável Técnico
+                  </h2>
+                  <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <ShieldCheck size={13} />
+                    Credencial Oficial
+                  </span>
+                </div>
+
+                {/* Seletor Integrado com Usuários */}
+                <div>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', marginBottom: '0.35rem', display: 'block' }}>
+                    Selecionar dos Usuários com Acesso ao Sistema:
+                  </label>
+                  <select
+                    className="input"
+                    value={profiles.some(p => p.name.trim() === formData.instrutorNome?.trim()) ? formData.instrutorNome : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const sel = profiles.find(p => p.name === e.target.value);
+                        setFormData(prev => ({
+                          ...prev,
+                          instrutorNome: sel ? sel.name : e.target.value,
+                          instrutorCargo: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instrutorCargo)
+                        }));
+                      }
+                    }}
+                    style={{ width: '100%', fontSize: '0.875rem', fontWeight: '600' }}
+                  >
+                    <option value="">Selecione um usuário do sistema...</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.name}>
+                        {p.name} {p.role ? `— ${p.role}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Campos do Instrutor */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                      Nome Completo do Instrutor
+                    </label>
+                    <input
+                      type="text"
+                      name="instrutorNome"
+                      className="input"
+                      value={formData.instrutorNome}
+                      onChange={handleChange}
+                      placeholder="Nome do Instrutor"
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                        Cargo / Qualificação
+                      </label>
+                      <input
+                        type="text"
+                        name="instrutorCargo"
+                        className="input"
+                        value={formData.instrutorCargo}
+                        onChange={handleChange}
+                        placeholder="Ex: Técnico em Segurança do Trabalho"
+                        style={{ width: '100%', marginTop: '0.25rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                        Registro Profissional (MTE / SRTE)
+                      </label>
+                      <input
+                        type="text"
+                        name="instrutorRegistro"
+                        className="input"
+                        value={formData.instrutorRegistro}
+                        onChange={handleChange}
+                        placeholder="Ex: SRTE N° 0009823/RN"
+                        style={{ width: '100%', marginTop: '0.25rem' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Conteúdo Programático (Verso do Certificado) */}
+              <div style={{
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '1rem',
+                padding: '1.4rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                  <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FileText size={18} style={{ color: '#0284c7' }} />
+                    Conteúdo Programático (Verso)
+                  </h2>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    Slide 2 de cada aluno
+                  </span>
+                </div>
+
+                <textarea
+                  name="conteudo"
+                  className="input"
+                  value={formData.conteudo}
+                  onChange={handleChange}
+                  rows={5}
+                  placeholder="Itens do conteúdo programático que serão impressos no verso do certificado..."
+                  style={{ width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8125rem', lineHeight: '1.5' }}
+                />
+              </div>
+
+            </div>
+
+            {/* ------------------------------------------------------------- */}
+            {/* COLUNA DIREITA: PREVIEW DO CERTIFICADO + ALUNOS + EMISSÃO    */}
+            {/* ------------------------------------------------------------- */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* CARD PREVIEW INTERATIVO DO CERTIFICADO */}
+              <div style={{
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '1rem',
+                padding: '1.25rem',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.04)',
+                background: 'linear-gradient(180deg, var(--surface) 0%, rgba(2, 132, 199, 0.02) 100%)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <Eye size={17} style={{ color: '#0284c7' }} />
+                    <span style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      Pré-visualização do Certificado
+                    </span>
+                  </div>
+
+                  {/* Toggle Frente / Verso */}
+                  <div style={{
+                    display: 'flex',
+                    backgroundColor: 'var(--surface-hover)',
+                    borderRadius: '0.5rem',
+                    padding: '2px',
+                    border: '1px solid var(--border)'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab('frente')}
+                      style={{
+                        padding: '0.25rem 0.65rem',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        borderRadius: '0.35rem',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: previewTab === 'frente' ? '#0284c7' : 'transparent',
+                        color: previewTab === 'frente' ? '#fff' : 'var(--text-secondary)'
+                      }}
+                    >
+                      Frente (Slide 1)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab('verso')}
+                      style={{
+                        padding: '0.25rem 0.65rem',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        borderRadius: '0.35rem',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: previewTab === 'verso' ? '#0284c7' : 'transparent',
+                        color: previewTab === 'verso' ? '#fff' : 'var(--text-secondary)'
+                      }}
+                    >
+                      Verso (Slide 2)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Moldura do Certificado Mockup */}
+                <div style={{
+                  border: '2px solid rgba(2, 132, 199, 0.35)',
+                  borderRadius: '0.75rem',
+                  padding: '1.25rem 1.5rem',
+                  backgroundColor: '#ffffff',
+                  boxShadow: 'inset 0 0 0 4px rgba(2, 132, 199, 0.05)',
+                  minHeight: '190px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  textAlign: 'center',
+                  position: 'relative'
+                }}>
+                  {previewTab === 'frente' ? (
+                    <>
+                      <div>
+                        <div style={{ 
+                          fontSize: '0.6875rem', 
+                          fontWeight: '800', 
+                          color: '#0284c7', 
+                          letterSpacing: '2px', 
+                          textTransform: 'uppercase',
+                          marginBottom: '0.25rem'
+                        }}>
+                          TOTALSAFETY • CERTIFICADO DE CAPACITAÇÃO
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                          Certificamos que
+                        </div>
+                        <div style={{ 
+                          fontSize: '1.1rem', 
+                          fontWeight: '800', 
+                          color: '#0f172a', 
+                          borderBottom: '1px solid #cbd5e1',
+                          display: 'inline-block',
+                          padding: '0.25rem 1.5rem',
+                          margin: '0.25rem auto'
+                        }}>
+                          {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '0.2rem' }}>
+                          CPF: <strong>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong> concluiu com êxito o treinamento:
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.95rem', 
+                          fontWeight: '700', 
+                          color: '#0284c7', 
+                          marginTop: '0.35rem' 
+                        }}>
+                          {formData.curso}
+                        </div>
+                      </div>
+
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: '1rem',
+                        paddingTop: '0.65rem',
+                        borderTop: '1px dashed #e2e8f0',
+                        fontSize: '0.6875rem',
+                        color: '#64748b'
+                      }}>
+                        <div style={{ textAlign: 'left' }}>
+                          <div><strong>Data:</strong> {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</div>
+                          <div><strong>Carga:</strong> {formData.duracao} • {formData.local}</div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: '700', color: '#0f172a' }}>{formData.instrutorNome}</div>
+                          <div style={{ fontSize: '0.65rem' }}>{formData.instrutorCargo}</div>
+                          <div style={{ fontSize: '0.62rem', color: '#94a3b8' }}>{formData.instrutorRegistro}</div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ 
+                        fontSize: '0.6875rem', 
+                        fontWeight: '800', 
+                        color: '#0284c7', 
+                        letterSpacing: '1px', 
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        marginBottom: '0.5rem'
+                      }}>
+                        CONTEÚDO PROGRAMÁTICO OFICIAL
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.72rem', 
+                        color: '#334155', 
+                        lineHeight: '1.45', 
+                        whiteSpace: 'pre-line',
+                        maxHeight: '140px',
+                        overflowY: 'auto'
+                      }}>
+                        {formData.conteudo}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* CARD DE ALUNOS PARTICIPANTES */}
+              <div style={{
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '1rem',
+                padding: '1.4rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  marginBottom: '1rem', 
+                  flexWrap: 'wrap', 
+                  gap: '0.5rem',
+                  borderBottom: '1px solid var(--border)',
+                  paddingBottom: '0.75rem'
+                }}>
+                  <div>
+                    <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <Users size={18} style={{ color: '#0284c7' }} />
+                      Lista de Participantes ({colaboradores.length})
+                    </h2>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {validCount} participante(s) com nome válido para emissão
+                    </span>
+                  </div>
+
+                  {/* Ações da Lista */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setShowBatchModal(true)}
+                      style={{ 
+                        backgroundColor: 'var(--surface-hover)', 
+                        border: '1px solid var(--border)',
+                        fontSize: '0.78rem', 
+                        fontWeight: '600',
+                        padding: '0.45rem 0.75rem',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.35rem' 
+                      }}
+                      title="Colar texto em lote com vários participantes"
+                    >
+                      <ClipboardCopy size={13} style={{ color: '#0284c7' }} />
+                      Colar em Lote
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={addColaborador}
+                      style={{ 
+                        backgroundColor: 'rgba(2, 132, 199, 0.1)', 
+                        border: '1px solid rgba(2, 132, 199, 0.25)',
+                        color: '#0284c7',
+                        fontSize: '0.78rem', 
+                        fontWeight: '700',
+                        padding: '0.45rem 0.8rem',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.35rem' 
+                      }}
+                    >
+                      <Plus size={14} />
+                      Adicionar Aluno
+                    </button>
+
+                    {colaboradores.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={clearAllColaboradores}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          padding: '0.4rem',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Limpar todos os participantes"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista de Alunos com Scroll Suave */}
+                <div style={{ 
+                  maxHeight: '420px', 
+                  overflowY: 'auto', 
+                  paddingRight: '0.35rem',
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '0.55rem' 
+                }}>
+                  {colaboradores.map((colab, idx) => {
+                    const isCpfValid = colab.cpf && colab.cpf.replace(/\D/g, '').length === 11;
+                    return (
+                      <div 
+                        key={idx} 
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.55rem',
+                          backgroundColor: 'var(--surface-hover)',
+                          padding: '0.55rem 0.85rem',
+                          borderRadius: '0.75rem',
+                          border: '1px solid var(--border)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {/* Avatar com Índice */}
+                        <div style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          backgroundColor: colab.nome.trim() ? 'rgba(2, 132, 199, 0.15)' : 'var(--border)',
+                          color: colab.nome.trim() ? '#0284c7' : 'var(--text-secondary)',
+                          fontSize: '0.72rem',
+                          fontWeight: '800',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          {idx + 1}
+                        </div>
+
+                        {/* Nome do Participante */}
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Nome completo do participante"
+                          value={colab.nome}
+                          onChange={(e) => handleColabChange(idx, 'nome', e.target.value)}
+                          style={{ flex: 2, fontSize: '0.85rem', padding: '0.45rem 0.75rem' }}
+                        />
+
+                        {/* CPF com Indicador de Formato */}
+                        <div style={{ position: 'relative', flex: 1.2 }}>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="000.000.000-00"
+                            value={colab.cpf}
+                            onChange={(e) => handleColabChange(idx, 'cpf', formatCpf(e.target.value))}
+                            style={{ 
+                              width: '100%', 
+                              fontSize: '0.85rem', 
+                              padding: '0.45rem 0.75rem', 
+                              fontFamily: 'monospace',
+                              paddingRight: isCpfValid ? '1.8rem' : '0.75rem'
+                            }}
+                            maxLength={14}
+                          />
+                          {isCpfValid && (
+                            <Check 
+                              size={14} 
+                              style={{ 
+                                position: 'absolute', 
+                                right: '0.6rem', 
+                                top: '50%', 
+                                transform: 'translateY(-50%)', 
+                                color: '#10b981' 
+                              }} 
+                            />
+                          )}
+                        </div>
+
+                        {/* Botão Remover */}
+                        <button
+                          type="button"
+                          onClick={() => removeColaborador(idx)}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            color: 'var(--text-secondary)', 
+                            cursor: 'pointer', 
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'color 0.15s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                          title="Remover participante"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* BOTÃO PRINCIPAL DE GERAÇÃO PPTX */}
+                <div style={{ marginTop: '1.25rem', paddingTop: '1.15rem', borderTop: '1px solid var(--border)' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.75rem',
+                    fontSize: '0.78rem',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    <span>Formato Oficial: <strong>Microsoft PowerPoint (.pptx)</strong></span>
+                    <span>Total de slides: <strong>{validCount * 2} slides</strong> (Frente + Verso)</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={generating || validCount === 0}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.65rem',
+                      fontSize: '1rem',
+                      fontWeight: '800',
+                      color: '#ffffff',
+                      background: validCount === 0 
+                        ? 'var(--border)' 
+                        : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      border: 'none',
+                      borderRadius: '0.85rem',
+                      cursor: validCount === 0 || generating ? 'not-allowed' : 'pointer',
+                      boxShadow: validCount === 0 ? 'none' : '0 10px 25px -5px rgba(2, 132, 199, 0.45)',
+                      transition: 'all 0.2s ease',
+                      opacity: generating ? 0.8 : 1
+                    }}
+                  >
+                    {generating ? (
+                      <>
+                        <Loader size={20} className="animate-spin" />
+                        Gerando Apresentação com {validCount} Certificados...
+                      </>
+                    ) : (
+                      <>
+                        <Download size={20} />
+                        Baixar Certificados em PowerPoint (.pptx)
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ABA 2: TURMAS & INSCRIÇÕES OFICIAIS                                       */}
       {/* ========================================================================= */}
       {activeTab === 'turmas' && (
         <div>
-          {/* Card Destacado: Link Público de Inscrição */}
+          {/* Card Hero: Link Público Geral */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.07) 0%, rgba(15, 23, 42, 0.03) 100%)',
+            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(15, 23, 42, 0.03) 100%)',
             border: '1px solid rgba(2, 132, 199, 0.25)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.25rem',
-            marginBottom: '1.5rem',
+            borderRadius: '1.15rem',
+            padding: '1.35rem 1.6rem',
+            marginBottom: '1.75rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '1rem'
+            gap: '1rem',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
           }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.35rem' }}>
                 <span style={{ 
                   backgroundColor: '#0284c7', 
                   color: '#fff', 
-                  fontSize: '0.7rem', 
+                  fontSize: '0.72rem', 
                   fontWeight: '700', 
-                  padding: '2px 8px', 
-                  borderRadius: '12px',
+                  padding: '2px 10px', 
+                  borderRadius: '1rem',
                   textTransform: 'uppercase'
                 }}>
-                  Link Público Geral
+                  Portal Público de Participação
                 </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#10b981', fontWeight: '600' }}>
-                  <ShieldCheck size={14} />
-                  Integração CPF A Ativa
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: '#10b981', fontWeight: '700' }}>
+                  <ShieldCheck size={15} />
+                  Validação Oficial Receita (CPF A)
                 </span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                Envie este link para os alunos se cadastrarem com CPF e Data de Nascimento:
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                Envie o link para os alunos preencherem a lista de presença com CPF e Data de Nascimento:
               </h3>
-              <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <code style={{ 
                   backgroundColor: 'var(--surface)', 
                   border: '1px solid var(--border)', 
-                  padding: '0.35rem 0.75rem', 
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.85rem',
+                  padding: '0.45rem 0.95rem', 
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
                   color: '#0284c7',
-                  fontWeight: '600'
+                  fontWeight: '700',
+                  fontFamily: 'monospace'
                 }}>
                   {window.location.origin}/inscricao
                 </code>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={() => copyPublicLink(null, 'banner-general')}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.45rem', 
+                  fontSize: '0.875rem',
+                  fontWeight: '700',
+                  padding: '0.65rem 1.15rem',
+                  backgroundColor: '#0284c7',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+                }}
               >
                 {copiedKey === 'banner-general' ? <Check size={16} /> : <Copy size={16} />}
                 {copiedKey === 'banner-general' ? 'Copiado para a Área de Transferência!' : 'Copiar Link Público'}
               </button>
+
+              <a
+                href="/inscricao"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  padding: '0.65rem 1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  textDecoration: 'none'
+                }}
+              >
+                <Eye size={15} />
+                Testar Formulário
+              </a>
             </div>
           </div>
 
-          {/* Seção de Turmas */}
-          <div style={{ marginBottom: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          {/* Seção de Turmas Cadastradas */}
+          <div style={{ marginBottom: '2.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.15rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
-                  Turmas Cadastradas ({turmas.length})
+                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                  Turmas de Treinamento ({turmas.length})
                 </h2>
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  Organize seus treinamentos em turmas com instrutores do sistema, datas, empresas e links exclusivos.
+                  Cada turma possui link próprio, instrutor do sistema e exportação direta de certificados.
                 </p>
               </div>
 
@@ -721,7 +1874,16 @@ const TrainingCertificatesPage = () => {
                 type="button"
                 className="btn btn-primary"
                 onClick={handleOpenNewTurma}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.45rem', 
+                  fontSize: '0.875rem',
+                  fontWeight: '700',
+                  backgroundColor: '#0284c7',
+                  padding: '0.6rem 1.15rem',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+                }}
               >
                 <Plus size={16} />
                 Nova Turma
@@ -729,37 +1891,37 @@ const TrainingCertificatesPage = () => {
             </div>
 
             {loadingData ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                <Loader size={24} className="animate-spin" style={{ margin: '0 auto 0.5rem' }} />
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <Loader size={26} className="animate-spin" style={{ margin: '0 auto 0.65rem', color: '#0284c7' }} />
                 Carregando turmas...
               </div>
             ) : turmas.length === 0 ? (
               <div style={{
-                padding: '2.5rem',
+                padding: '3rem 2rem',
                 textAlign: 'center',
                 backgroundColor: 'var(--surface)',
                 border: '1px dashed var(--border)',
-                borderRadius: 'var(--radius-lg)'
+                borderRadius: '1.25rem'
               }}>
-                <Award size={36} style={{ color: 'var(--text-secondary)', margin: '0 auto 0.75rem', opacity: 0.5 }} />
-                <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>
+                <Award size={40} style={{ color: 'var(--text-secondary)', margin: '0 auto 0.85rem', opacity: 0.4 }} />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
                   Nenhuma turma criada ainda
                 </h3>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem', marginBottom: '1rem' }}>
-                  Crie sua primeira turma selecionando um instrutor do sistema para gerar links de inscrição específicos e emitir certificados em lote.
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.35rem', marginBottom: '1.25rem' }}>
+                  Crie sua primeira turma selecionando um instrutor do sistema para gerar links de presença e certificados em lote.
                 </p>
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={handleOpenNewTurma}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.875rem', fontWeight: '700', backgroundColor: '#0284c7' }}
                 >
-                  <Plus size={15} />
+                  <Plus size={16} />
                   Criar Primeira Turma
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.15rem' }}>
                 {turmas.map(turma => {
                   const studentCount = enrollments.filter(e => e.turma_id === turma.id).length;
                   return (
@@ -768,25 +1930,25 @@ const TrainingCertificatesPage = () => {
                       style={{
                         backgroundColor: 'var(--surface)',
                         border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius-lg)',
-                        padding: '1.25rem',
+                        borderRadius: '1rem',
+                        padding: '1.35rem',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
-                        gap: '0.85rem',
-                        boxShadow: 'var(--shadow-sm)',
+                        gap: '1rem',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                         transition: 'transform 0.15s, box-shadow 0.15s'
                       }}
                     >
                       <div>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
                           <span style={{
-                            backgroundColor: turma.status === 'Concluída' ? '#f1f5f9' : '#e0f2fe',
-                            color: turma.status === 'Concluída' ? '#64748b' : '#0369a1',
-                            fontSize: '0.7rem',
+                            backgroundColor: turma.status === 'Concluída' ? '#f1f5f9' : 'rgba(2, 132, 199, 0.1)',
+                            color: turma.status === 'Concluída' ? '#64748b' : '#0284c7',
+                            fontSize: '0.72rem',
                             fontWeight: '700',
-                            padding: '2px 8px',
-                            borderRadius: '10px',
+                            padding: '3px 10px',
+                            borderRadius: '1rem',
                             textTransform: 'uppercase'
                           }}>
                             {turma.status || 'Aberta'}
@@ -796,69 +1958,85 @@ const TrainingCertificatesPage = () => {
                             <button
                               type="button"
                               onClick={() => handleEditTurma(turma)}
-                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '3px' }}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
                               title="Editar Turma"
                             >
-                              <Edit size={15} />
+                              <Edit size={16} />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteTurma(turma.id, turma.name)}
-                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '3px' }}
+                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px' }}
                               title="Excluir Turma"
                             >
-                              <Trash2 size={15} />
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </div>
 
-                        <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', margin: '0.5rem 0 0.25rem' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0.65rem 0 0.35rem' }}>
                           {turma.name}
                         </h3>
                         {turma.course_name && turma.course_name !== turma.name && (
-                          <div style={{ fontSize: '0.8125rem', color: '#0284c7', fontWeight: '600', marginBottom: '0.35rem' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: '700', marginBottom: '0.45rem' }}>
                             {turma.course_name}
                           </div>
                         )}
 
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           {turma.instructor_name && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <User size={13} style={{ color: '#0284c7' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <User size={14} style={{ color: '#0284c7' }} />
                               <span><strong>Instrutor:</strong> {turma.instructor_name}</span>
                             </div>
                           )}
                           {turma.company && (
-                            <div><strong>Empresa:</strong> {turma.company}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Building size={14} style={{ color: 'var(--text-secondary)' }} />
+                              <span><strong>Empresa:</strong> {turma.company}</span>
+                            </div>
                           )}
                           {turma.start_date && (
-                            <div><strong>Data:</strong> {new Date(turma.start_date).toLocaleDateString('pt-BR')} • {turma.duration || '8h'}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
+                              <span><strong>Data:</strong> {new Date(turma.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} • {turma.duration || '8h'}</span>
+                            </div>
                           )}
                         </div>
                       </div>
 
                       <div style={{
-                        paddingTop: '0.75rem',
+                        paddingTop: '0.85rem',
                         borderTop: '1px solid var(--border)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        gap: '0.5rem'
+                        gap: '0.5rem',
+                        flexWrap: 'wrap'
                       }}>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <Users size={14} style={{ color: '#0284c7' }} />
-                          <strong>{studentCount}</strong> inscritos
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Users size={15} style={{ color: '#0284c7' }} />
+                          <strong style={{ color: 'var(--text-primary)' }}>{studentCount}</strong> inscritos
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                           <button
                             type="button"
-                            className="btn btn-secondary"
+                            className="btn"
                             onClick={() => copyPublicLink(turma.id, `turma-${turma.id}`)}
-                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            style={{ 
+                              fontSize: '0.78rem', 
+                              padding: '0.4rem 0.75rem', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '0.3rem',
+                              backgroundColor: 'var(--surface-hover)',
+                              border: '1px solid var(--border)',
+                              fontWeight: '600'
+                            }}
                             title="Copiar link de inscrição específico desta turma"
                           >
-                            {copiedKey === `turma-${turma.id}` ? <Check size={13} style={{ color: '#10b981' }} /> : <Copy size={13} />}
+                            {copiedKey === `turma-${turma.id}` ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
                             {copiedKey === `turma-${turma.id}` ? 'Link Copiado' : 'Link da Turma'}
                           </button>
 
@@ -866,11 +2044,19 @@ const TrainingCertificatesPage = () => {
                             type="button"
                             className="btn btn-primary"
                             onClick={() => handleLoadTurmaIntoGenerator(turma)}
-                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            style={{ 
+                              fontSize: '0.78rem', 
+                              padding: '0.4rem 0.85rem', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '0.35rem',
+                              backgroundColor: '#0284c7',
+                              fontWeight: '700'
+                            }}
                             title="Carregar alunos desta turma no gerador de certificados"
                           >
-                            <Award size={13} />
-                            Emitir Certificados
+                            <Award size={14} />
+                            Emitir PPTX
                           </button>
                         </div>
                       </div>
@@ -881,7 +2067,7 @@ const TrainingCertificatesPage = () => {
             )}
           </div>
 
-          {/* Seção da Lista de Inscritos */}
+          {/* Seção da Tabela de Inscritos */}
           <div>
             <div style={{ 
               display: 'flex', 
@@ -889,38 +2075,38 @@ const TrainingCertificatesPage = () => {
               justifyContent: 'space-between', 
               flexWrap: 'wrap', 
               gap: '1rem', 
-              marginBottom: '1rem' 
+              marginBottom: '1.15rem' 
             }}>
               <div>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
                   Participantes & Lista de Presença ({filteredEnrollments.length})
                 </h2>
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  Dados oficiais recebidos em tempo real via link público com CPF e Data de Nascimento.
+                  Dados em tempo real obtidos com CPF e Data de Nascimento via Receita Federal.
                 </p>
               </div>
 
-              {/* Controles de Filtro e Busca */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {/* Filtros e Busca */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <Search size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                   <input
                     type="text"
                     placeholder="Buscar por nome ou CPF..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="input"
-                    style={{ paddingLeft: '2rem', width: '220px', fontSize: '0.8125rem' }}
+                    style={{ paddingLeft: '2.2rem', width: '240px', fontSize: '0.85rem' }}
                   />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Filter size={14} style={{ color: 'var(--text-secondary)' }} />
+                  <Filter size={15} style={{ color: 'var(--text-secondary)' }} />
                   <select
                     value={selectedTurmaFilter}
                     onChange={(e) => setSelectedTurmaFilter(e.target.value)}
                     className="input"
-                    style={{ fontSize: '0.8125rem' }}
+                    style={{ fontSize: '0.85rem' }}
                   >
                     <option value="all">Todas as Turmas ({enrollments.length})</option>
                     <option value="unassigned">Sem Turma Vinculada ({enrollments.filter(e => !e.turma_id).length})</option>
@@ -934,12 +2120,18 @@ const TrainingCertificatesPage = () => {
 
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="btn"
                   onClick={loadData}
-                  title="Atualizar lista"
-                  style={{ display: 'flex', alignItems: 'center', padding: '0.55rem' }}
+                  title="Atualizar lista em tempo real"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    padding: '0.6rem',
+                    backgroundColor: 'var(--surface)',
+                    border: '1px solid var(--border)'
+                  }}
                 >
-                  <RefreshCw size={14} />
+                  <RefreshCw size={15} />
                 </button>
               </div>
             </div>
@@ -948,74 +2140,101 @@ const TrainingCertificatesPage = () => {
             <div style={{
               backgroundColor: 'var(--surface)',
               border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
+              borderRadius: '1rem',
               overflow: 'hidden',
-              boxShadow: 'var(--shadow-sm)'
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
             }}>
               {filteredEnrollments.length === 0 ? (
-                <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  <Users size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-                  <p style={{ margin: 0, fontSize: '0.875rem' }}>
+                <div style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <Users size={36} style={{ margin: '0 auto 0.65rem', opacity: 0.3 }} />
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>
                     {searchQuery ? 'Nenhum aluno encontrado para os filtros atuais.' : 'Nenhuma inscrição recebida ainda.'}
                   </p>
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
                     <thead>
-                      <tr style={{ backgroundColor: 'var(--surface-hover)', borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                        <th style={{ padding: '0.75rem 1rem' }}>Participante (Receita)</th>
-                        <th style={{ padding: '0.75rem 1rem' }}>CPF</th>
-                        <th style={{ padding: '0.75rem 1rem' }}>Nascimento</th>
-                        <th style={{ padding: '0.75rem 1rem' }}>Turma Vinculada</th>
-                        <th style={{ padding: '0.75rem 1rem' }}>Data Inscrição</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Ações</th>
+                      <tr style={{ backgroundColor: 'var(--surface-hover)', borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        <th style={{ padding: '0.85rem 1.15rem' }}>Participante Oficial</th>
+                        <th style={{ padding: '0.85rem 1.15rem' }}>CPF</th>
+                        <th style={{ padding: '0.85rem 1.15rem' }}>Nascimento</th>
+                        <th style={{ padding: '0.85rem 1.15rem' }}>Turma Vinculada</th>
+                        <th style={{ padding: '0.85rem 1.15rem' }}>Inscrição</th>
+                        <th style={{ padding: '0.85rem 1.15rem', textAlign: 'right' }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredEnrollments.map(student => {
                         return (
                           <tr key={student.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.15s' }}>
-                            <td style={{ padding: '0.75rem 1rem' }}>
-                              <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
-                                {student.nome}
-                              </div>
-                              {student.empresa && (
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                                  {student.empresa} {student.telefone ? `• ${student.telefone}` : ''}
+                            <td style={{ padding: '0.85rem 1.15rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                <div style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                                  color: '#0284c7',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '800',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  {student.nome?.charAt(0)?.toUpperCase() || 'P'}
                                 </div>
-                              )}
+                                <div>
+                                  <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                                    {student.nome}
+                                  </div>
+                                  {student.empresa && (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                      {student.empresa} {student.telefone ? `• ${student.telefone}` : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: '500', color: '#0284c7' }}>
+                            <td style={{ padding: '0.85rem 1.15rem', fontFamily: 'monospace', fontWeight: '600', color: '#0284c7' }}>
                               {student.cpf}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>
-                              {student.data_nascimento ? new Date(student.data_nascimento).toLocaleDateString('pt-BR') : '-'}
+                            <td style={{ padding: '0.85rem 1.15rem', color: 'var(--text-secondary)' }}>
+                              {student.data_nascimento ? new Date(student.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem' }}>
+                            <td style={{ padding: '0.85rem 1.15rem' }}>
                               <select
                                 value={student.turma_id || ''}
                                 onChange={(e) => handleStudentTurmaChange(student.id, e.target.value)}
                                 className="input"
-                                style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem', width: 'auto', maxWidth: '200px' }}
+                                style={{ fontSize: '0.8125rem', padding: '0.35rem 0.65rem', width: 'auto', maxWidth: '220px' }}
                               >
-                                <option value="">(Sem turma)</option>
+                                <option value="">(Sem turma vinculada)</option>
                                 {turmas.map(t => (
                                   <option key={t.id} value={t.id}>{t.name}</option>
                                 ))}
                               </select>
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            <td style={{ padding: '0.85rem 1.15rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                               {student.created_at ? new Date(student.created_at).toLocaleDateString('pt-BR') : '-'}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                            <td style={{ padding: '0.85rem 1.15rem', textAlign: 'right' }}>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteStudent(student.id, student.nome)}
-                                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px' }}
+                                style={{ 
+                                  background: 'none', 
+                                  border: 'none', 
+                                  color: 'var(--text-secondary)', 
+                                  cursor: 'pointer', 
+                                  padding: '5px',
+                                  transition: 'color 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
                                 title="Excluir Inscrição"
                               >
-                                <Trash2 size={15} />
+                                <Trash2 size={16} />
                               </button>
                             </td>
                           </tr>
@@ -1031,559 +2250,101 @@ const TrainingCertificatesPage = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* ABA 2: GERADOR DE CERTIFICADOS PPTX                                       */}
-      {/* ========================================================================= */}
-      {activeTab === 'generator' && (
-        <div>
-          {/* Card: Seletor Rápido de Turma para Importação */}
-          {turmas.length > 0 && (
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1rem 1.25rem',
-              marginBottom: '1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.75rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Users size={18} style={{ color: '#0284c7' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                  Carregar Dados & Alunos de uma Turma:
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <select
-                  className="input"
-                  style={{ fontSize: '0.85rem', width: 'auto' }}
-                  onChange={(e) => {
-                    const found = turmas.find(t => String(t.id) === String(e.target.value));
-                    if (found) handleLoadTurmaIntoGenerator(found);
-                  }}
-                  defaultValue=""
-                >
-                  <option value="" disabled>Selecione uma turma para carregar...</option>
-                  {turmas.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({enrollments.filter(e => e.turma_id === t.id).length} inscritos)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* Template Card: Modelo de Certificado */}
-          <div style={{
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.25rem',
-            marginBottom: '1.5rem',
-            boxShadow: 'var(--shadow-sm)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Layers size={18} style={{ color: '#0284c7' }} />
-                  <h2 style={{ fontSize: '0.9375rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
-                    Arquivo de Modelo (.pptx)
-                  </h2>
-                  {customTemplateFile ? (
-                    <span style={{ 
-                      backgroundColor: '#dcfce7', 
-                      color: '#15803d', 
-                      fontSize: '0.6875rem', 
-                      fontWeight: '600', 
-                      padding: '0.15rem 0.5rem', 
-                      borderRadius: '1rem' 
-                    }}>
-                      Personalizado Ativo
-                    </span>
-                  ) : (
-                    <span style={{ 
-                      backgroundColor: '#f1f5f9', 
-                      color: '#475569', 
-                      fontSize: '0.6875rem', 
-                      fontWeight: '600', 
-                      padding: '0.15rem 0.5rem', 
-                      borderRadius: '1rem' 
-                    }}>
-                      Modelo do Sistema
-                    </span>
-                  )}
-                </div>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  {customTemplateFile 
-                    ? `Usando o arquivo carregado: "${customTemplateFile.name}" (${(customTemplateFile.size / 1024).toFixed(1)} KB)`
-                    : 'Você pode selecionar ou arrastar o seu novo arquivo PowerPoint (.pptx) de modelo TotalSafety.'}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  accept=".pptx" 
-                  onChange={handleTemplateUpload} 
-                  style={{ display: 'none' }} 
-                />
-
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem' }}
-                >
-                  <Upload size={14} />
-                  {customTemplateFile ? 'Trocar Arquivo Modelo' : 'Carregar Modelo (.pptx)'}
-                </button>
-
-                {customTemplateFile && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={removeCustomTemplate}
-                    title="Voltar para o modelo padrão"
-                    style={{ fontSize: '0.8125rem', color: 'var(--danger)' }}
-                  >
-                    Remover
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Grid Principal: Dados do Curso + Lista de Alunos */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
-            
-            {/* Card: Dados do Treinamento */}
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-              boxShadow: 'var(--shadow-sm)'
-            }}>
-              <h2 style={{ fontSize: '0.9375rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={16} style={{ color: '#0284c7' }} />
-                Informações do Curso / Treinamento
-              </h2>
-
-              <div>
-                <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.8125rem' }}>
-                  Nome do Treinamento / Curso *
-                </label>
-                <input
-                  type="text"
-                  name="curso"
-                  className="input"
-                  value={formData.curso}
-                  onChange={handleChange}
-                  placeholder="Ex: NR-35 Trabalho em Altura / Brigada de Incêndio"
-                  style={{ width: '100%', marginTop: '0.25rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.8125rem' }}>
-                    Carga Horária *
-                  </label>
-                  <input
-                    type="text"
-                    name="duracao"
-                    className="input"
-                    value={formData.duracao}
-                    onChange={handleChange}
-                    placeholder="Ex: 8 horas, 16 horas"
-                    style={{ width: '100%', marginTop: '0.25rem' }}
-                  />
-                </div>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.8125rem' }}>
-                    Data de Conclusão *
-                  </label>
-                  <input
-                    type="date"
-                    name="data"
-                    className="input"
-                    value={formData.data}
-                    onChange={handleChange}
-                    style={{ width: '100%', marginTop: '0.25rem' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.8125rem' }}>
-                    Local / Cidade
-                  </label>
-                  <input
-                    type="text"
-                    name="local"
-                    className="input"
-                    value={formData.local}
-                    onChange={handleChange}
-                    placeholder="Ex: Mossoró - RN"
-                    style={{ width: '100%', marginTop: '0.25rem' }}
-                  />
-                </div>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.8125rem' }}>
-                    Empresa Solicitante
-                  </label>
-                  <input
-                    type="text"
-                    name="empresa"
-                    className="input"
-                    value={formData.empresa}
-                    onChange={handleChange}
-                    placeholder="Ex: Nome da Empresa / TotalSafety"
-                    style={{ width: '100%', marginTop: '0.25rem' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.8125rem' }}>
-                  Texto / Descrição do Certificado
-                </label>
-                <textarea
-                  name="descricao"
-                  className="input"
-                  value={formData.descricao}
-                  onChange={handleChange}
-                  rows={2}
-                  style={{ width: '100%', marginTop: '0.25rem', resize: 'vertical' }}
-                />
-              </div>
-
-              <div style={{ paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <User size={14} style={{ color: '#0284c7' }} />
-                  Dados do Instrutor Responsável
-                </div>
-                
-                {/* Seleção do Instrutor entre os Usuários do Sistema */}
-                <div style={{ marginBottom: '0.65rem' }}>
-                  <label className="modal-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
-                    Selecionar dos Usuários do Sistema:
-                  </label>
-                  <select
-                    className="input"
-                    value={profiles.some(p => p.name.trim() === formData.instrutorNome?.trim()) ? formData.instrutorNome : ''}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        const sel = profiles.find(p => p.name === e.target.value);
-                        setFormData(prev => ({
-                          ...prev,
-                          instrutorNome: sel ? sel.name : e.target.value
-                        }));
-                      }
-                    }}
-                    style={{ width: '100%', fontSize: '0.8125rem' }}
-                  >
-                    <option value="">Selecione um usuário com acesso ao sistema...</option>
-                    {profiles.map(p => (
-                      <option key={p.id} value={p.name}>
-                        {p.name} {p.role ? `(${p.role})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    name="instrutorNome"
-                    className="input"
-                    value={formData.instrutorNome}
-                    onChange={handleChange}
-                    placeholder="Nome do Instrutor"
-                  />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    <input
-                      type="text"
-                      name="instrutorCargo"
-                      className="input"
-                      value={formData.instrutorCargo}
-                      onChange={handleChange}
-                      placeholder="Cargo / Qualificação"
-                    />
-                    <input
-                      type="text"
-                      name="instrutorRegistro"
-                      className="input"
-                      value={formData.instrutorRegistro}
-                      onChange={handleChange}
-                      placeholder="Registro Profissional / SRTE"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="modal-label" style={{ fontWeight: '600', fontSize: '0.8125rem' }}>
-                  Conteúdo Programático (Verso do Certificado)
-                </label>
-                <textarea
-                  name="conteudo"
-                  className="input"
-                  value={formData.conteudo}
-                  onChange={handleChange}
-                  rows={4}
-                  style={{ width: '100%', marginTop: '0.25rem', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8125rem' }}
-                />
-              </div>
-            </div>
-
-            {/* Card: Lista de Participantes para o PPTX */}
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: 'var(--shadow-sm)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '0.9375rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Users size={16} style={{ color: '#0284c7' }} />
-                    Alunos na Geração Atual ({colaboradores.length})
-                  </h2>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    Cada participante gerará seus respectivos slides no PowerPoint.
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.375rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowBatchModal(true)}
-                    style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                  >
-                    <ClipboardCopy size={14} />
-                    Colar Lista
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={addColaborador}
-                    style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                  >
-                    <Plus size={14} />
-                    Adicionar
-                  </button>
-                </div>
-              </div>
-
-              {/* Lista com scroll */}
-              <div style={{ 
-                maxHeight: '480px', 
-                overflowY: 'auto', 
-                paddingRight: '0.25rem',
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '0.625rem' 
-              }}>
-                {colaboradores.map((colab, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    backgroundColor: 'var(--surface-hover)',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border)'
-                  }}>
-                    <span style={{ 
-                      color: 'var(--text-secondary)', 
-                      fontSize: '0.75rem', 
-                      fontWeight: '700', 
-                      minWidth: '22px' 
-                    }}>
-                      #{idx + 1}
-                    </span>
-
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Nome completo do participante"
-                      value={colab.nome}
-                      onChange={(e) => handleColabChange(idx, 'nome', e.target.value)}
-                      style={{ flex: 2, fontSize: '0.85rem', padding: '0.4rem 0.65rem' }}
-                    />
-
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="000.000.000-00"
-                      value={colab.cpf}
-                      onChange={(e) => handleColabChange(idx, 'cpf', formatCpf(e.target.value))}
-                      style={{ flex: 1.2, fontSize: '0.85rem', padding: '0.4rem 0.65rem', fontFamily: 'monospace' }}
-                      maxLength={14}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => removeColaborador(idx)}
-                      style={{ 
-                        background: 'none', 
-                        border: 'none', 
-                        color: 'var(--danger)', 
-                        cursor: 'pointer', 
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                      title="Remover participante"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Botão Principal de Download */}
-              <div style={{ marginTop: 'auto', paddingTop: '1.25rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.9375rem',
-                    fontWeight: '700',
-                    backgroundColor: '#0284c7',
-                    boxShadow: '0 4px 6px -1px rgba(2, 132, 199, 0.4)'
-                  }}
-                >
-                  {generating ? (
-                    <>
-                      <Loader size={18} className="animate-spin" />
-                      Gerando Arquivo PPTX com {colaboradores.filter(c => c.nome.trim()).length} Certificados...
-                    </>
-                  ) : (
-                    <>
-                      <Download size={18} />
-                      Baixar Certificados em PowerPoint (.pptx)
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* MODAL: CRIAR OU EDITAR TURMA                                              */}
       {/* ========================================================================= */}
       {showTurmaModal && (
         <div className="modal-backdrop" onClick={() => setShowTurmaModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px' }}>
-            <div className="modal-header">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Award size={18} style={{ color: '#0284c7' }} />
-                {editingTurma ? 'Editar Turma' : 'Criar Nova Turma de Treinamento'}
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', borderRadius: '1.25rem', padding: '1.75rem' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.15rem', fontWeight: '800' }}>
+                <Award size={20} style={{ color: '#0284c7' }} />
+                {editingTurma ? 'Editar Turma de Treinamento' : 'Criar Nova Turma de Treinamento'}
               </h2>
               <button className="modal-close" onClick={() => setShowTurmaModal(false)}>
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveTurma} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+            <form onSubmit={handleSaveTurma} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
               <div>
-                <label className="modal-label" style={{ fontWeight: '600' }}>Identificação da Turma *</label>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Identificação da Turma *</label>
                 <input
                   type="text"
                   required
                   className="input"
-                  placeholder="Ex: Turma 01 - NR-35 Trabalho em Altura / Turma Março 2026"
+                  placeholder="Ex: Turma 01 - NR-35 Trabalho em Altura / Março 2026"
                   value={turmaFormData.name}
                   onChange={e => setTurmaFormData(prev => ({ ...prev, name: e.target.value }))}
+                  style={{ width: '100%', marginTop: '0.35rem', fontWeight: '600' }}
                 />
               </div>
 
               <div>
-                <label className="modal-label" style={{ fontWeight: '600' }}>Nome Oficial do Curso *</label>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Nome Oficial do Curso *</label>
                 <input
                   type="text"
                   className="input"
                   placeholder="Ex: NR-35 - Segurança no Trabalho em Altura"
                   value={turmaFormData.course_name}
                   onChange={e => setTurmaFormData(prev => ({ ...prev, course_name: e.target.value }))}
+                  style={{ width: '100%', marginTop: '0.35rem' }}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '600' }}>Carga Horária</label>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Carga Horária</label>
                   <input
                     type="text"
                     className="input"
                     placeholder="Ex: 8 horas, 16 horas"
                     value={turmaFormData.duration}
                     onChange={e => setTurmaFormData(prev => ({ ...prev, duration: e.target.value }))}
+                    style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '600' }}>Data de Conclusão / Realização</label>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Data de Conclusão / Realização</label>
                   <input
                     type="date"
                     className="input"
                     value={turmaFormData.start_date}
                     onChange={e => setTurmaFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                    style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '600' }}>Local / Cidade</label>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Local / Cidade</label>
                   <input
                     type="text"
                     className="input"
                     placeholder="Ex: Mossoró - RN"
                     value={turmaFormData.location}
                     onChange={e => setTurmaFormData(prev => ({ ...prev, location: e.target.value }))}
+                    style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '600' }}>Empresa Solicitante</label>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Empresa Solicitante</label>
                   <input
                     type="text"
                     className="input"
                     placeholder="Ex: TotalSafety / Nome do Cliente"
                     value={turmaFormData.company}
                     onChange={e => setTurmaFormData(prev => ({ ...prev, company: e.target.value }))}
+                    style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
               </div>
 
-              {/* Seleção do Instrutor entre os Usuários do Sistema */}
+              {/* Instrutor entre os Usuários */}
               <div>
-                <label className="modal-label" style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <User size={14} style={{ color: '#0284c7' }} />
-                  Instrutor Responsável (Usuário com Acesso ao Sistema) *
+                  Instrutor Responsável Técnico *
                 </label>
                 
                 <select
@@ -1592,7 +2353,7 @@ const TrainingCertificatesPage = () => {
                   onChange={(e) => {
                     const val = e.target.value;
                     if (val === 'custom') {
-                      // Permite digitar manualmente
+                      // Custom
                     } else if (val) {
                       const sel = profiles.find(p => p.name === val);
                       setTurmaFormData(prev => ({
@@ -1602,7 +2363,7 @@ const TrainingCertificatesPage = () => {
                       }));
                     }
                   }}
-                  style={{ marginBottom: '0.4rem', width: '100%' }}
+                  style={{ marginTop: '0.35rem', marginBottom: '0.5rem', width: '100%' }}
                 >
                   <option value="">Selecione um instrutor dos usuários do sistema...</option>
                   {profiles.map(p => (
@@ -1620,36 +2381,40 @@ const TrainingCertificatesPage = () => {
                   placeholder="Nome do Instrutor"
                   value={turmaFormData.instructor_name}
                   onChange={e => setTurmaFormData(prev => ({ ...prev, instructor_name: e.target.value }))}
+                  style={{ width: '100%' }}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '600' }}>Cargo do Instrutor</label>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Cargo do Instrutor</label>
                   <input
                     type="text"
                     className="input"
                     value={turmaFormData.instructor_role}
                     onChange={e => setTurmaFormData(prev => ({ ...prev, instructor_role: e.target.value }))}
+                    style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '600' }}>Registro SRTE</label>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Registro SRTE</label>
                   <input
                     type="text"
                     className="input"
                     value={turmaFormData.instructor_registration}
                     onChange={e => setTurmaFormData(prev => ({ ...prev, instructor_registration: e.target.value }))}
+                    style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="modal-label" style={{ fontWeight: '600' }}>Status da Turma</label>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Status da Turma</label>
                 <select
                   className="input"
                   value={turmaFormData.status}
                   onChange={e => setTurmaFormData(prev => ({ ...prev, status: e.target.value }))}
+                  style={{ width: '100%', marginTop: '0.35rem' }}
                 >
                   <option value="Aberta">Aberta (Aceitando inscrições)</option>
                   <option value="Em Andamento">Em Andamento</option>
@@ -1657,11 +2422,11 @@ const TrainingCertificatesPage = () => {
                 </select>
               </div>
 
-              <div className="modal-actions" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <div className="modal-actions" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTurmaModal(false)}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7' }}>
+                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7', fontWeight: '700' }}>
                   {editingTurma ? 'Salvar Alterações' : 'Criar Turma'}
                 </button>
               </div>
@@ -1675,9 +2440,9 @@ const TrainingCertificatesPage = () => {
       {/* ========================================================================= */}
       {showTokenModal && (
         <div className="modal-backdrop" onClick={() => setShowTokenModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-            <div className="modal-header">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', borderRadius: '1.25rem', padding: '1.75rem' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.15rem', fontWeight: '800' }}>
                 <Key size={18} style={{ color: '#0284c7' }} />
                 Configuração da API CPF A
               </h2>
@@ -1686,24 +2451,24 @@ const TrainingCertificatesPage = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveApiToken} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+            <form onSubmit={handleSaveApiToken} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
                 A página pública de inscrição utiliza a <strong>API CPF.CNPJ (Pacote 1: CPF A)</strong> para consultar a Receita Federal e validar em tempo real o nome completo do participante ao digitar o CPF.
               </div>
 
               <div>
-                <label className="modal-label" style={{ fontWeight: '600' }}>Base URL da API</label>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Base URL da API</label>
                 <input
                   type="text"
                   disabled
                   className="input"
                   value="https://api.cpfcnpj.com.br"
-                  style={{ opacity: 0.8 }}
+                  style={{ opacity: 0.8, marginTop: '0.35rem', width: '100%' }}
                 />
               </div>
 
               <div>
-                <label className="modal-label" style={{ fontWeight: '600' }}>Token de Acesso (Teste ou Produção)</label>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Token de Acesso (Teste ou Produção)</label>
                 <input
                   type="text"
                   required
@@ -1711,18 +2476,18 @@ const TrainingCertificatesPage = () => {
                   placeholder="Cole aqui seu token de integração"
                   value={apiToken}
                   onChange={e => setApiToken(e.target.value)}
-                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  style={{ fontFamily: 'monospace', fontSize: '0.85rem', marginTop: '0.35rem', width: '100%' }}
                 />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
-                  Token de testes configurado: <code>5ae973d7a997af13f0aaf2bf60e65803</code>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.35rem', display: 'block' }}>
+                  Token padrão: <code>5ae973d7a997af13f0aaf2bf60e65803</code>
                 </span>
               </div>
 
-              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>
+              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '0.75rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTokenModal(false)}>
                   Fechar
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7' }}>
+                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7', fontWeight: '700' }}>
                   Salvar Token
                 </button>
               </div>
@@ -1736,10 +2501,10 @@ const TrainingCertificatesPage = () => {
       {/* ========================================================================= */}
       {showBatchModal && (
         <div className="modal-backdrop" onClick={() => setShowBatchModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '560px' }}>
-            <div className="modal-header">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ClipboardCopy size={18} style={{ color: '#0284c7' }} />
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '580px', borderRadius: '1.25rem', padding: '1.75rem' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.15rem', fontWeight: '800' }}>
+                <ClipboardCopy size={20} style={{ color: '#0284c7' }} />
                 Importar Participantes em Lote
               </h2>
               <button className="modal-close" onClick={() => setShowBatchModal(false)}>
@@ -1747,25 +2512,25 @@ const TrainingCertificatesPage = () => {
               </button>
             </div>
 
-            <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                Cole abaixo a lista de participantes, um por linha. Você pode colar Nome e CPF separados por hífen, vírgula ou espaço.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                Cole abaixo a lista de participantes, um por linha. O sistema detecta automaticamente nomes e CPFs separados por traço, vírgula, tabulação ou espaço.
               </p>
 
               <textarea
                 className="input"
-                rows={8}
+                rows={9}
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
-                placeholder={"Exemplo:\nJoão Silva - 123.456.789-00\nMaria Santos, 98765432100\nCarlos Eduardo"}
-                style={{ fontFamily: 'monospace', fontSize: '0.8125rem', resize: 'vertical' }}
+                placeholder={"Exemplo:\nJoão da Silva - 123.456.789-00\nMaria Santos, 98765432100\nCarlos Eduardo Ferreira\nAna Paula de Oliveira - 111.222.333-44"}
+                style={{ fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical', width: '100%', lineHeight: '1.5' }}
               />
 
-              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowBatchModal(false)}>
                   Cancelar
                 </button>
-                <button type="button" className="btn btn-primary" onClick={handleProcessBatch} style={{ backgroundColor: '#0284c7' }}>
+                <button type="button" className="btn btn-primary" onClick={handleProcessBatch} style={{ backgroundColor: '#0284c7', fontWeight: '700' }}>
                   Processar Lista
                 </button>
               </div>
