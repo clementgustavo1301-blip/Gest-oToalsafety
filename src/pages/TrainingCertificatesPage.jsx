@@ -1973,13 +1973,13 @@ const TrainingCertificatesPage = () => {
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
                   boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.06)',
-                  border: certModel === 'modelo1' ? '1.5px solid rgba(124, 58, 237, 0.3)' : '1.5px solid rgba(234, 88, 12, 0.3)',
+                  border: certModel === 'modelo1' ? '1.5px solid rgba(100, 38, 138, 0.35)' : '1.5px solid rgba(51, 64, 230, 0.35)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   padding: certModel === 'modelo1' ? '3.5% 9.5% 3.5% 9.5%' : '3% 7% 3% 7%',
                   boxSizing: 'border-box',
-                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                  fontFamily: certModel === 'modelo1' ? "'Roboto', 'Lato', sans-serif" : "'Lato', 'Montserrat', sans-serif"
                 }}>
                   {/* ========================================================================= */}
                   {/* RENDERIZAÇÃO: MODELO 1 (EcoCurvas Laterais - Roxo Oficial EcoSafety)       */}
@@ -1987,7 +1987,7 @@ const TrainingCertificatesPage = () => {
                   {certModel === 'modelo1' ? (
                     previewTab === 'frente' ? (
                       /* MODELO 1 - FRENTE */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Roboto', sans-serif" }}>
                         {/* Topo: Header Banner Oficial com Logomarca EcoSafety e Título */}
                         <div style={{ textAlign: 'center' }}>
                           <img 
@@ -1997,36 +1997,38 @@ const TrainingCertificatesPage = () => {
                           />
                         </div>
 
-                        {/* Corpo: Texto Narrativo Justificado Contínuo */}
+                        {/* Corpo: Texto Narrativo Justificado Contínuo (Roboto, Preto Absoluto #000000) */}
                         <div style={{ 
+                          fontFamily: "'Roboto', sans-serif",
                           fontSize: '0.67rem', 
                           lineHeight: '1.52', 
                           textAlign: 'justify', 
-                          color: '#0f172a', 
+                          color: '#000000', 
                           margin: '0.3rem 0' 
                         }}>
-                          A ECOSAFETY certifica que: <strong style={{ color: '#000000', fontWeight: '800' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong> e Matrícula: <strong>{firstStudent?.matricula || '266522'}</strong>, completou com aprovação no período de <strong>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong>{formData.local || 'Mossoró/RN'}</strong>, o treinamento de <strong style={{ color: '#000000', fontWeight: '800' }}>{formData.curso}</strong>. {formData.descricao}
-                          <div style={{ marginTop: '0.4rem', textAlign: 'left', fontWeight: '500', color: '#1e293b' }}>
+                          A ECOSAFETY certifica que: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong> e Matrícula: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.matricula || '266522'}</strong>, completou com aprovação no período de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.local || 'Mossoró/RN'}</strong>, o treinamento de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.curso}</strong>. {formData.descricao}
+                          <div style={{ marginTop: '0.4rem', textAlign: 'left', fontWeight: '400', color: '#000000' }}>
                             {formData.local || 'Mossoró/RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                           </div>
                         </div>
 
-                        {/* Rodapé: 3 Assinaturas com Traços e Imagens */}
+                        {/* Rodapé: 3 Assinaturas com Traços e Tipografia em Roxo Oficial EcoSafety #64268a */}
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: '1fr 1fr 1fr',
                           gap: '0.45rem',
                           alignItems: 'end',
                           textAlign: 'center',
-                          marginTop: '0.35rem'
+                          marginTop: '0.35rem',
+                          fontFamily: "'Lato', sans-serif"
                         }}>
                           {/* Coluna 1: Responsável Técnico */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <img src="/certificate-templates/signatures/sig_eider_gomes.png" alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
-                            <div style={{ borderTop: '1px solid #475569', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.54rem', fontWeight: '800', color: '#4c1d95', textTransform: 'uppercase' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: '0.51rem', color: '#1e293b' }}>Eider Gomes do Nascimento</div>
-                              <div style={{ fontSize: '0.48rem', color: '#64748b' }}>Registro: MTE0009995/RN</div>
+                            <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>RESPONSAVEL TÉCNICO</div>
+                              <div style={{ fontSize: '0.51rem', fontWeight: '700', color: '#64268a' }}>Eider Gomes do Nascimento</div>
+                              <div style={{ fontSize: '0.48rem', color: '#64268a' }}>Registro: MTE0009995/RN</div>
                             </div>
                           </div>
 
@@ -2035,39 +2037,39 @@ const TrainingCertificatesPage = () => {
                             <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.5rem', letterSpacing: '0.3px' }}>[ Assinatura Pendente ]</span>
                             </div>
-                            <div style={{ borderTop: '1px solid #475569', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.54rem', fontWeight: '800', color: '#1e293b' }}>ALUNO:</div>
-                              <div style={{ fontSize: '0.51rem', color: '#1e293b', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE'}</div>
+                            <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a' }}>ALUNO:</div>
+                              <div style={{ fontSize: '0.51rem', color: '#64268a', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE'}</div>
                             </div>
                           </div>
 
                           {/* Coluna 3: Instrutor (Vinculado ao Dono) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <img src={getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
-                            <div style={{ borderTop: '1px solid #475569', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.54rem', fontWeight: '800', color: '#4c1d95', textTransform: 'uppercase' }}>INSTRUTOR:</div>
-                              <div style={{ fontSize: '0.51rem', color: '#1e293b', fontWeight: '700' }}>{formData.instrutorNome || 'Pedro Henrique Lima Padilha'}</div>
-                              <div style={{ fontSize: '0.48rem', color: '#64748b' }}>{formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP'}</div>
+                            <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>INSTRUTOR:</div>
+                              <div style={{ fontSize: '0.51rem', color: '#64268a', fontWeight: '700' }}>{formData.instrutorNome || 'Pedro Henrique Lima Padilha'}</div>
+                              <div style={{ fontSize: '0.48rem', color: '#64268a' }}>{formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP'}</div>
                             </div>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      /* MODELO 1 - VERSO (Conteúdo em 1 Coluna Limpa) */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                      /* MODELO 1 - VERSO (Conteúdo em 1 Coluna Limpa - Lato & Cinza Nobre #595959) */
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
                         <div>
                           <div style={{ borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '0.35rem', marginBottom: '0.4rem' }}>
-                            <div style={{ fontSize: '0.74rem', fontWeight: '800', color: '#1e293b' }}>
-                              Programa: <span style={{ color: '#4c1d95' }}>{formData.curso}</span>
+                            <div style={{ fontSize: '0.74rem', fontWeight: '700', color: '#595959' }}>
+                              Programa: <span style={{ color: '#64268a' }}>{formData.curso}</span>
                             </div>
-                            <div style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>
+                            <div style={{ fontSize: '0.66rem', color: '#595959', fontWeight: '400', marginTop: '2px' }}>
                               Carga horária: {formData.duracao}
                             </div>
                           </div>
 
                           <div style={{ 
                             fontSize: '0.63rem', 
-                            color: '#1e293b', 
+                            color: '#000000', 
                             lineHeight: '1.45', 
                             maxHeight: '190px', 
                             overflowY: 'auto', 
@@ -2082,9 +2084,9 @@ const TrainingCertificatesPage = () => {
                           textAlign: 'center',
                           fontSize: '0.56rem',
                           fontWeight: '700',
-                          color: '#64748b',
+                          color: '#595959',
                           letterSpacing: '0.4px',
-                          borderTop: '1px solid rgba(0,0,0,0.08)',
+                          borderTop: '1px solid #e2e8f0',
                           paddingTop: '0.35rem'
                         }}>
                           ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
@@ -2093,48 +2095,50 @@ const TrainingCertificatesPage = () => {
                     )
                   ) : (
                     /* ========================================================================= */
-                    /* RENDERIZAÇÃO: MODELO 2 (Ondas Diagonais & Colmeia Tech - Roxo + Laranja)   */
+                    /* RENDERIZAÇÃO: MODELO 2 (Ondas Diagonais & Colmeia Tech - Padrão Fiel PDF) */
                     /* ========================================================================= */
                     previewTab === 'frente' ? (
                       /* MODELO 2 - FRENTE */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
                         {/* Topo do Certificado */}
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ 
-                            fontSize: '1.02rem', 
-                            fontWeight: '900', 
-                            color: '#1e293b', 
+                            fontFamily: "'Montserrat', sans-serif",
+                            fontSize: '1.05rem', 
+                            fontWeight: '800', 
+                            color: '#595959', 
                             letterSpacing: '1.5px', 
                             textTransform: 'uppercase' 
                           }}>
                             CERTIFICADO DE CAPACITAÇÃO
                           </div>
-                          <div style={{ fontSize: '0.69rem', fontWeight: '600', color: '#334155', marginTop: '1px' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: '400', color: '#000000', marginTop: '1px' }}>
                             A ECOSAFETY certifica que:
                           </div>
 
-                          {/* Destaque do Nome em Azul Real */}
+                          {/* Destaque do Nome em Azul Real Oficial #3340e6 com Lato Black 900 */}
                           <div style={{ 
-                            fontSize: '1.15rem', 
+                            fontFamily: "'Lato', sans-serif",
+                            fontSize: '1.18rem', 
                             fontWeight: '900', 
-                            color: '#1d4ed8', 
+                            color: '#3340e6', 
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px',
-                            margin: '0.3rem 0'
+                            margin: '0.28rem 0'
                           }}>
                             {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
                           </div>
 
-                          <div style={{ fontSize: '0.65rem', color: '#334155', lineHeight: '1.4' }}>
-                            Portador do CPF: <strong>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
-                            <strong>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na ECOSAFETY TREINAMENTOS, o treinamento de:
+                          <div style={{ fontSize: '0.65rem', color: '#000000', lineHeight: '1.4' }}>
+                            Portador do CPF: <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
+                            <strong style={{ color: '#000000' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na ECOSAFETY TREINAMENTOS, o treinamento de:
                           </div>
 
                           <div style={{ 
-                            fontSize: '0.84rem', 
+                            fontSize: '0.88rem', 
                             fontWeight: '800', 
-                            color: '#1d4ed8', 
-                            margin: '0.25rem 0' 
+                            color: '#3340e6', 
+                            margin: '0.22rem 0' 
                           }}>
                             {formData.curso}
                           </div>
@@ -2142,7 +2146,7 @@ const TrainingCertificatesPage = () => {
                           {formData.descricao && (
                             <div style={{ 
                               fontSize: '0.6rem', 
-                              color: '#475569', 
+                              color: '#000000', 
                               textAlign: 'justify', 
                               lineHeight: '1.34', 
                               maxWidth: '94%', 
@@ -2152,27 +2156,28 @@ const TrainingCertificatesPage = () => {
                             </div>
                           )}
 
-                          <div style={{ fontSize: '0.63rem', color: '#1e293b', marginTop: '0.3rem' }}>
+                          <div style={{ fontSize: '0.63rem', color: '#000000', marginTop: '0.3rem' }}>
                             {formData.local || 'Mossoró, RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                           </div>
                         </div>
 
-                        {/* Rodapé: 4 Assinaturas com Traços e Imagens */}
+                        {/* Rodapé: 4 Assinaturas com Linhas e Textos em Preto Oficial #000000 */}
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: '1fr 1fr 1fr 1fr',
                           gap: '0.35rem',
                           alignItems: 'end',
                           textAlign: 'center',
-                          marginTop: '0.35rem'
+                          marginTop: '0.35rem',
+                          fontFamily: "'Lato', sans-serif"
                         }}>
                           {/* Raimundo - Responsável Técnico Geral */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <img src="/certificate-templates/signatures/sig_raimundo_fernandes.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
-                            <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#1e293b' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: '0.45rem', color: '#334155' }}>Raimundo Fernandes de Oliveira Junior</div>
-                              <div style={{ fontSize: '0.43rem', color: '#64748b' }}>Registro CREA – 211204597-0</div>
+                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO</div>
+                              <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '600' }}>Raimundo Fernandes de Oliveira Junior</div>
+                              <div style={{ fontSize: '0.43rem', color: '#595959' }}>Registro CREA – 211204597-0</div>
                             </div>
                           </div>
 
@@ -2181,20 +2186,20 @@ const TrainingCertificatesPage = () => {
                             {formData.curso?.toLowerCase().includes('aph') || formData.curso?.toLowerCase().includes('hospitalar') || formData.instrutorNome?.toLowerCase().includes('leiliana') ? (
                               <>
                                 <img src="/certificate-templates/signatures/sig_leiliana_nunes.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
-                                <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#1e293b' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#334155' }}>Leiliana Nunes de Lima Fernandes</div>
-                                  <div style={{ fontSize: '0.41rem', color: '#64748b' }}>Registro Coren RN 333018</div>
+                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#000000', fontWeight: '600' }}>Leiliana Nunes de Lima Fernandes</div>
+                                  <div style={{ fontSize: '0.41rem', color: '#595959' }}>Registro Coren RN 333018</div>
                                 </div>
                               </>
                             ) : (
                               <>
                                 <img src="/certificate-templates/signatures/sig_cezar_augusto.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
-                                <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#1e293b' }}>RESPONSAVEL TÉCNICO / INSTRUTOR</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#334155' }}>Engenheiro Eletricista</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#334155' }}>Cezar Augusto Galvão De P. Camêlo</div>
-                                  <div style={{ fontSize: '0.41rem', color: '#64748b' }}>CREA-RN 211051104-4</div>
+                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO / INSTRUTOR</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#595959' }}>Engenheiro Eletricista</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#000000', fontWeight: '600' }}>Cezar Augusto Galvão De P. Camêlo</div>
+                                  <div style={{ fontSize: '0.41rem', color: '#595959' }}>CREA-RN 211051104-4</div>
                                 </div>
                               </>
                             )}
@@ -2205,37 +2210,37 @@ const TrainingCertificatesPage = () => {
                             <div style={{ height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <span style={{ fontSize: '0.42rem', color: '#94a3b8', fontStyle: 'italic' }}>[ Assinatura Pendente ]</span>
                             </div>
-                            <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#1e293b' }}>ALUNO</div>
-                              <div style={{ fontSize: '0.45rem', color: '#1d4ed8', fontWeight: '700' }}>{firstStudent?.nome || 'Participante'}</div>
+                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>ALUNO</div>
+                              <div style={{ fontSize: '0.45rem', color: '#3340e6', fontWeight: '700' }}>{firstStudent?.nome || 'Participante'}</div>
                             </div>
                           </div>
 
                           {/* Instrutor (Vinculado ao Dono) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <img src={getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
-                            <div style={{ borderTop: '1px solid #64748b', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#1e293b' }}>INSTRUTOR</div>
-                              <div style={{ fontSize: '0.45rem', color: '#334155', fontWeight: '700' }}>{formData.instrutorNome || 'Eider Gomes do Nascimento'}</div>
-                              <div style={{ fontSize: '0.43rem', color: '#64748b' }}>{formData.instrutorRegistro || 'MTE0009995/RN'}</div>
+                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>INSTRUTOR</div>
+                              <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '700' }}>{formData.instrutorNome || 'Eider Gomes do Nascimento'}</div>
+                              <div style={{ fontSize: '0.43rem', color: '#595959' }}>{formData.instrutorRegistro || 'MTE0009995/RN'}</div>
                             </div>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      /* MODELO 2 - VERSO (Conteúdo em 2 Colunas Balanceadas) */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                      /* MODELO 2 - VERSO (Conteúdo em 2 Colunas Balanceadas - Calibri & Times New Roman) */
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Calibri', 'Lato', sans-serif" }}>
                         <div>
                           <div style={{ borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '0.3rem', marginBottom: '0.4rem' }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#1e293b' }}>
-                              Programa: <span style={{ color: '#1d4ed8' }}>{formData.curso}</span>
+                            <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#595959' }}>
+                              Programa: <span style={{ color: '#3340e6' }}>{formData.curso}</span>
                             </div>
-                            <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#595959', fontWeight: '400', marginTop: '2px' }}>
                               Carga horária: {formData.duracao}
                             </div>
                           </div>
 
-                          {/* 2 Colunas de Conteúdo */}
+                          {/* 2 Colunas de Conteúdo com Times New Roman (Fiel ao PDF Original) */}
                           {(() => {
                             const lines = (formData.conteudo || '').split('\n').filter(l => l.trim().length > 0);
                             const mid = Math.ceil(lines.length / 2);
@@ -2246,8 +2251,9 @@ const TrainingCertificatesPage = () => {
                                 display: 'grid',
                                 gridTemplateColumns: '1fr 1fr',
                                 gap: '1.1rem',
-                                fontSize: '0.61rem',
-                                color: '#1e293b',
+                                fontFamily: "'Times New Roman', Times, serif",
+                                fontSize: '0.63rem',
+                                color: '#000000',
                                 lineHeight: '1.38',
                                 maxHeight: '190px',
                                 overflowY: 'auto',
@@ -2263,10 +2269,10 @@ const TrainingCertificatesPage = () => {
                         <div style={{
                           textAlign: 'center',
                           fontSize: '0.56rem',
-                          fontWeight: '700',
-                          color: '#64748b',
+                          fontWeight: '600',
+                          color: '#595959',
                           letterSpacing: '0.4px',
-                          borderTop: '1px solid rgba(0,0,0,0.08)',
+                          borderTop: '1px solid #e2e8f0',
                           paddingTop: '0.35rem'
                         }}>
                           ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
