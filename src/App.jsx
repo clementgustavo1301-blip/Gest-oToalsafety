@@ -24,6 +24,7 @@ import CATPage from './pages/CATPage';
 import CertificatesPage from './pages/CertificatesPage';
 import TrainingCertificatesPage from './pages/TrainingCertificatesPage';
 import PublicTrainingEnrollmentPage from './pages/PublicTrainingEnrollmentPage';
+import PublicTrainingSignPage from './pages/PublicTrainingSignPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -171,6 +172,8 @@ function App() {
           <Route path="/inscricao" element={<PublicTrainingEnrollmentPage />} />
           <Route path="/inscricao/:turmaId" element={<PublicTrainingEnrollmentPage />} />
           <Route path="/inscricao-treinamento" element={<PublicTrainingEnrollmentPage />} />
+          <Route path="/assinar-turma" element={<PublicTrainingSignPage />} />
+          <Route path="/assinar-turma/:turmaId" element={<PublicTrainingSignPage />} />
 
           {/* Rotas Protegidas */}
           <Route path="/*" element={

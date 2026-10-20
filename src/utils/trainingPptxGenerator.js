@@ -21,7 +21,8 @@ export async function generateTrainingPPTX({
   instrutorCargo,
   instrutorRegistro,
   conteudo,
-  colaboradores
+  colaboradores,
+  turmaSignatures
 }) {
   let buffer = templateBuffer;
 
@@ -285,21 +286,70 @@ export async function generateTrainingPPTX({
   contentTypes = contentTypes.replace('</Types>', newOverrides + '</Types>');
   newZip.file('[Content_Types].xml', contentTypes);
 
-  // Injetar a assinatura oficial correspondente ao instrutor selecionado
-  if (instrutorNome) {
+  // Helper para converter base64 DataURL para ArrayBuffer
+  const dataUrlToArrayBuffer = (dataUrl) => {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
     try {
-      const sigUrl = getInstructorSignatureUrl(instrutorNome);
-      const sigRes = await fetch(sigUrl);
-      if (sigRes.ok) {
-        const sigBuffer = await sigRes.arrayBuffer();
-        if (certModel === 'modelo1') {
-          newZip.file('ppt/media/image4.png', sigBuffer);
-        } else {
-          newZip.file('ppt/media/image5.png', sigBuffer);
-        }
+      const base64 = dataUrl.split(',')[1];
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
       }
-    } catch {
-      // Mantém a assinatura padrão do arquivo base
+      return bytes.buffer;
+    } catch (e) {
+      console.warn('Erro ao converter dataUrl para buffer:', e);
+      return null;
+    }
+  };
+
+  // Helper para obter buffer de assinatura (manual ou oficial)
+  const getSignatureBuffer = async (manualEntry, fallbackUrl) => {
+    if (manualEntry?.dataUrl) {
+      const buf = dataUrlToArrayBuffer(manualEntry.dataUrl);
+      if (buf) return buf;
+    }
+    if (fallbackUrl) {
+      try {
+        const res = await fetch(fallbackUrl);
+        if (res.ok) return await res.arrayBuffer();
+      } catch {
+        // Ignora
+      }
+    }
+    return null;
+  };
+
+  // 1. Assinatura do Instrutor (Manual ou Oficial)
+  const instrutorFallback = instrutorNome ? getInstructorSignatureUrl(instrutorNome) : null;
+  const instrutorBuffer = await getSignatureBuffer(turmaSignatures?.instructor, instrutorFallback);
+  if (instrutorBuffer) {
+    if (certModel === 'modelo1') {
+      newZip.file('ppt/media/image4.png', instrutorBuffer);
+    } else {
+      newZip.file('ppt/media/image5.png', instrutorBuffer);
+    }
+  }
+
+  // 2. Assinatura do Responsável Técnico (Eider Gomes / Raimundo Fernandes)
+  const techLeadFallback = certModel === 'modelo1' 
+    ? '/certificate-templates/signatures/sig_eider_gomes.png' 
+    : '/certificate-templates/signatures/sig_raimundo_fernandes.png';
+  const techLeadBuffer = await getSignatureBuffer(turmaSignatures?.tech_lead, techLeadFallback);
+  if (techLeadBuffer) {
+    if (certModel === 'modelo1') {
+      newZip.file('ppt/media/image3.png', techLeadBuffer);
+    } else {
+      newZip.file('ppt/media/image2.png', techLeadBuffer);
+    }
+  }
+
+  // 3. Assinatura da Coordenação / 2º Responsável (Modelo 2)
+  if (certModel === 'modelo2' && turmaSignatures?.coordinator?.dataUrl) {
+    const coordBuffer = await getSignatureBuffer(turmaSignatures.coordinator, null);
+    if (coordBuffer) {
+      newZip.file('ppt/media/image3.png', coordBuffer);
     }
   }
 

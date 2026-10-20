@@ -5,7 +5,8 @@ import {
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
   Edit, Key, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
-  Eye, CheckCircle, Clock, BookOpen, Briefcase, MapPin, Building
+  Eye, CheckCircle, Clock, BookOpen, Briefcase, MapPin, Building,
+  Smartphone, QrCode, PenTool, Share2
 } from 'lucide-react';
 import { generateTrainingPPTX } from '../utils/trainingPptxGenerator';
 import { formatCpf } from '../services/cpfService';
@@ -14,6 +15,10 @@ import {
   getTrainingClasses, saveTrainingClass, deleteTrainingClass,
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments 
 } from '../services/trainingClassesService';
+import SignaturePadModal from '../components/SignaturePadModal';
+import { 
+  getTurmaSignatures, saveRoleSignature, clearTurmaSignature, subscribeToTurmaSignatures 
+} from '../services/turmaSignatureService';
 
 import { OFFICIAL_TRAINING_MODELS, OFFICIAL_INSTRUCTORS, getInstructorSignatureUrl } from '../data/officialTrainingModels';
 
@@ -70,6 +75,15 @@ const TrainingCertificatesPage = () => {
 
   // Feedback de Cópia
   const [copiedKey, setCopiedKey] = useState(null);
+
+  // Assinaturas Manuais da Turma (Em Lote)
+  const [currentTurmaSignatures, setCurrentTurmaSignatures] = useState({});
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [signModalRole, setSignModalRole] = useState('instructor');
+  const [signModalSignerName, setSignModalSignerName] = useState('');
+  const [signModalRoleTitle, setSignModalRoleTitle] = useState('');
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrModalTurma, setQrModalTurma] = useState(null);
 
   // ----------------------------------------------------
   // Estados do Gerador de Certificados (PPTX)
@@ -161,6 +175,88 @@ const TrainingCertificatesPage = () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  // Sincronização em tempo real das assinaturas manuais da turma
+  useEffect(() => {
+    const targetId = selectedTurmaIdInGenerator || 'draft_turma';
+    const sigs = getTurmaSignatures(targetId);
+    setCurrentTurmaSignatures(sigs || {});
+
+    const unsubscribeSignatures = subscribeToTurmaSignatures((event) => {
+      const currentId = selectedTurmaIdInGenerator || 'draft_turma';
+      if (String(event.turmaId) === String(currentId)) {
+        setCurrentTurmaSignatures(event.signatures || {});
+        setFeedback({
+          type: 'success',
+          text: '✍️ Assinatura manual da turma atualizada em tempo real!'
+        });
+        setTimeout(() => setFeedback(null), 4000);
+      }
+    });
+
+    return () => {
+      if (unsubscribeSignatures) unsubscribeSignatures();
+    };
+  }, [selectedTurmaIdInGenerator]);
+
+  // Handlers para Assinaturas Manuais da Turma
+  const handleOpenSignatureModal = (roleKey) => {
+    const activeTurma = turmas.find(t => String(t.id) === String(selectedTurmaIdInGenerator));
+    let name = '';
+    let title = '';
+
+    if (roleKey === 'instructor') {
+      name = formData.instrutorNome || activeTurma?.instructor_name || 'Adeylton da Silva Araújo';
+      title = 'Instrutor(a)';
+    } else if (roleKey === 'tech_lead') {
+      name = certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes de Oliveira Junior';
+      title = 'Responsável Técnico';
+    } else if (roleKey === 'coordinator') {
+      name = formData.curso?.toLowerCase().includes('aph') ? 'Leiliana Nunes de Lima Fernandes' : 'Cezar Augusto Galvão De P. Camêlo';
+      title = 'Coordenador(a) Técnico(a)';
+    }
+
+    setSignModalRole(roleKey);
+    setSignModalSignerName(name);
+    setSignModalRoleTitle(title);
+    setShowSignModal(true);
+  };
+
+  const handleSaveDrawnSignature = (dataUrl) => {
+    const targetId = selectedTurmaIdInGenerator || 'draft_turma';
+    const updated = saveRoleSignature(targetId, signModalRole, dataUrl, {
+      signerName: signModalSignerName,
+      roleTitle: signModalRoleTitle
+    });
+    if (updated) {
+      setCurrentTurmaSignatures(updated);
+      setFeedback({
+        type: 'success',
+        text: `Assinatura de ${signModalSignerName} vinculada com sucesso a toda a turma!`
+      });
+      setTimeout(() => setFeedback(null), 4500);
+    }
+  };
+
+  const handleClearSignature = (roleKey) => {
+    const targetId = selectedTurmaIdInGenerator || 'draft_turma';
+    clearTurmaSignature(targetId, roleKey);
+    setCurrentTurmaSignatures(getTurmaSignatures(targetId));
+    setFeedback({
+      type: 'info',
+      text: 'Assinatura manual removida. A turma voltará ao padrão oficial.'
+    });
+    setTimeout(() => setFeedback(null), 3500);
+  };
+
+  const handleOpenQrModal = (turma = null) => {
+    const t = turma || turmas.find(item => String(item.id) === String(selectedTurmaIdInGenerator)) || {
+      id: selectedTurmaIdInGenerator || 'draft_turma',
+      name: formData.curso || 'Turma Ativa'
+    };
+    setQrModalTurma(t);
+    setShowQrModal(true);
+  };
 
   // ----------------------------------------------------
   // Ações de Turmas
@@ -496,7 +592,8 @@ const TrainingCertificatesPage = () => {
         instrutorCargo: formData.instrutorCargo,
         instrutorRegistro: formData.instrutorRegistro,
         conteudo: formData.conteudo,
-        colaboradores: validColaboradores
+        colaboradores: validColaboradores,
+        turmaSignatures: currentTurmaSignatures
       });
 
       const url = URL.createObjectURL(blob);
@@ -1094,6 +1191,370 @@ const TrainingCertificatesPage = () => {
                   </div>
                 );
               })()}
+            </div>
+
+            {/* Card: Assinaturas Manuais da Turma (Em Lote) */}
+            <div style={{
+              backgroundColor: 'var(--surface)',
+              border: '1.5px solid #8b5cf6',
+              borderRadius: '1rem',
+              padding: '1.25rem 1.4rem',
+              boxShadow: '0 4px 14px rgba(139, 92, 246, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.9rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '0.55rem',
+                    backgroundColor: 'rgba(139, 92, 246, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <PenTool size={17} style={{ color: '#8b5cf6' }} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                      Assinaturas Manuais da Turma (Em Lote)
+                    </span>
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      Assine no celular desenhando com o dedo ou na tela • Replica em toda a turma
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQrModal()}
+                    className="btn"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      fontSize: '0.78rem',
+                      fontWeight: '700',
+                      padding: '0.45rem 0.85rem',
+                      backgroundColor: 'rgba(139, 92, 246, 0.08)',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      color: '#7c3aed',
+                      borderRadius: '0.6rem',
+                      cursor: 'pointer'
+                    }}
+                    title="Escanear QR Code para assinar no celular"
+                  >
+                    <Smartphone size={14} />
+                    📱 Assinar no Celular (QR Code)
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid dos Papéis de Assinatura */}
+              <div style={{ display: 'grid', gridTemplateColumns: certModel === 'modelo2' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.75rem' }}>
+                {/* 1. Instrutor */}
+                <div style={{
+                  padding: '0.85rem',
+                  borderRadius: '0.75rem',
+                  backgroundColor: currentTurmaSignatures?.instructor?.dataUrl ? 'rgba(16, 185, 129, 0.05)' : 'var(--surface-hover)',
+                  border: currentTurmaSignatures?.instructor?.dataUrl ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64268a', textTransform: 'uppercase' }}>
+                        👨‍🏫 Instrutor(a)
+                      </span>
+                      {currentTurmaSignatures?.instructor?.dataUrl ? (
+                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#059669', backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '1rem' }}>
+                          Assinado Manualmente ✅
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', backgroundColor: '#fffbeb', padding: '1px 6px', borderRadius: '1rem' }}>
+                          Padrão do Sistema ⚠️
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                      {formData.instrutorNome || 'Adeylton da Silva Araújo'}
+                    </div>
+
+                    {currentTurmaSignatures?.instructor?.dataUrl && (
+                      <div style={{
+                        height: '42px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '0.45rem',
+                        border: '1px solid #e2e8f0',
+                        marginBottom: '0.45rem',
+                        padding: '2px'
+                      }}>
+                        <img src={currentTurmaSignatures.instructor.dataUrl} alt="Assinatura Manual" style={{ maxHeight: '38px', maxWidth: '90%', objectFit: 'contain' }} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSignatureModal('instructor')}
+                      style={{
+                        flex: 1,
+                        padding: '0.4rem 0.65rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #7c3aed',
+                        backgroundColor: '#7c3aed',
+                        color: '#fff',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.3rem'
+                      }}
+                    >
+                      <PenTool size={12} />
+                      {currentTurmaSignatures?.instructor?.dataUrl ? 'Refazer Desenho' : 'Desenhar na Tela'}
+                    </button>
+                    {currentTurmaSignatures?.instructor?.dataUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearSignature('instructor')}
+                        style={{
+                          padding: '0.4rem 0.55rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #ef4444',
+                          backgroundColor: 'transparent',
+                          color: '#ef4444',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer'
+                        }}
+                        title="Limpar e voltar ao padrão"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Responsável Técnico */}
+                <div style={{
+                  padding: '0.85rem',
+                  borderRadius: '0.75rem',
+                  backgroundColor: currentTurmaSignatures?.tech_lead?.dataUrl ? 'rgba(16, 185, 129, 0.05)' : 'var(--surface-hover)',
+                  border: currentTurmaSignatures?.tech_lead?.dataUrl ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64268a', textTransform: 'uppercase' }}>
+                        🛡️ Resp. Técnico
+                      </span>
+                      {currentTurmaSignatures?.tech_lead?.dataUrl ? (
+                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#059669', backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '1rem' }}>
+                          Assinado Manualmente ✅
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', backgroundColor: '#fffbeb', padding: '1px 6px', borderRadius: '1rem' }}>
+                          Padrão do Sistema ⚠️
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                      {certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes Jr.'}
+                    </div>
+
+                    {currentTurmaSignatures?.tech_lead?.dataUrl && (
+                      <div style={{
+                        height: '42px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '0.45rem',
+                        border: '1px solid #e2e8f0',
+                        marginBottom: '0.45rem',
+                        padding: '2px'
+                      }}>
+                        <img src={currentTurmaSignatures.tech_lead.dataUrl} alt="Assinatura Manual" style={{ maxHeight: '38px', maxWidth: '90%', objectFit: 'contain' }} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSignatureModal('tech_lead')}
+                      style={{
+                        flex: 1,
+                        padding: '0.4rem 0.65rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #7c3aed',
+                        backgroundColor: '#7c3aed',
+                        color: '#fff',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.3rem'
+                      }}
+                    >
+                      <PenTool size={12} />
+                      {currentTurmaSignatures?.tech_lead?.dataUrl ? 'Refazer Desenho' : 'Desenhar na Tela'}
+                    </button>
+                    {currentTurmaSignatures?.tech_lead?.dataUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearSignature('tech_lead')}
+                        style={{
+                          padding: '0.4rem 0.55rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #ef4444',
+                          backgroundColor: 'transparent',
+                          color: '#ef4444',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer'
+                        }}
+                        title="Limpar e voltar ao padrão"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Coordenação / 2º Resp (apenas Modelo 2) */}
+                {certModel === 'modelo2' && (
+                  <div style={{
+                    padding: '0.85rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: currentTurmaSignatures?.coordinator?.dataUrl ? 'rgba(16, 185, 129, 0.05)' : 'var(--surface-hover)',
+                    border: currentTurmaSignatures?.coordinator?.dataUrl ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64268a', textTransform: 'uppercase' }}>
+                          ⚡ Coordenação / 2º Resp.
+                        </span>
+                        {currentTurmaSignatures?.coordinator?.dataUrl ? (
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#059669', backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '1rem' }}>
+                            Assinado ✅
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', backgroundColor: '#fffbeb', padding: '1px 6px', borderRadius: '1rem' }}>
+                            Padrão ⚠️
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                        {formData.curso?.toLowerCase().includes('aph') ? 'Leiliana Nunes Fernandes' : 'Cezar Augusto Galvão'}
+                      </div>
+
+                      {currentTurmaSignatures?.coordinator?.dataUrl && (
+                        <div style={{
+                          height: '42px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '0.45rem',
+                          border: '1px solid #e2e8f0',
+                          marginBottom: '0.45rem',
+                          padding: '2px'
+                        }}>
+                          <img src={currentTurmaSignatures.coordinator.dataUrl} alt="Assinatura Manual" style={{ maxHeight: '38px', maxWidth: '90%', objectFit: 'contain' }} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSignatureModal('coordinator')}
+                        style={{
+                          flex: 1,
+                          padding: '0.4rem 0.65rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #7c3aed',
+                          backgroundColor: '#7c3aed',
+                          color: '#fff',
+                          fontSize: '0.72rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <PenTool size={12} />
+                        {currentTurmaSignatures?.coordinator?.dataUrl ? 'Refazer Desenho' : 'Desenhar na Tela'}
+                      </button>
+                      {currentTurmaSignatures?.coordinator?.dataUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleClearSignature('coordinator')}
+                          style={{
+                            padding: '0.4rem 0.55rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #ef4444',
+                            backgroundColor: 'transparent',
+                            color: '#ef4444',
+                            fontSize: '0.72rem',
+                            cursor: 'pointer'
+                          }}
+                          title="Limpar e voltar ao padrão"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Lembrete sobre a Assinatura do Aluno */}
+              <div style={{
+                padding: '0.6rem 0.85rem',
+                backgroundColor: 'rgba(2, 132, 199, 0.05)',
+                borderRadius: '0.65rem',
+                border: '1px solid rgba(2, 132, 199, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.4rem',
+                fontSize: '0.73rem',
+                color: '#0369a1'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span>🔒</span>
+                  <span>
+                    <strong>Assinatura do Aluno:</strong> Permanece sempre <strong>PENDENTE</strong> para assinatura presencial de cada participante ao receber seu certificado.
+                  </span>
+                </div>
+                <span style={{ fontWeight: '700', color: '#0284c7' }}>
+                  Padrão Oficial TotalSafety
+                </span>
+              </div>
             </div>
 
             {/* Card: Arquivo de Modelo PPTX */}
@@ -2024,7 +2485,7 @@ const TrainingCertificatesPage = () => {
                         }}>
                           {/* Coluna 1: Responsável Técnico */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src="/certificate-templates/signatures/sig_eider_gomes.png" alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
+                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_eider_gomes.png"} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
                             <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
                               <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>RESPONSAVEL TÉCNICO</div>
                               <div style={{ fontSize: '0.51rem', fontWeight: '700', color: '#64268a' }}>Eider Gomes do Nascimento</div>
@@ -2045,7 +2506,7 @@ const TrainingCertificatesPage = () => {
 
                           {/* Coluna 3: Instrutor (Vinculado ao Dono) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
+                            <img src={currentTurmaSignatures?.instructor?.dataUrl || getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
                             <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
                               <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>INSTRUTOR:</div>
                               <div style={{ fontSize: '0.51rem', color: '#64268a', fontWeight: '700' }}>{formData.instrutorNome || 'Pedro Henrique Lima Padilha'}</div>
@@ -2173,7 +2634,7 @@ const TrainingCertificatesPage = () => {
                         }}>
                           {/* Raimundo - Responsável Técnico Geral */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src="/certificate-templates/signatures/sig_raimundo_fernandes.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_raimundo_fernandes.png"} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
                             <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
                               <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO</div>
                               <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '600' }}>Raimundo Fernandes de Oliveira Junior</div>
@@ -2183,7 +2644,16 @@ const TrainingCertificatesPage = () => {
 
                           {/* Cezar Augusto ou Leiliana Nunes (se APH) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            {formData.curso?.toLowerCase().includes('aph') || formData.curso?.toLowerCase().includes('hospitalar') || formData.instrutorNome?.toLowerCase().includes('leiliana') ? (
+                            {currentTurmaSignatures?.coordinator?.dataUrl ? (
+                              <>
+                                <img src={currentTurmaSignatures.coordinator.dataUrl} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#000000', fontWeight: '600' }}>{currentTurmaSignatures.coordinator.signerName || 'Coordenação Técnica'}</div>
+                                  <div style={{ fontSize: '0.41rem', color: '#595959' }}>Registro Oficial</div>
+                                </div>
+                              </>
+                            ) : formData.curso?.toLowerCase().includes('aph') || formData.curso?.toLowerCase().includes('hospitalar') || formData.instrutorNome?.toLowerCase().includes('leiliana') ? (
                               <>
                                 <img src="/certificate-templates/signatures/sig_leiliana_nunes.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
                                 <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
@@ -2218,7 +2688,7 @@ const TrainingCertificatesPage = () => {
 
                           {/* Instrutor (Vinculado ao Dono) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                            <img src={currentTurmaSignatures?.instructor?.dataUrl || getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
                             <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
                               <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>INSTRUTOR</div>
                               <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '700' }}>{formData.instrutorNome || 'Eider Gomes do Nascimento'}</div>
@@ -2809,6 +3279,27 @@ const TrainingCertificatesPage = () => {
                           <button
                             type="button"
                             className="btn"
+                            onClick={() => handleOpenQrModal(turma)}
+                            style={{ 
+                              fontSize: '0.78rem', 
+                              padding: '0.4rem 0.75rem', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '0.3rem',
+                              backgroundColor: 'rgba(124, 58, 237, 0.08)',
+                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                              color: '#7c3aed',
+                              fontWeight: '700'
+                            }}
+                            title="Abrir QR Code para assinar esta turma pelo celular"
+                          >
+                            <Smartphone size={14} />
+                            Assinar no Celular
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn"
                             onClick={() => copyPublicLink(turma.id, `turma-${turma.id}`)}
                             style={{ 
                               fontSize: '0.78rem', 
@@ -3321,6 +3812,150 @@ const TrainingCertificatesPage = () => {
                   Processar Lista
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ASSINATURA MANUAL EM TELA (CANVAS TOUCH / MOUSE)                   */}
+      {/* ========================================================================= */}
+      <SignaturePadModal
+        isOpen={showSignModal}
+        onClose={() => setShowSignModal(false)}
+        onSave={handleSaveDrawnSignature}
+        title={`Assinatura Manual: ${signModalRoleTitle}`}
+        subtitle="Desenhe a assinatura na tela com o mouse, caneta ou toque"
+        signerName={signModalSignerName}
+        roleTitle={signModalRoleTitle}
+      />
+
+      {/* ========================================================================= */}
+      {/* MODAL: ASSINAR PELO CELULAR (QR CODE & LINK DE COMPARTILHAMENTO)          */}
+      {/* ========================================================================= */}
+      {showQrModal && qrModalTurma && (
+        <div className="modal-backdrop" onClick={() => setShowQrModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '490px', borderRadius: '1.25rem', padding: '1.75rem', textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '0.55rem',
+                  backgroundColor: 'rgba(124, 58, 237, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Smartphone size={18} style={{ color: '#7c3aed' }} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                    Assinar Turma pelo Celular
+                  </h3>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    Turma: <strong>{qrModalTurma.name}</strong>
+                  </span>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setShowQrModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0', lineHeight: '1.45' }}>
+              Aponte a câmera do celular para o QR Code abaixo para abrir o portal de assinatura com o dedo. Ao salvar, a assinatura é aplicada automaticamente em lote para todos os alunos.
+            </p>
+
+            {/* Imagem do QR Code Dinâmico */}
+            <div style={{
+              display: 'inline-block',
+              padding: '0.75rem',
+              backgroundColor: '#ffffff',
+              borderRadius: '1rem',
+              border: '2px solid #e2e8f0',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+              marginBottom: '1rem'
+            }}>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                  `${window.location.origin}/assinar-turma/${qrModalTurma.id}`
+                )}`}
+                alt="QR Code para Assinatura no Celular"
+                style={{ width: '200px', height: '200px', display: 'block', borderRadius: '0.5rem' }}
+              />
+            </div>
+
+            {/* Campo com Link Direto */}
+            <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
+              <input
+                type="text"
+                readOnly
+                className="input"
+                value={`${window.location.origin}/assinar-turma/${qrModalTurma.id}`}
+                style={{ fontSize: '0.78rem', padding: '0.55rem 0.75rem', fontFamily: 'monospace' }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/assinar-turma/${qrModalTurma.id}`);
+                  setCopiedKey('qr-modal-link');
+                  setTimeout(() => setCopiedKey(null), 2500);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+              >
+                {copiedKey === 'qr-modal-link' ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
+                {copiedKey === 'qr-modal-link' ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+
+            {/* Ações de Compartilhamento */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Olá! Segue o link para assinar digitalmente pelo celular os certificados da turma "${qrModalTurma.name}": ${window.location.origin}/assinar-turma/${qrModalTurma.id}`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  backgroundColor: '#25D366',
+                  color: '#ffffff',
+                  fontWeight: '700',
+                  fontSize: '0.8rem',
+                  padding: '0.65rem',
+                  borderRadius: '0.65rem',
+                  textDecoration: 'none'
+                }}
+              >
+                <Share2 size={15} />
+                WhatsApp
+              </a>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => window.open(`/assinar-turma/${qrModalTurma.id}`, '_blank')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  backgroundColor: '#7c3aed',
+                  fontWeight: '700',
+                  fontSize: '0.8rem',
+                  padding: '0.65rem',
+                  borderRadius: '0.65rem'
+                }}
+              >
+                <ExternalLink size={15} />
+                Abrir Portal
+              </button>
             </div>
           </div>
         </div>
