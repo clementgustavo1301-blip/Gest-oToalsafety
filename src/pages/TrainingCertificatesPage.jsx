@@ -1968,7 +1968,7 @@ const TrainingCertificatesPage = () => {
                   backgroundColor: '#ffffff',
                   backgroundImage: certModel === 'modelo1'
                     ? `url(${previewTab === 'frente' ? '/certificate-templates/m1_frente_bg.jpg' : '/certificate-templates/m1_verso_bg.jpg'})`
-                    : `url(${previewTab === 'frente' ? '/certificate-templates/m2_frente_bg.png' : '/certificate-templates/m2_verso_bg.png'})`,
+                    : `url(${previewTab === 'frente' ? '/certificate-templates/m2_frente_bg.png?v=pristine_v4' : '/certificate-templates/m2_verso_bg.png?v=pristine_v4'})`,
                   backgroundSize: '100% 100%',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
