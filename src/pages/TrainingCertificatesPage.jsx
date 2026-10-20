@@ -4,7 +4,7 @@ import {
   Upload, CheckCircle2, AlertCircle, Users, Sparkles, 
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
-  Edit, Key, ShieldCheck, ChevronRight, UserCheck, X, User,
+  Edit, Key, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
   Eye, CheckCircle, Clock, BookOpen, Briefcase, MapPin, Building
 } from 'lucide-react';
 import { generateTrainingPPTX } from '../utils/trainingPptxGenerator';
@@ -152,6 +152,9 @@ const TrainingCertificatesPage = () => {
   const [companies, setCompanies] = useState([]);
   const [groups, setGroups] = useState([]);
   const [selectedTurmaIdInGenerator, setSelectedTurmaIdInGenerator] = useState('');
+  const [isCustomCourse, setIsCustomCourse] = useState(false);
+  const [isCustomCompany, setIsCustomCompany] = useState(false);
+  const [isEditingInstructor, setIsEditingInstructor] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [selectedTurmaFilter, setSelectedTurmaFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1326,108 +1329,147 @@ const TrainingCertificatesPage = () => {
 
                 {/* Treinamento / Curso Oficial */}
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
                     <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <BookOpen size={15} style={{ color: '#0284c7' }} />
                       Treinamento Oficial / Norma Regulamentadora (NR) *
                     </label>
-                    <span style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: '700' }}>
-                      ⚡ Auto-preenchimento
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomCourse(!isCustomCourse)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        padding: '2px 4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}
+                    >
+                      {isCustomCourse ? '↺ Escolher da Lista Oficial' : '✏️ Digitar Título Livre'}
+                    </button>
                   </div>
 
-                  {/* SELECT PRINCIPAL DE CURSOS E NRs */}
-                  <select
-                    className="input"
-                    value={COURSE_PRESETS.some(p => p.name.toLowerCase() === formData.curso?.trim().toLowerCase()) ? formData.curso : 'custom'}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === 'custom') {
-                        // mantém para edição
-                      } else {
-                        const found = COURSE_PRESETS.find(p => p.name === val);
-                        if (found) applyPreset(found);
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '0.65rem',
-                      border: '1.5px solid #0284c7',
-                      backgroundColor: 'var(--surface)',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                      marginBottom: '0.5rem'
-                    }}
-                  >
-                    <option value="" disabled>Selecione uma Norma Regulamentadora ou Curso Padrão...</option>
-                    
-                    <optgroup label="📋 Normas Regulamentadoras (NRs)">
-                      {COURSE_PRESETS.filter(p => p.category === 'Normas Regulamentadoras (NRs)').map((p, idx) => (
-                        <option key={idx} value={p.name}>
-                          {p.name} ({p.duration})
-                        </option>
-                      ))}
-                    </optgroup>
+                  {!isCustomCourse ? (
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        className="input"
+                        value={COURSE_PRESETS.some(p => p.name.toLowerCase() === formData.curso?.trim().toLowerCase()) ? formData.curso : 'custom'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'custom') {
+                            setIsCustomCourse(true);
+                          } else {
+                            const found = COURSE_PRESETS.find(p => p.name === val);
+                            if (found) applyPreset(found);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          padding: '0.65rem 2.2rem 0.65rem 0.85rem',
+                          borderRadius: '0.65rem',
+                          border: '1.5px solid #0284c7',
+                          backgroundColor: 'var(--surface)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          appearance: 'none'
+                        }}
+                      >
+                        <option value="" disabled>Selecione uma Norma Regulamentadora ou Curso Padrão...</option>
+                        
+                        <optgroup label="📋 Normas Regulamentadoras (NRs)">
+                          {COURSE_PRESETS.filter(p => p.category === 'Normas Regulamentadoras (NRs)').map((p, idx) => (
+                            <option key={idx} value={p.name}>
+                              {p.name} ({p.duration})
+                            </option>
+                          ))}
+                        </optgroup>
 
-                    <optgroup label="🚑 Emergência, Brigada & Primeiros Socorros">
-                      {COURSE_PRESETS.filter(p => p.category === 'Emergência & Primeiros Socorros').map((p, idx) => (
-                        <option key={idx} value={p.name}>
-                          {p.name} ({p.duration})
-                        </option>
-                      ))}
-                    </optgroup>
+                        <optgroup label="🚑 Emergência, Brigada & Primeiros Socorros">
+                          {COURSE_PRESETS.filter(p => p.category === 'Emergência & Primeiros Socorros').map((p, idx) => (
+                            <option key={idx} value={p.name}>
+                              {p.name} ({p.duration})
+                            </option>
+                          ))}
+                        </optgroup>
 
-                    <optgroup label="🚗 Operacional, Direção & Trânsito">
-                      {COURSE_PRESETS.filter(p => p.category === 'Operacional & Trânsito').map((p, idx) => (
-                        <option key={idx} value={p.name}>
-                          {p.name} ({p.duration})
-                        </option>
-                      ))}
-                    </optgroup>
+                        <optgroup label="🚗 Operacional, Direção & Trânsito">
+                          {COURSE_PRESETS.filter(p => p.category === 'Operacional & Trânsito').map((p, idx) => (
+                            <option key={idx} value={p.name}>
+                              {p.name} ({p.duration})
+                            </option>
+                          ))}
+                        </optgroup>
 
-                    <option value="custom">✏️ Outro Treinamento (digitar título personalizado)</option>
-                  </select>
-
-                  <input
-                    type="text"
-                    name="curso"
-                    className="input"
-                    value={formData.curso}
-                    onChange={handleChange}
-                    placeholder="Ex: NR-35 Trabalho em Altura / Brigada de Incêndio"
-                    style={{ width: '100%', fontSize: '0.9rem', fontWeight: '600' }}
-                  />
+                        <option value="custom">✏️ Outro Treinamento (digitar título personalizado)</option>
+                      </select>
+                      <div style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#0284c7' }}>
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      name="curso"
+                      className="input"
+                      value={formData.curso}
+                      onChange={handleChange}
+                      placeholder="Ex: NR-35 Trabalho em Altura / Brigada de Incêndio"
+                      autoFocus
+                      style={{ width: '100%', fontSize: '0.9rem', fontWeight: '600', border: '1.5px solid #0284c7' }}
+                    />
+                  )}
                 </div>
 
                 {/* Chips de Seleção Rápida */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
-                    Atalhos Rápidos Mais Usados:
-                  </label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    {COURSE_PRESETS.slice(0, 7).map((p, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => applyPreset(p)}
-                        style={{
-                          backgroundColor: formData.curso === p.name ? 'rgba(2, 132, 199, 0.12)' : 'var(--surface-hover)',
-                          border: formData.curso === p.name ? '1.5px solid #0284c7' : '1px solid var(--border)',
-                          color: formData.curso === p.name ? '#0284c7' : 'var(--text-primary)',
-                          borderRadius: '1.25rem',
-                          padding: '0.25rem 0.65rem',
-                          fontSize: '0.72rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {p.name.split(' ')[0]}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginRight: '0.15rem' }}>
+                      Atalhos Rápidos:
+                    </span>
+                    {[
+                      { label: 'NR-35 Altura', name: 'NR-35 Trabalho em Altura' },
+                      { label: 'NR-10 Elétrica', name: 'NR-10 Segurança em Instalações e Serviços em Eletricidade' },
+                      { label: 'NR-33 Confinado', name: 'NR-33 Segurança em Espaços Confinados (Trabalhadores e Vigias)' },
+                      { label: 'NR-06 EPI', name: 'NR-06 Equipamentos de Proteção Individual' },
+                      { label: 'Brigada Incêndio', name: 'Brigada de Incêndio e Emergência' },
+                      { label: '1º Socorros', name: 'Primeiros Socorros e Suporte Básico de Vida' },
+                      { label: 'NR-11 Empilhadeira', name: 'NR-11 Operador de Empilhadeira' }
+                    ].map((item, idx) => {
+                      const isSelected = formData.curso === item.name;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const preset = COURSE_PRESETS.find(p => p.name === item.name);
+                            if (preset) {
+                              setIsCustomCourse(false);
+                              applyPreset(preset);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: isSelected ? '#0284c7' : 'var(--surface-hover)',
+                            border: isSelected ? '1px solid #0284c7' : '1px solid var(--border)',
+                            color: isSelected ? '#fff' : 'var(--text-primary)',
+                            borderRadius: '1.25rem',
+                            padding: '0.2rem 0.65rem',
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1438,35 +1480,45 @@ const TrainingCertificatesPage = () => {
                       <Clock size={14} style={{ color: '#0284c7' }} />
                       Carga Horária *
                     </label>
-                    <select
-                      className="input"
-                      value={['4 horas', '8 horas', '16 horas', '20 horas', '40 horas'].includes(formData.duracao) ? formData.duracao : 'custom'}
-                      onChange={(e) => {
-                        if (e.target.value !== 'custom') {
-                          setFormData(prev => ({ ...prev, duracao: e.target.value }));
-                        }
-                      }}
-                      style={{ width: '100%', fontSize: '0.85rem', marginBottom: '0.35rem', borderRadius: '0.55rem' }}
-                    >
-                      <option value="4 horas">4 horas (Integração / NR-06)</option>
-                      <option value="8 horas">8 horas (1 dia - NR-35 / Brigada)</option>
-                      <option value="16 horas">16 horas (2 dias - NR-33 / NR-11)</option>
-                      <option value="20 horas">20 horas (NR-05 CIPA)</option>
-                      <option value="40 horas">40 horas (1 semana - NR-10 Básico / SEP)</option>
-                      <option value="custom">Outra carga horária (personalizada)...</option>
-                    </select>
                     <input
                       type="text"
                       name="duracao"
                       className="input"
                       value={formData.duracao}
                       onChange={handleChange}
-                      placeholder="Ex: 8 horas, 16 horas"
-                      style={{ width: '100%' }}
+                      placeholder="Ex: 8 horas"
+                      style={{ width: '100%', fontSize: '0.875rem', fontWeight: '600' }}
                     />
+                    {/* Atalhos de Carga Horária */}
+                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                      {['4 horas', '8 horas', '16 horas', '20 horas', '40 horas'].map((h) => {
+                        const isSel = formData.duracao === h;
+                        return (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, duracao: h }))}
+                            style={{
+                              padding: '0.18rem 0.5rem',
+                              fontSize: '0.7rem',
+                              fontWeight: '700',
+                              borderRadius: '0.4rem',
+                              border: isSel ? '1px solid #0284c7' : '1px solid var(--border)',
+                              backgroundColor: isSel ? 'rgba(2, 132, 199, 0.12)' : 'var(--surface-hover)',
+                              color: isSel ? '#0284c7' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {h.replace(' horas', 'h')}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+
                   <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
                       <Calendar size={14} style={{ color: '#0284c7' }} />
                       Data de Conclusão *
                     </label>
@@ -1476,7 +1528,7 @@ const TrainingCertificatesPage = () => {
                       className="input"
                       value={formData.data}
                       onChange={handleChange}
-                      style={{ width: '100%', marginTop: '0.35rem' }}
+                      style={{ width: '100%', fontSize: '0.875rem', fontWeight: '600' }}
                     />
                   </div>
                 </div>
@@ -1484,7 +1536,7 @@ const TrainingCertificatesPage = () => {
                 {/* Local e Empresa Solicitante */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                   <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
                       <MapPin size={14} style={{ color: '#0284c7' }} />
                       Local / Cidade
                     </label>
@@ -1495,62 +1547,98 @@ const TrainingCertificatesPage = () => {
                       value={formData.local}
                       onChange={handleChange}
                       placeholder="Ex: Mossoró - RN"
-                      style={{ width: '100%', marginTop: '0.35rem' }}
+                      style={{ width: '100%', fontSize: '0.875rem' }}
                     />
                   </div>
+
                   <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-                      <Building size={14} style={{ color: '#0284c7' }} />
-                      Empresa Solicitante
-                    </label>
-                    <select
-                      className="input"
-                      value={
-                        companies.some(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase())
-                          ? companies.find(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase()).id
-                          : (formData.empresa === 'TotalSafety' ? 'totalsafety' : 'custom')
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === 'totalsafety') {
-                          setFormData(prev => ({ ...prev, empresa: 'TotalSafety' }));
-                        } else if (val === 'custom') {
-                          // mantém para edição
-                        } else {
-                          const found = companies.find(c => String(c.id) === String(val));
-                          if (found) {
-                            setFormData(prev => ({ ...prev, empresa: found.name }));
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+                        <Building size={14} style={{ color: '#0284c7' }} />
+                        Empresa Solicitante
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomCompany(!isCustomCompany)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0284c7',
+                          fontSize: '0.7rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          padding: '1px 3px'
+                        }}
+                      >
+                        {isCustomCompany ? '↺ Lista' : '✏️ Digitar outra'}
+                      </button>
+                    </div>
+
+                    {!isCustomCompany ? (
+                      <div style={{ position: 'relative' }}>
+                        <select
+                          className="input"
+                          value={
+                            companies.some(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase())
+                              ? companies.find(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase()).id
+                              : (formData.empresa === 'TotalSafety' ? 'totalsafety' : 'custom')
                           }
-                        }
-                      }}
-                      style={{ width: '100%', fontSize: '0.85rem', marginBottom: '0.35rem', borderRadius: '0.55rem' }}
-                    >
-                      <option value="totalsafety">🏢 TotalSafety (Padrão / Própria)</option>
-                      {companies.length > 0 && (
-                        <optgroup label="🏢 Empresas Cadastradas no TotalSafety">
-                          {[...companies]
-                            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-                            .map(c => {
-                              const grp = groups.find(g => g.id === c.groupId);
-                              return (
-                                <option key={c.id} value={c.id}>
-                                  {c.name} {grp ? `(${grp.name.replace(/^\d+\s*-\s*/, '')})` : ''}
-                                </option>
-                              );
-                            })}
-                        </optgroup>
-                      )}
-                      <option value="custom">✍️ Digitar outro nome de empresa...</option>
-                    </select>
-                    <input
-                      type="text"
-                      name="empresa"
-                      className="input"
-                      value={formData.empresa}
-                      onChange={handleChange}
-                      placeholder="Ex: Nome da Empresa / TotalSafety"
-                      style={{ width: '100%' }}
-                    />
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 'totalsafety') {
+                              setFormData(prev => ({ ...prev, empresa: 'TotalSafety' }));
+                            } else if (val === 'custom') {
+                              setIsCustomCompany(true);
+                            } else {
+                              const found = companies.find(c => String(c.id) === String(val));
+                              if (found) {
+                                setFormData(prev => ({ ...prev, empresa: found.name }));
+                              }
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            fontSize: '0.85rem',
+                            fontWeight: '600',
+                            padding: '0.6rem 2rem 0.6rem 0.75rem',
+                            borderRadius: '0.55rem',
+                            appearance: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="totalsafety">TotalSafety (Padrão)</option>
+                          {companies.length > 0 && (
+                            <optgroup label="Empresas Cadastradas">
+                              {[...companies]
+                                .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+                                .map(c => {
+                                  const grp = groups.find(g => g.id === c.groupId);
+                                  return (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name} {grp ? `— ${grp.name.replace(/^\d+\s*-\s*/, '')}` : ''}
+                                    </option>
+                                  );
+                                })}
+                            </optgroup>
+                          )}
+                          <option value="custom">✏️ Outra Empresa (digitar livremente)...</option>
+                        </select>
+                        <div style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }}>
+                          <ChevronDown size={15} />
+                        </div>
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        name="empresa"
+                        className="input"
+                        value={formData.empresa}
+                        onChange={handleChange}
+                        placeholder="Nome da empresa contratante..."
+                        autoFocus
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1594,50 +1682,71 @@ const TrainingCertificatesPage = () => {
 
                 {/* Seletor Integrado com Usuários */}
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>Selecionar dos Usuários com Acesso ao Sistema:</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>
-                      {profiles.length} instrutores disponíveis
-                    </span>
-                  </label>
-                  <select
-                    className="input"
-                    value={profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase()) ? formData.instrutorNome : 'custom'}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === 'custom') {
-                        // Mantém o valor atual para edição livre
-                      } else if (val) {
-                        const sel = profiles.find(p => p.name === val);
-                        setFormData(prev => ({
-                          ...prev,
-                          instrutorNome: sel ? sel.name : val,
-                          instrutorCargo: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instrutorCargo)
-                        }));
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '0.65rem',
-                      border: '1.5px solid #0284c7',
-                      backgroundColor: 'var(--surface)',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value="" disabled>Selecione um instrutor credenciado...</option>
-                    <optgroup label="👥 Usuários Cadastrados no Sistema TotalSafety">
-                      {profiles.map(p => (
-                        <option key={p.id} value={p.name}>
-                          {p.name} {p.role ? `— ${p.role}` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <option value="custom">✏️ Outro Instrutor / Digitar Manualmente</option>
-                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', margin: 0 }}>
+                      Selecionar Instrutor Credenciado:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingInstructor(!isEditingInstructor)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        padding: '1px 3px'
+                      }}
+                    >
+                      {isEditingInstructor ? '✓ Concluir edição' : '✏️ Ajustar dados'}
+                    </button>
+                  </div>
+
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      className="input"
+                      value={profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase()) ? formData.instrutorNome : 'custom'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'custom') {
+                          setIsEditingInstructor(true);
+                        } else if (val) {
+                          const sel = profiles.find(p => p.name === val);
+                          setFormData(prev => ({
+                            ...prev,
+                            instrutorNome: sel ? sel.name : val,
+                            instrutorCargo: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instrutorCargo)
+                          }));
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        padding: '0.65rem 2.2rem 0.65rem 0.85rem',
+                        borderRadius: '0.65rem',
+                        border: '1.5px solid #0284c7',
+                        backgroundColor: 'var(--surface)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        appearance: 'none'
+                      }}
+                    >
+                      <option value="" disabled>Selecione um instrutor credenciado...</option>
+                      <optgroup label="👥 Usuários Cadastrados no Sistema TotalSafety">
+                        {profiles.map(p => (
+                          <option key={p.id} value={p.name}>
+                            {p.name} {p.role ? `— ${p.role}` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="custom">✏️ Outro Instrutor / Digitar Manualmente</option>
+                    </select>
+                    <div style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#0284c7' }}>
+                      <ChevronDown size={18} />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Badge / Card Visual do Instrutor Selecionado */}
@@ -1702,54 +1811,56 @@ const TrainingCertificatesPage = () => {
                   </div>
                 )}
 
-                {/* Campos do Instrutor */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                      Nome Completo do Instrutor
-                    </label>
-                    <input
-                      type="text"
-                      name="instrutorNome"
-                      className="input"
-                      value={formData.instrutorNome}
-                      onChange={handleChange}
-                      placeholder="Nome do Instrutor"
-                      style={{ width: '100%', marginTop: '0.25rem' }}
-                    />
-                  </div>
+                {/* Campos do Instrutor para ajuste fino */}
+                {isEditingInstructor && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem', animation: 'fadeIn 0.2s ease' }}>
+                    <div>
+                      <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                        Nome Completo do Instrutor
+                      </label>
+                      <input
+                        type="text"
+                        name="instrutorNome"
+                        className="input"
+                        value={formData.instrutorNome}
+                        onChange={handleChange}
+                        placeholder="Nome do Instrutor"
+                        style={{ width: '100%', marginTop: '0.25rem' }}
+                      />
+                    </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                    <div>
-                      <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                        Cargo / Qualificação
-                      </label>
-                      <input
-                        type="text"
-                        name="instrutorCargo"
-                        className="input"
-                        value={formData.instrutorCargo}
-                        onChange={handleChange}
-                        placeholder="Ex: Técnico em Segurança do Trabalho"
-                        style={{ width: '100%', marginTop: '0.25rem' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                        Registro Profissional (MTE / SRTE)
-                      </label>
-                      <input
-                        type="text"
-                        name="instrutorRegistro"
-                        className="input"
-                        value={formData.instrutorRegistro}
-                        onChange={handleChange}
-                        placeholder="Ex: SRTE N° 0009823/RN"
-                        style={{ width: '100%', marginTop: '0.25rem' }}
-                      />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                          Cargo / Qualificação
+                        </label>
+                        <input
+                          type="text"
+                          name="instrutorCargo"
+                          className="input"
+                          value={formData.instrutorCargo}
+                          onChange={handleChange}
+                          placeholder="Ex: Técnico em Segurança do Trabalho"
+                          style={{ width: '100%', marginTop: '0.25rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                          Registro Profissional (MTE / SRTE)
+                        </label>
+                        <input
+                          type="text"
+                          name="instrutorRegistro"
+                          className="input"
+                          value={formData.instrutorRegistro}
+                          onChange={handleChange}
+                          placeholder="Ex: SRTE N° 0009823/RN"
+                          style={{ width: '100%', marginTop: '0.25rem' }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Card 3: Conteúdo Programático (Verso do Certificado) */}
