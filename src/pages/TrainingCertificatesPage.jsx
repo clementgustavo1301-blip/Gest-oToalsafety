@@ -16,6 +16,7 @@ import {
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments 
 } from '../services/trainingClassesService';
 import SignaturePadModal from '../components/SignaturePadModal';
+import './TrainingCertificatesPage.css';
 import { 
   getTurmaSignatures, saveRoleSignature, clearTurmaSignature, subscribeToTurmaSignatures 
 } from '../services/turmaSignatureService';
@@ -637,1787 +638,671 @@ const TrainingCertificatesPage = () => {
   const validCount = colaboradores.filter(c => c.nome.trim()).length;
   const firstStudent = colaboradores.find(c => c.nome.trim());
 
+  // Dados derivados para o layout do gerador
+  const selectedPreset = COURSE_PRESETS.find(p =>
+    p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
+    p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
+  );
+  const isAphCourse = formData.curso?.toLowerCase().includes('aph');
+  const signatureRoles = [
+    { key: 'instructor', label: 'Instrutor(a)', name: formData.instrutorNome || 'Instrutor não definido' },
+    {
+      key: 'tech_lead',
+      label: 'Responsável Técnico',
+      name: certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes de Oliveira Junior'
+    },
+    ...(certModel === 'modelo2'
+      ? [{
+          key: 'coordinator',
+          label: 'Coordenação Técnica',
+          name: isAphCourse ? 'Leiliana Nunes de Lima Fernandes' : 'Cezar Augusto Galvão De P. Camêlo'
+        }]
+      : [])
+  ];
+  const signedCount = signatureRoles.filter(r => currentTurmaSignatures?.[r.key]?.dataUrl).length;
+  const countStudentsInTurma = (turmaId) => enrollments.filter(e => String(e.turma_id) === String(turmaId)).length;
+  const turmaStatusGroups = [
+    { label: 'Turmas abertas', match: t => t.status === 'Aberta' || !t.status },
+    { label: 'Em andamento', match: t => t.status === 'Em Andamento' },
+    { label: 'Concluídas', match: t => t.status === 'Concluída' }
+  ];
+
   return (
-    <div className="training-certificates-page" style={{ padding: '1.75rem', maxWidth: '1440px', margin: '0 auto' }}>
-      
-      {/* ========================================================================= */}
-      {/* HERO SECTION / HEADER ELEGANTE                                            */}
-      {/* ========================================================================= */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(99, 102, 241, 0.04) 50%, rgba(15, 23, 42, 0.02) 100%)',
-        border: '1px solid rgba(2, 132, 199, 0.18)',
-        borderRadius: '1.25rem',
-        padding: '1.5rem 1.75rem',
-        marginBottom: '1.5rem',
-        boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Glow de fundo */}
-        <div style={{
-          position: 'absolute',
-          top: '-40px',
-          right: '-40px',
-          width: '220px',
-          height: '220px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(2, 132, 199, 0.15) 0%, transparent 70%)',
-          pointerEvents: 'none'
-        }} />
+    <div className="training-certificates-page tc-page">
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1.25rem',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          {/* Lado Esquerdo: Título e Identidade */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.15rem' }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '1rem',
-              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 10px 25px -5px rgba(2, 132, 199, 0.45)',
-              flexShrink: 0
-            }}>
-              <Award size={30} />
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                  Emissão de Certificados & Treinamentos
-                </h1>
-                <span style={{ 
-                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)',
-                  border: '1px solid rgba(2, 132, 199, 0.25)',
-                  color: '#0284c7', 
-                  fontSize: '0.72rem', 
-                  fontWeight: '700', 
-                  padding: '0.2rem 0.65rem', 
-                  borderRadius: '2rem', 
-                  textTransform: 'uppercase',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem'
-                }}>
-                  <ShieldCheck size={13} />
-                  Módulo Treinamento
-                </span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Ambiente integrado para geração de apresentações PowerPoint (.pptx) com 2 slides por participante, gestão de turmas e inscrição com CPF A da Receita.
-              </p>
-            </div>
+      {/* ========================================================================= */}
+      {/* CABEÇALHO COMPACTO + ABAS                                                 */}
+      {/* ========================================================================= */}
+      <header className="tc-header">
+        <div className="tc-header-title">
+          <div className="tc-header-icon">
+            <Award size={22} />
           </div>
-
-          {/* Lado Direito: Ações Rápidas de Configuração & Inscrição */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setShowTokenModal(true)}
-              style={{ 
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-                fontSize: '0.8125rem',
-                fontWeight: '600',
-                padding: '0.55rem 0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-              }}
-              title="Configurar Token da API CPF.CNPJ"
-            >
-              <Key size={14} style={{ color: '#0284c7' }} />
-              API CPF A (Receita)
-            </button>
-
-            <button
-              type="button"
-              className="btn"
-              onClick={() => copyPublicLink(null, 'general-header')}
-              style={{ 
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-                fontSize: '0.8125rem',
-                fontWeight: '600',
-                padding: '0.55rem 0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-              }}
-            >
-              {copiedKey === 'general-header' ? <Check size={14} style={{ color: '#10b981' }} /> : <LinkIcon size={14} style={{ color: '#0284c7' }} />}
-              {copiedKey === 'general-header' ? 'Link Copiado!' : 'Copiar Link Público'}
-            </button>
-
-            <a
-              href="/inscricao"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn"
-              style={{ 
-                backgroundColor: '#0284c7',
-                color: '#fff',
-                fontSize: '0.8125rem',
-                fontWeight: '600',
-                padding: '0.55rem 0.95rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)',
-                textDecoration: 'none'
-              }}
-              title="Abrir página pública de inscrição"
-            >
-              <ExternalLink size={14} />
-              Portal de Inscrição
-            </a>
+          <div>
+            <h1>Certificados de Treinamento</h1>
+            <p>Preencha os dados, confira a prévia e baixe os certificados em PowerPoint.</p>
           </div>
         </div>
 
-        {/* Métricas / Estatísticas Rápidas em Pills */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '0.85rem',
-          marginTop: '1.25rem',
-          paddingTop: '1.15rem',
-          borderTop: '1px solid rgba(2, 132, 199, 0.12)'
-        }}>
-          <div style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(2, 132, 199, 0.15)',
-            borderRadius: '0.75rem',
-            padding: '0.65rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '0.5rem',
-              backgroundColor: 'rgba(2, 132, 199, 0.12)',
-              color: '#0284c7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Award size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                Turmas Ativas
-              </div>
-              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                {turmas.length} {turmas.length === 1 ? 'turma' : 'turmas'}
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(16, 185, 129, 0.18)',
-            borderRadius: '0.75rem',
-            padding: '0.65rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '0.5rem',
-              backgroundColor: 'rgba(16, 185, 129, 0.12)',
-              color: '#10b981',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Users size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                Inscrições Recebidas
-              </div>
-              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                {enrollments.length} {enrollments.length === 1 ? 'participante' : 'participantes'}
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(99, 102, 241, 0.18)',
-            borderRadius: '0.75rem',
-            padding: '0.65rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '0.5rem',
-              backgroundColor: 'rgba(99, 102, 241, 0.12)',
-              color: '#6366f1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Layers size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                Certificados no Gerador
-              </div>
-              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                {validCount} {validCount === 1 ? 'aluno pronto' : 'alunos prontos'}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+        <nav className="tc-tabs" aria-label="Seções do módulo de treinamento">
+          <button
+            id="tab-generator"
+            type="button"
+            className={`tc-tab ${activeTab === 'generator' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('generator')}
+          >
+            <Award size={15} />
+            Gerar Certificados
+          </button>
+          <button
+            id="tab-turmas"
+            type="button"
+            className={`tc-tab ${activeTab === 'turmas' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('turmas')}
+          >
+            <Users size={15} />
+            Turmas &amp; Inscrições
+            <span className="tc-tab-count">{enrollments.length}</span>
+          </button>
+        </nav>
+      </header>
 
       {/* Alerta de Feedback Global */}
       {feedback && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.65rem',
-          padding: '0.85rem 1.15rem',
-          marginBottom: '1.25rem',
-          borderRadius: '0.75rem',
-          backgroundColor: feedback.type === 'success' ? '#f0fdf4' : feedback.type === 'info' ? '#f0f9ff' : '#eff6ff',
-          border: feedback.type === 'success' ? '1px solid #bbf7d0' : feedback.type === 'info' ? '1px solid #bae6fd' : '1px solid #bfdbfe',
-          color: feedback.type === 'success' ? '#166534' : feedback.type === 'info' ? '#0369a1' : '#1e40af',
-          fontSize: '0.875rem',
-          fontWeight: '500',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-          animation: 'fadeIn 0.2s ease-in-out'
-        }}>
-          <CheckCircle2 size={18} />
+        <div className={`tc-toast tc-toast--${feedback.type}`} role="status">
+          <CheckCircle2 size={16} />
           <span>{feedback.text}</span>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* SEGMENTED TAB CONTROL                                                     */}
-      {/* ========================================================================= */}
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '0.35rem',
-        backgroundColor: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: '0.85rem',
-        marginBottom: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        gap: '0.35rem'
-      }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('generator')}
-          style={{
-            padding: '0.65rem 1.35rem',
-            border: 'none',
-            borderRadius: '0.65rem',
-            backgroundColor: activeTab === 'generator' ? '#0284c7' : 'transparent',
-            color: activeTab === 'generator' ? '#fff' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'generator' ? '700' : '600',
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.55rem',
-            boxShadow: activeTab === 'generator' ? '0 4px 12px rgba(2, 132, 199, 0.35)' : 'none',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <Award size={17} />
-          Gerador de Certificados PPTX
-          {validCount > 0 && (
-            <span style={{
-              backgroundColor: activeTab === 'generator' ? 'rgba(255,255,255,0.25)' : '#10b981',
-              color: '#fff',
-              fontSize: '0.72rem',
-              padding: '2px 8px',
-              borderRadius: '1rem',
-              fontWeight: '700'
-            }}>
-              {validCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('turmas')}
-          style={{
-            padding: '0.65rem 1.35rem',
-            border: 'none',
-            borderRadius: '0.65rem',
-            backgroundColor: activeTab === 'turmas' ? '#0284c7' : 'transparent',
-            color: activeTab === 'turmas' ? '#fff' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'turmas' ? '700' : '600',
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.55rem',
-            boxShadow: activeTab === 'turmas' ? '0 4px 12px rgba(2, 132, 199, 0.35)' : 'none',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <Users size={17} />
-          Turmas & Inscrições Oficiais
-          <span style={{
-            backgroundColor: activeTab === 'turmas' ? 'rgba(255,255,255,0.25)' : 'var(--border)',
-            color: activeTab === 'turmas' ? '#fff' : 'var(--text-secondary)',
-            fontSize: '0.72rem',
-            padding: '2px 8px',
-            borderRadius: '1rem',
-            fontWeight: '700'
-          }}>
-            {enrollments.length}
-          </span>
-        </button>
-      </div>
-
-      {/* ========================================================================= */}
       {/* ABA 1: GERADOR DE CERTIFICADOS PPTX                                       */}
       {/* ========================================================================= */}
       {activeTab === 'generator' && (
-        <div>
-          
-          {/* BARRA SUPERIOR UNIFICADA: Importar Turma & Template PPTX */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
-            {/* Card: Carregador Rápido de Turma */}
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: selectedTurmaIdInGenerator ? '1.5px solid #0284c7' : '1px solid var(--border)',
-              borderRadius: '1rem',
-              padding: '1.15rem 1.35rem',
-              boxShadow: selectedTurmaIdInGenerator ? '0 4px 14px rgba(2, 132, 199, 0.08)' : '0 2px 6px rgba(0,0,0,0.03)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              gap: '0.85rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Users size={18} style={{ color: '#0284c7' }} />
-                  <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                    Vincular / Importar Alunos de uma Turma
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                  {turmas.length} turmas cadastradas
-                </span>
-              </div>
+        <div className="tc-gen">
 
-              <div>
-                <select
-                  className="input"
-                  value={selectedTurmaIdInGenerator || ''}
-                  style={{
-                    fontSize: '0.875rem',
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '0.65rem',
-                    border: '1.5px solid #0284c7',
-                    fontWeight: '600',
-                    backgroundColor: 'var(--surface)',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer'
-                  }}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (!val) {
-                      handleClearTurmaLink();
-                      return;
-                    }
-                    const found = turmas.find(t => String(t.id) === String(val));
-                    if (found) handleLoadTurmaIntoGenerator(found);
-                  }}
-                >
-                  <option value="">Selecione uma turma para carregar alunos e curso...</option>
-                  
-                  {turmas.some(t => t.status === 'Aberta' || !t.status) && (
-                    <optgroup label="🟢 Turmas Abertas (Inscrições Ativas)">
-                      {turmas
-                        .filter(t => t.status === 'Aberta' || !t.status)
-                        .map(t => {
-                          const count = enrollments.filter(e => String(e.turma_id) === String(t.id)).length;
-                          return (
-                            <option key={t.id} value={t.id}>
-                              {t.name} — {t.course_name || 'Geral'} ({count} aluno{count !== 1 ? 's' : ''})
-                            </option>
-                          );
-                        })}
-                    </optgroup>
-                  )}
+          {/* ------------------------------------------------------------- */}
+          {/* COLUNA ESQUERDA: ETAPAS DO FORMULÁRIO                         */}
+          {/* ------------------------------------------------------------- */}
+          <div className="tc-form">
 
-                  {turmas.some(t => t.status === 'Em Andamento') && (
-                    <optgroup label="🔵 Turmas em Andamento">
-                      {turmas
-                        .filter(t => t.status === 'Em Andamento')
-                        .map(t => {
-                          const count = enrollments.filter(e => String(e.turma_id) === String(t.id)).length;
-                          return (
-                            <option key={t.id} value={t.id}>
-                              {t.name} — {t.course_name || 'Geral'} ({count} aluno{count !== 1 ? 's' : ''})
-                            </option>
-                          );
-                        })}
-                    </optgroup>
-                  )}
-
-                  {turmas.some(t => t.status === 'Concluída') && (
-                    <optgroup label="⚪ Turmas Concluídas">
-                      {turmas
-                        .filter(t => t.status === 'Concluída')
-                        .map(t => {
-                          const count = enrollments.filter(e => String(e.turma_id) === String(t.id)).length;
-                          return (
-                            <option key={t.id} value={t.id}>
-                              {t.name} — {t.course_name || 'Geral'} ({count} aluno{count !== 1 ? 's' : ''})
-                            </option>
-                          );
-                        })}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
-              {selectedTurmaIdInGenerator && (() => {
-                const currentTurma = turmas.find(t => String(t.id) === String(selectedTurmaIdInGenerator));
-                const studentCount = enrollments.filter(e => String(e.turma_id) === String(selectedTurmaIdInGenerator)).length;
-                if (!currentTurma) return null;
-                return (
-                  <div style={{
-                    backgroundColor: 'rgba(2, 132, 199, 0.06)',
-                    border: '1px solid rgba(2, 132, 199, 0.25)',
-                    borderRadius: '0.65rem',
-                    padding: '0.65rem 0.85rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '0.5rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <CheckCircle size={16} style={{ color: '#0284c7' }} />
-                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#0369a1' }}>
-                        Turma ativa: {currentTurma.name}
-                      </span>
-                      <span style={{
-                        backgroundColor: '#0284c7',
-                        color: '#fff',
-                        fontSize: '0.7rem',
-                        fontWeight: '700',
-                        padding: '1px 7px',
-                        borderRadius: '1rem'
-                      }}>
-                        {studentCount} aluno{studentCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <button
-                        type="button"
-                        onClick={handleReloadTurmaStudents}
-                        className="btn"
-                        title="Recarregar inscrições mais recentes da turma"
-                        style={{
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          padding: '0.3rem 0.65rem',
-                          backgroundColor: '#fff',
-                          border: '1px solid rgba(2, 132, 199, 0.35)',
-                          color: '#0284c7',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}
-                      >
-                        <RefreshCw size={12} />
-                        Sincronizar
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleClearTurmaLink}
-                        className="btn"
-                        title="Desvincular e personalizar livremente"
-                        style={{
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          padding: '0.3rem 0.65rem',
-                          backgroundColor: 'transparent',
-                          border: '1px solid var(--border)',
-                          color: 'var(--text-secondary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}
-                      >
-                        <X size={12} />
-                        Desvincular
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Card: Assinaturas Manuais da Turma (Em Lote) */}
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1.5px solid #8b5cf6',
-              borderRadius: '1rem',
-              padding: '1.25rem 1.4rem',
-              boxShadow: '0 4px 14px rgba(139, 92, 246, 0.08)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.9rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '0.55rem',
-                    backgroundColor: 'rgba(139, 92, 246, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <PenTool size={17} style={{ color: '#8b5cf6' }} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                      Assinaturas Manuais da Turma (Em Lote)
-                    </span>
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                      Assine no celular desenhando com o dedo ou na tela • Replica em toda a turma
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenQrModal()}
-                    className="btn"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      fontSize: '0.78rem',
-                      fontWeight: '700',
-                      padding: '0.45rem 0.85rem',
-                      backgroundColor: 'rgba(139, 92, 246, 0.08)',
-                      border: '1px solid rgba(139, 92, 246, 0.3)',
-                      color: '#7c3aed',
-                      borderRadius: '0.6rem',
-                      cursor: 'pointer'
-                    }}
-                    title="Escanear QR Code para assinar no celular"
-                  >
-                    <Smartphone size={14} />
-                    📱 Assinar no Celular (QR Code)
-                  </button>
+            {/* ETAPA 1: Treinamento */}
+            <section className="tc-card" aria-labelledby="tc-step1-title">
+              <div className="tc-step-head">
+                <span className="tc-step-num">1</span>
+                <div>
+                  <h2 id="tc-step1-title">Treinamento</h2>
+                  <p>Escolha a turma ou o curso — os demais campos são preenchidos automaticamente.</p>
                 </div>
               </div>
 
-              {/* Grid dos Papéis de Assinatura */}
-              <div style={{ display: 'grid', gridTemplateColumns: certModel === 'modelo2' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.75rem' }}>
-                {/* 1. Instrutor */}
-                <div style={{
-                  padding: '0.85rem',
-                  borderRadius: '0.75rem',
-                  backgroundColor: currentTurmaSignatures?.instructor?.dataUrl ? 'rgba(16, 185, 129, 0.05)' : 'var(--surface-hover)',
-                  border: currentTurmaSignatures?.instructor?.dataUrl ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64268a', textTransform: 'uppercase' }}>
-                        👨‍🏫 Instrutor(a)
-                      </span>
-                      {currentTurmaSignatures?.instructor?.dataUrl ? (
-                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#059669', backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '1rem' }}>
-                          Assinado Manualmente ✅
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', backgroundColor: '#fffbeb', padding: '1px 6px', borderRadius: '1rem' }}>
-                          Padrão do Sistema ⚠️
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                      {formData.instrutorNome || 'Adeylton da Silva Araújo'}
-                    </div>
-
-                    {currentTurmaSignatures?.instructor?.dataUrl && (
-                      <div style={{
-                        height: '42px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#ffffff',
-                        borderRadius: '0.45rem',
-                        border: '1px solid #e2e8f0',
-                        marginBottom: '0.45rem',
-                        padding: '2px'
-                      }}>
-                        <img src={currentTurmaSignatures.instructor.dataUrl} alt="Assinatura Manual" style={{ maxHeight: '38px', maxWidth: '90%', objectFit: 'contain' }} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenSignatureModal('instructor')}
-                      style={{
-                        flex: 1,
-                        padding: '0.4rem 0.65rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #7c3aed',
-                        backgroundColor: '#7c3aed',
-                        color: '#fff',
-                        fontSize: '0.72rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.3rem'
-                      }}
-                    >
-                      <PenTool size={12} />
-                      {currentTurmaSignatures?.instructor?.dataUrl ? 'Refazer Desenho' : 'Desenhar na Tela'}
-                    </button>
-                    {currentTurmaSignatures?.instructor?.dataUrl && (
-                      <button
-                        type="button"
-                        onClick={() => handleClearSignature('instructor')}
-                        style={{
-                          padding: '0.4rem 0.55rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid #ef4444',
-                          backgroundColor: 'transparent',
-                          color: '#ef4444',
-                          fontSize: '0.72rem',
-                          cursor: 'pointer'
-                        }}
-                        title="Limpar e voltar ao padrão"
-                      >
-                        Limpar
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Responsável Técnico */}
-                <div style={{
-                  padding: '0.85rem',
-                  borderRadius: '0.75rem',
-                  backgroundColor: currentTurmaSignatures?.tech_lead?.dataUrl ? 'rgba(16, 185, 129, 0.05)' : 'var(--surface-hover)',
-                  border: currentTurmaSignatures?.tech_lead?.dataUrl ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64268a', textTransform: 'uppercase' }}>
-                        🛡️ Resp. Técnico
-                      </span>
-                      {currentTurmaSignatures?.tech_lead?.dataUrl ? (
-                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#059669', backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '1rem' }}>
-                          Assinado Manualmente ✅
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', backgroundColor: '#fffbeb', padding: '1px 6px', borderRadius: '1rem' }}>
-                          Padrão do Sistema ⚠️
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                      {certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes Jr.'}
-                    </div>
-
-                    {currentTurmaSignatures?.tech_lead?.dataUrl && (
-                      <div style={{
-                        height: '42px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#ffffff',
-                        borderRadius: '0.45rem',
-                        border: '1px solid #e2e8f0',
-                        marginBottom: '0.45rem',
-                        padding: '2px'
-                      }}>
-                        <img src={currentTurmaSignatures.tech_lead.dataUrl} alt="Assinatura Manual" style={{ maxHeight: '38px', maxWidth: '90%', objectFit: 'contain' }} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenSignatureModal('tech_lead')}
-                      style={{
-                        flex: 1,
-                        padding: '0.4rem 0.65rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #7c3aed',
-                        backgroundColor: '#7c3aed',
-                        color: '#fff',
-                        fontSize: '0.72rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.3rem'
-                      }}
-                    >
-                      <PenTool size={12} />
-                      {currentTurmaSignatures?.tech_lead?.dataUrl ? 'Refazer Desenho' : 'Desenhar na Tela'}
-                    </button>
-                    {currentTurmaSignatures?.tech_lead?.dataUrl && (
-                      <button
-                        type="button"
-                        onClick={() => handleClearSignature('tech_lead')}
-                        style={{
-                          padding: '0.4rem 0.55rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid #ef4444',
-                          backgroundColor: 'transparent',
-                          color: '#ef4444',
-                          fontSize: '0.72rem',
-                          cursor: 'pointer'
-                        }}
-                        title="Limpar e voltar ao padrão"
-                      >
-                        Limpar
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Coordenação / 2º Resp (apenas Modelo 2) */}
-                {certModel === 'modelo2' && (
-                  <div style={{
-                    padding: '0.85rem',
-                    borderRadius: '0.75rem',
-                    backgroundColor: currentTurmaSignatures?.coordinator?.dataUrl ? 'rgba(16, 185, 129, 0.05)' : 'var(--surface-hover)',
-                    border: currentTurmaSignatures?.coordinator?.dataUrl ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64268a', textTransform: 'uppercase' }}>
-                          ⚡ Coordenação / 2º Resp.
-                        </span>
-                        {currentTurmaSignatures?.coordinator?.dataUrl ? (
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#059669', backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '1rem' }}>
-                            Assinado ✅
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', backgroundColor: '#fffbeb', padding: '1px 6px', borderRadius: '1rem' }}>
-                            Padrão ⚠️
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                        {formData.curso?.toLowerCase().includes('aph') ? 'Leiliana Nunes Fernandes' : 'Cezar Augusto Galvão'}
-                      </div>
-
-                      {currentTurmaSignatures?.coordinator?.dataUrl && (
-                        <div style={{
-                          height: '42px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '0.45rem',
-                          border: '1px solid #e2e8f0',
-                          marginBottom: '0.45rem',
-                          padding: '2px'
-                        }}>
-                          <img src={currentTurmaSignatures.coordinator.dataUrl} alt="Assinatura Manual" style={{ maxHeight: '38px', maxWidth: '90%', objectFit: 'contain' }} />
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenSignatureModal('coordinator')}
-                        style={{
-                          flex: 1,
-                          padding: '0.4rem 0.65rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid #7c3aed',
-                          backgroundColor: '#7c3aed',
-                          color: '#fff',
-                          fontSize: '0.72rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.3rem'
-                        }}
-                      >
-                        <PenTool size={12} />
-                        {currentTurmaSignatures?.coordinator?.dataUrl ? 'Refazer Desenho' : 'Desenhar na Tela'}
-                      </button>
-                      {currentTurmaSignatures?.coordinator?.dataUrl && (
-                        <button
-                          type="button"
-                          onClick={() => handleClearSignature('coordinator')}
-                          style={{
-                            padding: '0.4rem 0.55rem',
-                            borderRadius: '0.5rem',
-                            border: '1px solid #ef4444',
-                            backgroundColor: 'transparent',
-                            color: '#ef4444',
-                            fontSize: '0.72rem',
-                            cursor: 'pointer'
-                          }}
-                          title="Limpar e voltar ao padrão"
-                        >
-                          Limpar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Lembrete sobre a Assinatura do Aluno */}
-              <div style={{
-                padding: '0.6rem 0.85rem',
-                backgroundColor: 'rgba(2, 132, 199, 0.05)',
-                borderRadius: '0.65rem',
-                border: '1px solid rgba(2, 132, 199, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.4rem',
-                fontSize: '0.73rem',
-                color: '#0369a1'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                  <span>🔒</span>
-                  <span>
-                    <strong>Assinatura do Aluno:</strong> Permanece sempre <strong>PENDENTE</strong> para assinatura presencial de cada participante ao receber seu certificado.
-                  </span>
-                </div>
-                <span style={{ fontWeight: '700', color: '#0284c7' }}>
-                  Padrão Oficial TotalSafety
-                </span>
-              </div>
-            </div>
-
-            {/* Card: Arquivo de Modelo PPTX */}
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '1rem',
-              padding: '1.15rem 1.35rem',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.75rem'
-            }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                  <Layers size={18} style={{ color: '#0284c7' }} />
-                  <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                    Modelo de Certificado (.pptx)
-                  </span>
-                  {customTemplateFile ? (
-                    <span style={{ 
-                      backgroundColor: '#dcfce7', 
-                      color: '#15803d', 
-                      fontSize: '0.7rem', 
-                      fontWeight: '700', 
-                      padding: '0.15rem 0.55rem', 
-                      borderRadius: '1rem' 
-                    }}>
-                      Personalizado
-                    </span>
-                  ) : (
-                    <span style={{ 
-                      backgroundColor: '#f1f5f9', 
-                      color: '#475569', 
-                      fontSize: '0.7rem', 
-                      fontWeight: '700', 
-                      padding: '0.15rem 0.55rem', 
-                      borderRadius: '1rem' 
-                    }}>
-                      Padrão TotalSafety
-                    </span>
-                  )}
-                </div>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  {customTemplateFile 
-                    ? `Arquivo: "${customTemplateFile.name}" (${(customTemplateFile.size / 1024).toFixed(1)} KB)`
-                    : 'Usando slide mestre oficial com frente e verso.'}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  accept=".pptx" 
-                  onChange={handleTemplateUpload} 
-                  style={{ display: 'none' }} 
-                />
-
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{ 
-                    backgroundColor: 'var(--surface-hover)', 
-                    border: '1px solid var(--border)',
-                    fontSize: '0.8rem', 
-                    fontWeight: '600',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '0.35rem',
-                    padding: '0.5rem 0.8rem'
-                  }}
-                >
-                  <Upload size={14} />
-                  {customTemplateFile ? 'Trocar PPTX' : 'Carregar PPTX'}
-                </button>
-
-                {customTemplateFile && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={removeCustomTemplate}
-                    title="Restaurar modelo padrão TotalSafety"
-                    style={{ 
-                      backgroundColor: 'transparent',
-                      border: '1px solid var(--border)',
-                      fontSize: '0.8rem', 
-                      color: 'var(--danger)',
-                      padding: '0.5rem 0.75rem'
+              {/* Turma (opcional) */}
+              <div className="tc-field">
+                <label htmlFor="tc-turma">
+                  Turma <span className="tc-optional">(opcional — importa os alunos inscritos)</span>
+                </label>
+                <div className="tc-inline">
+                  <select
+                    id="tc-turma"
+                    className="tc-input"
+                    value={selectedTurmaIdInGenerator || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        handleClearTurmaLink();
+                        return;
+                      }
+                      const found = turmas.find(t => String(t.id) === String(val));
+                      if (found) handleLoadTurmaIntoGenerator(found);
                     }}
                   >
-                    Restaurar
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ========================================================================= */}
-          {/* GRID PRINCIPAL: DADOS DO TREINAMENTO (ESQ) + ALUNOS & PREVIEW (DIR)      */}
-          {/* ========================================================================= */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(380px, 1.25fr) minmax(420px, 1.4fr)',
-            gap: '1.5rem',
-            alignItems: 'start'
-          }}>
-            
-            {/* ------------------------------------------------------------- */}
-            {/* COLUNA ESQUERDA: FORMULÁRIO DO TREINAMENTO & INSTRUTOR       */}
-            {/* ------------------------------------------------------------- */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
-              {/* Card 1: Identificação do Curso & Chips Rápidos */}
-              <div style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '1rem',
-                padding: '1.4rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1.15rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
-                  <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <BookOpen size={18} style={{ color: '#0284c7' }} />
-                    Informações do Treinamento
-                  </h2>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    Frente do Certificado
-                  </span>
-                </div>
-
-                {/* Treinamento / Curso Oficial */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <BookOpen size={15} style={{ color: '#0284c7' }} />
-                      Treinamento Oficial / Norma Regulamentadora (NR) *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomCourse(!isCustomCourse)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#0284c7',
-                        fontSize: '0.72rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        padding: '2px 4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem'
-                      }}
-                    >
-                      {isCustomCourse ? '↺ Escolher da Lista Oficial' : '✏️ Digitar Título Livre'}
-                    </button>
-                  </div>
-
-                  {!isCustomCourse ? (
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        className="input"
-                        value={
-                          COURSE_PRESETS.some(p => 
-                            p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
-                            p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
-                          ) 
-                            ? COURSE_PRESETS.find(p => 
-                                p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
-                                p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
-                              ).id 
-                            : 'custom'
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === 'custom') {
-                            setIsCustomCourse(true);
-                          } else {
-                            const found = COURSE_PRESETS.find(p => p.id === val);
-                            if (found) applyPreset(found);
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          padding: '0.65rem 2.2rem 0.65rem 0.85rem',
-                          borderRadius: '0.65rem',
-                          border: '1.5px solid #0284c7',
-                          backgroundColor: 'var(--surface)',
-                          color: 'var(--text-primary)',
-                          cursor: 'pointer',
-                          appearance: 'none'
-                        }}
-                      >
-                        <option value="" disabled>Selecione um modelo oficial de treinamento...</option>
-                        
-                        {Array.from(new Set(COURSE_PRESETS.map(p => p.category))).map(cat => (
-                          <optgroup key={cat} label={`📂 ${cat}`}>
-                            {COURSE_PRESETS.filter(p => p.category === cat).map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-
-                        <option value="custom">✏️ Outro Treinamento (digitar título livre)...</option>
-                      </select>
-                      <div style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#0284c7' }}>
-                        <ChevronDown size={18} />
-                      </div>
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      name="curso"
-                      className="input"
-                      value={formData.curso}
-                      onChange={handleChange}
-                      placeholder="Ex: NR-35 Trabalho em Altura / Brigada de Incêndio"
-                      autoFocus
-                      style={{ width: '100%', fontSize: '0.9rem', fontWeight: '600', border: '1.5px solid #0284c7' }}
-                    />
-                  )}
-                </div>
-
-                {/* Chips de Seleção Rápida */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginRight: '0.15rem' }}>
-                      Atalhos Rápidos:
-                    </span>
-                    {[
-                      { label: 'NR-35 Básico (8h)', id: 'nr35-basico' },
-                      { label: 'NR-35 Avançado (24h)', id: 'nr35-avancado' },
-                      { label: 'NR-10 Elétrica (40h)', id: 'nr10-basico' },
-                      { label: 'NR-10 SEP (40h)', id: 'nr10-sep' },
-                      { label: 'NR-33 Vigia (16h)', id: 'nr33-trabalhador' },
-                      { label: 'NR-33 Supervisor (40h)', id: 'nr33-supervisor' },
-                      { label: 'NR-18 Construção (4h)', id: 'nr18-basico' },
-                      { label: 'NR-06 EPI (16h)', id: 'nr06-epi' },
-                      { label: 'Brigada Incêndio (24h)', id: 'brigada-incendio' },
-                      { label: 'APH (100h)', id: 'aph-100h' },
-                      { label: 'NR-11 Empilhadeira (16h)', id: 'nr11-empilhadeira' },
-                      { label: 'Inspetor EPI (16h)', id: 'inspetor-epi' },
-                      { label: '1º Socorros (8h)', id: 'primeiros-socorros' }
-                    ].map((item, idx) => {
-                      const preset = COURSE_PRESETS.find(p => p.id === item.id);
-                      const isSelected = preset && (
-                        formData.curso === preset.title || 
-                        formData.curso === preset.name
-                      );
+                    <option value="">Sem turma — preencher manualmente</option>
+                    {turmaStatusGroups.map(group => {
+                      const list = turmas.filter(group.match);
+                      if (list.length === 0) return null;
                       return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            if (preset) {
-                              setIsCustomCourse(false);
-                              applyPreset(preset);
-                            }
-                          }}
-                          style={{
-                            backgroundColor: isSelected ? '#0284c7' : 'var(--surface-hover)',
-                            border: isSelected ? '1px solid #0284c7' : '1px solid var(--border)',
-                            color: isSelected ? '#fff' : 'var(--text-primary)',
-                            borderRadius: '1.25rem',
-                            padding: '0.2rem 0.65rem',
-                            fontSize: '0.72rem',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {item.label}
-                        </button>
+                        <optgroup key={group.label} label={group.label}>
+                          {list.map(t => {
+                            const count = countStudentsInTurma(t.id);
+                            return (
+                              <option key={t.id} value={t.id}>
+                                {t.name} — {t.course_name || 'Geral'} ({count} aluno{count !== 1 ? 's' : ''})
+                              </option>
+                            );
+                          })}
+                        </optgroup>
                       );
                     })}
-                  </div>
-                </div>
-
-                {/* Carga Horária e Data */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                  <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-                      <Clock size={14} style={{ color: '#0284c7' }} />
-                      Carga Horária *
-                    </label>
-                    <input
-                      type="text"
-                      name="duracao"
-                      className="input"
-                      value={formData.duracao}
-                      onChange={handleChange}
-                      placeholder="Ex: 8 horas"
-                      style={{ width: '100%', fontSize: '0.875rem', fontWeight: '600' }}
-                    />
-                    {/* Atalhos de Carga Horária */}
-                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
-                      {['4 horas', '8 horas', '16 horas', '20 horas', '40 horas'].map((h) => {
-                        const isSel = formData.duracao === h;
-                        return (
-                          <button
-                            key={h}
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, duracao: h }))}
-                            style={{
-                              padding: '0.18rem 0.5rem',
-                              fontSize: '0.7rem',
-                              fontWeight: '700',
-                              borderRadius: '0.4rem',
-                              border: isSel ? '1px solid #0284c7' : '1px solid var(--border)',
-                              backgroundColor: isSel ? 'rgba(2, 132, 199, 0.12)' : 'var(--surface-hover)',
-                              color: isSel ? '#0284c7' : 'var(--text-secondary)',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {h.replace(' horas', 'h')}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-                      <Calendar size={14} style={{ color: '#0284c7' }} />
-                      Data de Conclusão *
-                    </label>
-                    <input
-                      type="date"
-                      name="data"
-                      className="input"
-                      value={formData.data}
-                      onChange={handleChange}
-                      style={{ width: '100%', fontSize: '0.875rem', fontWeight: '600' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Local e Empresa Solicitante */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                  <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-                      <MapPin size={14} style={{ color: '#0284c7' }} />
-                      Local / Cidade
-                    </label>
-                    <input
-                      type="text"
-                      name="local"
-                      className="input"
-                      value={formData.local}
-                      onChange={handleChange}
-                      placeholder="Ex: Mossoró - RN"
-                      style={{ width: '100%', fontSize: '0.875rem' }}
-                    />
-                  </div>
-
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                      <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
-                        <Building size={14} style={{ color: '#0284c7' }} />
-                        Empresa Solicitante
-                      </label>
+                  </select>
+                  {selectedTurmaIdInGenerator && (
+                    <>
                       <button
+                        id="btn-sync-turma"
                         type="button"
-                        onClick={() => setIsCustomCompany(!isCustomCompany)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#0284c7',
-                          fontSize: '0.7rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          padding: '1px 3px'
-                        }}
+                        className="tc-icon-btn"
+                        onClick={handleReloadTurmaStudents}
+                        title="Sincronizar inscrições da turma"
                       >
-                        {isCustomCompany ? '↺ Lista' : '✏️ Digitar outra'}
+                        <RefreshCw size={15} />
                       </button>
-                    </div>
-
-                    {!isCustomCompany ? (
-                      <div style={{ position: 'relative' }}>
-                        <select
-                          className="input"
-                          value={
-                            companies.some(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase())
-                              ? companies.find(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase()).id
-                              : (formData.empresa === 'TotalSafety' ? 'totalsafety' : 'custom')
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'totalsafety') {
-                              setFormData(prev => ({ ...prev, empresa: 'TotalSafety' }));
-                            } else if (val === 'custom') {
-                              setIsCustomCompany(true);
-                            } else {
-                              const found = companies.find(c => String(c.id) === String(val));
-                              if (found) {
-                                setFormData(prev => ({ ...prev, empresa: found.name }));
-                              }
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            fontSize: '0.85rem',
-                            fontWeight: '600',
-                            padding: '0.6rem 2rem 0.6rem 0.75rem',
-                            borderRadius: '0.55rem',
-                            appearance: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="totalsafety">TotalSafety (Padrão)</option>
-                          {companies.length > 0 && (
-                            <optgroup label="Empresas Cadastradas">
-                              {[...companies]
-                                .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-                                .map(c => {
-                                  const grp = groups.find(g => g.id === c.groupId);
-                                  return (
-                                    <option key={c.id} value={c.id}>
-                                      {c.name} {grp ? `— ${grp.name.replace(/^\d+\s*-\s*/, '')}` : ''}
-                                    </option>
-                                  );
-                                })}
-                            </optgroup>
-                          )}
-                          <option value="custom">✏️ Outra Empresa (digitar livremente)...</option>
-                        </select>
-                        <div style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }}>
-                          <ChevronDown size={15} />
-                        </div>
-                      </div>
-                    ) : (
-                      <input
-                        type="text"
-                        name="empresa"
-                        className="input"
-                        value={formData.empresa}
-                        onChange={handleChange}
-                        placeholder="Nome da empresa contratante..."
-                        autoFocus
-                        style={{ width: '100%', fontSize: '0.85rem' }}
-                      />
-                    )}
-                  </div>
+                      <button
+                        id="btn-unlink-turma"
+                        type="button"
+                        className="tc-icon-btn tc-icon-btn--danger"
+                        onClick={handleClearTurmaLink}
+                        title="Desvincular turma"
+                      >
+                        <X size={15} />
+                      </button>
+                    </>
+                  )}
                 </div>
+              </div>
 
-                {/* Descrição / Texto de Conclusão */}
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>
-                    Texto de Certificação / Aproveitamento
-                  </label>
-                  <textarea
-                    name="descricao"
-                    className="input"
-                    value={formData.descricao}
+              {/* Curso */}
+              <div className="tc-field">
+                <div className="tc-label-row">
+                  <label htmlFor="tc-curso">Curso *</label>
+                  <button
+                    type="button"
+                    className="tc-link"
+                    onClick={() => setIsCustomCourse(!isCustomCourse)}
+                  >
+                    {isCustomCourse ? 'Escolher da lista oficial' : 'Digitar outro curso'}
+                  </button>
+                </div>
+                {!isCustomCourse ? (
+                  <select
+                    id="tc-curso"
+                    className="tc-input tc-input--strong"
+                    value={selectedPreset ? selectedPreset.id : 'custom'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'custom') {
+                        setIsCustomCourse(true);
+                      } else {
+                        const found = COURSE_PRESETS.find(p => p.id === val);
+                        if (found) applyPreset(found);
+                      }
+                    }}
+                  >
+                    {Array.from(new Set(COURSE_PRESETS.map(p => p.category))).map(cat => (
+                      <optgroup key={cat} label={cat}>
+                        {COURSE_PRESETS.filter(p => p.category === cat).map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                    <option value="custom">
+                      {selectedPreset ? 'Outro curso (digitar)...' : (formData.curso || 'Outro curso (digitar)...')}
+                    </option>
+                  </select>
+                ) : (
+                  <input
+                    id="tc-curso"
+                    type="text"
+                    name="curso"
+                    className="tc-input tc-input--strong"
+                    value={formData.curso}
                     onChange={handleChange}
-                    rows={2}
-                    style={{ width: '100%', marginTop: '0.35rem', resize: 'vertical', fontSize: '0.85rem' }}
+                    placeholder="Ex: NR-35 – Trabalho em Altura"
+                    autoFocus
+                  />
+                )}
+              </div>
+
+              {/* Carga horária, data e cidade */}
+              <div className="tc-grid-3">
+                <div className="tc-field">
+                  <label htmlFor="tc-duracao">Carga horária *</label>
+                  <input
+                    id="tc-duracao"
+                    type="text"
+                    name="duracao"
+                    className="tc-input"
+                    value={formData.duracao}
+                    onChange={handleChange}
+                    placeholder="Ex: 8 horas"
+                  />
+                </div>
+                <div className="tc-field">
+                  <label htmlFor="tc-data">Data de conclusão *</label>
+                  <input
+                    id="tc-data"
+                    type="date"
+                    name="data"
+                    className="tc-input"
+                    value={formData.data}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="tc-field">
+                  <label htmlFor="tc-local">Cidade</label>
+                  <input
+                    id="tc-local"
+                    type="text"
+                    name="local"
+                    className="tc-input"
+                    value={formData.local}
+                    onChange={handleChange}
+                    placeholder="Ex: Mossoró - RN"
                   />
                 </div>
               </div>
 
-              {/* Card 2: Instrutor Responsável (Usuário do Sistema) */}
-              <div style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '1rem',
-                padding: '1.4rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1.15rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
-                  <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <UserCheck size={18} style={{ color: '#0284c7' }} />
-                    Instrutor Responsável Técnico
-                  </h2>
-                  <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <ShieldCheck size={13} />
-                    Credencial Oficial
+              {/* Instrutor */}
+              <div className="tc-field">
+                <div className="tc-label-row">
+                  <label htmlFor="tc-instrutor">Instrutor *</label>
+                  <button
+                    type="button"
+                    className="tc-link"
+                    onClick={() => setIsEditingInstructor(!isEditingInstructor)}
+                  >
+                    {isEditingInstructor ? 'Concluir edição' : 'Editar dados'}
+                  </button>
+                </div>
+                <select
+                  id="tc-instrutor"
+                  className="tc-input"
+                  value={profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase()) ? formData.instrutorNome : 'custom'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'custom') {
+                      setIsEditingInstructor(true);
+                    } else if (val) {
+                      const sel = profiles.find(p => p.name === val);
+                      setFormData(prev => ({
+                        ...prev,
+                        instrutorNome: sel ? sel.name : val,
+                        instrutorCargo: sel?.role || prev.instrutorCargo,
+                        instrutorRegistro: sel?.registration || prev.instrutorRegistro
+                      }));
+                    }
+                  }}
+                >
+                  {profiles.map(p => (
+                    <option key={p.id || p.name} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                  <option value="custom">
+                    {profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase())
+                      ? 'Outro instrutor (digitar)...'
+                      : (formData.instrutorNome || 'Outro instrutor (digitar)...')}
+                  </option>
+                </select>
+                {!isEditingInstructor && (formData.instrutorCargo || formData.instrutorRegistro) && (
+                  <span className="tc-hint">
+                    {[formData.instrutorCargo, formData.instrutorRegistro].filter(Boolean).join(' · ')}
                   </span>
-                </div>
-
-                {/* Seletor Integrado com Usuários */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', margin: 0 }}>
-                      Selecionar Instrutor Credenciado:
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingInstructor(!isEditingInstructor)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#0284c7',
-                        fontSize: '0.72rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        padding: '1px 3px'
-                      }}
-                    >
-                      {isEditingInstructor ? '✓ Concluir edição' : '✏️ Ajustar dados'}
-                    </button>
-                  </div>
-
-                  <div style={{ position: 'relative' }}>
-                    <select
-                      className="input"
-                      value={profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase()) ? formData.instrutorNome : 'custom'}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === 'custom') {
-                          setIsEditingInstructor(true);
-                        } else if (val) {
-                          const sel = profiles.find(p => p.name === val);
-                          setFormData(prev => ({
-                            ...prev,
-                            instrutorNome: sel ? sel.name : val,
-                            instrutorCargo: sel?.role || prev.instrutorCargo,
-                            instrutorRegistro: sel?.registration || prev.instrutorRegistro
-                          }));
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        padding: '0.65rem 2.2rem 0.65rem 0.85rem',
-                        borderRadius: '0.65rem',
-                        border: '1.5px solid #0284c7',
-                        backgroundColor: 'var(--surface)',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer',
-                        appearance: 'none'
-                      }}
-                    >
-                      <option value="" disabled>Selecione um instrutor credenciado...</option>
-                      <optgroup label="👥 Usuários Cadastrados no Sistema TotalSafety">
-                        {profiles.map(p => (
-                          <option key={p.id} value={p.name}>
-                            {p.name} {p.role ? `— ${p.role}` : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <option value="custom">✏️ Outro Instrutor / Digitar Manualmente</option>
-                    </select>
-                    <div style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#0284c7' }}>
-                      <ChevronDown size={18} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Badge / Card Visual do Instrutor Selecionado */}
-                {formData.instrutorNome && (
-                  <div style={{
-                    backgroundColor: 'rgba(2, 132, 199, 0.05)',
-                    border: '1px solid rgba(2, 132, 199, 0.2)',
-                    borderRadius: '0.75rem',
-                    padding: '0.75rem 1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      backgroundColor: '#0284c7',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: '800',
-                      fontSize: '0.9rem',
-                      flexShrink: 0
-                    }}>
-                      {formData.instrutorNome.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                          {formData.instrutorNome}
-                        </span>
-                        {profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome.trim().toLowerCase()) ? (
-                          <span style={{
-                            backgroundColor: '#dcfce7',
-                            color: '#15803d',
-                            fontSize: '0.68rem',
-                            fontWeight: '700',
-                            padding: '1px 6px',
-                            borderRadius: '0.75rem'
-                          }}>
-                            ✓ Usuário do Sistema
-                          </span>
-                        ) : (
-                          <span style={{
-                            backgroundColor: '#fef3c7',
-                            color: '#b45309',
-                            fontSize: '0.68rem',
-                            fontWeight: '700',
-                            padding: '1px 6px',
-                            borderRadius: '0.75rem'
-                          }}>
-                            Instrutor Externo
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                        {formData.instrutorCargo || 'Instrutor e Responsável Técnico'} • {formData.instrutorRegistro || 'SRTE N° 0009823/RN'}
-                      </div>
-                    </div>
-                  </div>
                 )}
-
-                {/* Campos do Instrutor para ajuste fino */}
                 {isEditingInstructor && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem', animation: 'fadeIn 0.2s ease' }}>
-                    <div>
-                      <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                        Nome Completo do Instrutor
-                      </label>
+                  <div className="tc-grid-3 tc-mt">
+                    <div className="tc-field">
+                      <label htmlFor="tc-instrutor-nome">Nome</label>
                       <input
+                        id="tc-instrutor-nome"
                         type="text"
                         name="instrutorNome"
-                        className="input"
+                        className="tc-input"
                         value={formData.instrutorNome}
                         onChange={handleChange}
-                        placeholder="Nome do Instrutor"
-                        style={{ width: '100%', marginTop: '0.25rem' }}
+                        placeholder="Nome completo"
                       />
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                      <div>
-                        <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                          Cargo / Qualificação
-                        </label>
-                        <input
-                          type="text"
-                          name="instrutorCargo"
-                          className="input"
-                          value={formData.instrutorCargo}
-                          onChange={handleChange}
-                          placeholder="Ex: Técnico em Segurança do Trabalho"
-                          style={{ width: '100%', marginTop: '0.25rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="modal-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                          Registro Profissional (MTE / SRTE)
-                        </label>
-                        <input
-                          type="text"
-                          name="instrutorRegistro"
-                          className="input"
-                          value={formData.instrutorRegistro}
-                          onChange={handleChange}
-                          placeholder="Ex: SRTE N° 0009823/RN"
-                          style={{ width: '100%', marginTop: '0.25rem' }}
-                        />
-                      </div>
+                    <div className="tc-field">
+                      <label htmlFor="tc-instrutor-cargo">Cargo</label>
+                      <input
+                        id="tc-instrutor-cargo"
+                        type="text"
+                        name="instrutorCargo"
+                        className="tc-input"
+                        value={formData.instrutorCargo}
+                        onChange={handleChange}
+                        placeholder="Ex: Técnico em Segurança"
+                      />
+                    </div>
+                    <div className="tc-field">
+                      <label htmlFor="tc-instrutor-registro">Registro</label>
+                      <input
+                        id="tc-instrutor-registro"
+                        type="text"
+                        name="instrutorRegistro"
+                        className="tc-input"
+                        value={formData.instrutorRegistro}
+                        onChange={handleChange}
+                        placeholder="Ex: MTE0009995/RN"
+                      />
                     </div>
                   </div>
                 )}
               </div>
+            </section>
 
-              {/* Card 3: Conteúdo Programático (Verso do Certificado) */}
-              <div style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '1rem',
-                padding: '1.4rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.85rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
-                  <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FileText size={18} style={{ color: '#0284c7' }} />
-                    Conteúdo Programático (Verso)
-                  </h2>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    Slide 2 de cada aluno
-                  </span>
+            {/* ETAPA 2: Participantes */}
+            <section className="tc-card" aria-labelledby="tc-step2-title">
+              <div className="tc-step-head">
+                <span className="tc-step-num">2</span>
+                <div>
+                  <h2 id="tc-step2-title">Participantes</h2>
+                  <p>{validCount} pronto{validCount !== 1 ? 's' : ''} para emissão</p>
                 </div>
-
-                <textarea
-                  name="conteudo"
-                  className="input"
-                  value={formData.conteudo}
-                  onChange={handleChange}
-                  rows={5}
-                  placeholder="Itens do conteúdo programático que serão impressos no verso do certificado..."
-                  style={{ width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8125rem', lineHeight: '1.5' }}
-                />
+                <div className="tc-step-actions">
+                  <button
+                    id="btn-paste-students"
+                    type="button"
+                    className="tc-btn"
+                    onClick={() => setShowBatchModal(true)}
+                    title="Colar vários participantes de uma vez"
+                  >
+                    <ClipboardCopy size={14} />
+                    Colar lista
+                  </button>
+                  <button
+                    id="btn-add-student"
+                    type="button"
+                    className="tc-btn tc-btn--soft"
+                    onClick={addColaborador}
+                  >
+                    <Plus size={14} />
+                    Adicionar
+                  </button>
+                </div>
               </div>
 
-            </div>
+              <div className="tc-students">
+                <div className="tc-students-head">
+                  <span>#</span>
+                  <span>Nome completo</span>
+                  <span>CPF</span>
+                  <span />
+                </div>
+                <div className="tc-students-body">
+                  {colaboradores.map((colab, idx) => {
+                    const isCpfValid = colab.cpf && colab.cpf.replace(/\D/g, '').length === 11;
+                    return (
+                      <div key={idx} className="tc-student-row">
+                        <span className="tc-student-idx">{idx + 1}</span>
+                        <input
+                          id={`student-name-${idx}`}
+                          type="text"
+                          className="tc-input"
+                          placeholder="Nome do participante"
+                          value={colab.nome}
+                          onChange={(e) => handleColabChange(idx, 'nome', e.target.value)}
+                        />
+                        <div className="tc-cpf-wrap">
+                          <input
+                            id={`student-cpf-${idx}`}
+                            type="text"
+                            className="tc-input"
+                            placeholder="000.000.000-00"
+                            value={colab.cpf}
+                            onChange={(e) => handleColabChange(idx, 'cpf', formatCpf(e.target.value))}
+                            maxLength={14}
+                          />
+                          {isCpfValid && <Check size={13} className="tc-cpf-ok" />}
+                        </div>
+                        <button
+                          type="button"
+                          className="tc-icon-btn tc-icon-btn--sm tc-icon-btn--danger"
+                          onClick={() => removeColaborador(idx)}
+                          title="Remover participante"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-            {/* ------------------------------------------------------------- */}
-            {/* COLUNA DIREITA: PREVIEW DO CERTIFICADO + ALUNOS + EMISSÃO    */}
-            {/* ------------------------------------------------------------- */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
-              {/* CARD PREVIEW INTERATIVO DO CERTIFICADO */}
-              <div style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '1rem',
-                padding: '1.25rem',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.04)',
-                background: 'linear-gradient(180deg, var(--surface) 0%, rgba(2, 132, 199, 0.02) 100%)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <Eye size={17} style={{ color: '#0284c7' }} />
-                    <span style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                      Pré-visualização do Certificado
+              {colaboradores.length > 1 && (
+                <button type="button" className="tc-link tc-link--danger" onClick={clearAllColaboradores}>
+                  <Trash2 size={12} />
+                  Limpar lista
+                </button>
+              )}
+            </section>
+
+            {/* ETAPA 3: Assinaturas da Turma (Em Lote) */}
+            <section className="tc-card" aria-labelledby="tc-step3-title">
+              <div className="tc-step-head">
+                <span className="tc-step-num">3</span>
+                <div>
+                  <h2 id="tc-step3-title">Assinaturas da turma</h2>
+                  <p>Assine uma vez e vale para todos os certificados · {signedCount}/{signatureRoles.length} assinadas</p>
+                </div>
+                <div className="tc-step-actions">
+                  <button
+                    id="btn-sign-mobile"
+                    type="button"
+                    className="tc-btn"
+                    onClick={() => handleOpenQrModal()}
+                    title="Abrir QR Code para assinar pelo celular"
+                  >
+                    <Smartphone size={14} />
+                    Assinar no celular
+                  </button>
+                </div>
+              </div>
+
+              <ul className="tc-sign-list">
+                {signatureRoles.map(role => {
+                  const sig = currentTurmaSignatures?.[role.key];
+                  const isSigned = Boolean(sig?.dataUrl);
+                  return (
+                    <li key={role.key} className={`tc-sign-row ${isSigned ? 'is-signed' : ''}`}>
+                      <div className="tc-sign-info">
+                        <span className="tc-sign-role">{role.label}</span>
+                        <span className="tc-sign-name" title={role.name}>{role.name}</span>
+                      </div>
+                      <div className="tc-sign-thumb">
+                        {isSigned
+                          ? <img src={sig.dataUrl} alt={`Assinatura de ${role.name}`} />
+                          : <span>Não assinado</span>}
+                      </div>
+                      <div className="tc-sign-actions">
+                        <button
+                          id={`btn-sign-${role.key}`}
+                          type="button"
+                          className={`tc-btn ${isSigned ? '' : 'tc-btn--primary'}`}
+                          onClick={() => handleOpenSignatureModal(role.key)}
+                        >
+                          <PenTool size={13} />
+                          {isSigned ? 'Refazer' : 'Assinar'}
+                        </button>
+                        {isSigned && (
+                          <button
+                            type="button"
+                            className="tc-icon-btn tc-icon-btn--sm tc-icon-btn--danger"
+                            onClick={() => handleClearSignature(role.key)}
+                            title="Remover assinatura"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+
+                {/* Aluno: sempre pendente */}
+                <li className="tc-sign-row is-pending">
+                  <div className="tc-sign-info">
+                    <span className="tc-sign-role">Aluno</span>
+                    <span className="tc-sign-name">Cada participante</span>
+                  </div>
+                  <div className="tc-sign-thumb">
+                    <span>Assina na entrega</span>
+                  </div>
+                  <div className="tc-sign-actions">
+                    <span className="tc-badge">
+                      <Clock size={12} />
+                      Pendente
                     </span>
                   </div>
+                </li>
+              </ul>
+            </section>
 
-                  {/* Toggle Frente / Verso */}
-                  <div style={{
-                    display: 'flex',
-                    backgroundColor: 'var(--surface-hover)',
-                    borderRadius: '0.5rem',
-                    padding: '2px',
-                    border: '1px solid var(--border)'
-                  }}>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewTab('frente')}
-                      style={{
-                        padding: '0.25rem 0.65rem',
-                        fontSize: '0.72rem',
-                        fontWeight: '700',
-                        borderRadius: '0.35rem',
-                        border: 'none',
-                        cursor: 'pointer',
-                        backgroundColor: previewTab === 'frente' ? '#0284c7' : 'transparent',
-                        color: previewTab === 'frente' ? '#fff' : 'var(--text-secondary)'
-                      }}
-                    >
-                      Frente (Slide 1)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewTab('verso')}
-                      style={{
-                        padding: '0.25rem 0.65rem',
-                        fontSize: '0.72rem',
-                        fontWeight: '700',
-                        borderRadius: '0.35rem',
-                        border: 'none',
-                        cursor: 'pointer',
-                        backgroundColor: previewTab === 'verso' ? '#0284c7' : 'transparent',
-                        color: previewTab === 'verso' ? '#fff' : 'var(--text-secondary)'
-                      }}
-                    >
-                      Verso (Slide 2)
-                    </button>
+            {/* OPÇÕES AVANÇADAS (recolhidas por padrão) */}
+            <details className="tc-card tc-advanced">
+              <summary>
+                <div>
+                  <div className="tc-adv-title">Opções avançadas</div>
+                  <small>Texto do certificado, conteúdo do verso, validade, empresa e modelo .pptx próprio</small>
+                </div>
+                <ChevronDown size={18} className="tc-adv-chevron" />
+              </summary>
+
+              <div className="tc-advanced-body">
+                <div className="tc-field">
+                  <label htmlFor="tc-descricao">Texto da certificação (frente)</label>
+                  <textarea
+                    id="tc-descricao"
+                    name="descricao"
+                    className="tc-input"
+                    value={formData.descricao}
+                    onChange={handleChange}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="tc-field">
+                  <label htmlFor="tc-conteudo">Conteúdo programático (verso)</label>
+                  <textarea
+                    id="tc-conteudo"
+                    name="conteudo"
+                    className="tc-input tc-mono"
+                    value={formData.conteudo}
+                    onChange={handleChange}
+                    rows={6}
+                    placeholder="Um item por linha..."
+                  />
+                </div>
+
+                <div className="tc-grid-2">
+                  <div className="tc-field">
+                    <label htmlFor="tc-validade">Validade</label>
+                    <input
+                      id="tc-validade"
+                      type="text"
+                      name="validade"
+                      className="tc-input"
+                      value={formData.validade}
+                      onChange={handleChange}
+                      placeholder="Ex: 24 meses"
+                    />
+                  </div>
+                  <div className="tc-field">
+                    <label htmlFor="tc-empresa">Empresa solicitante</label>
+                    <input
+                      id="tc-empresa"
+                      type="text"
+                      name="empresa"
+                      className="tc-input"
+                      list="tc-empresas-list"
+                      value={formData.empresa}
+                      onChange={handleChange}
+                      placeholder="TotalSafety"
+                    />
+                    <datalist id="tc-empresas-list">
+                      <option value="TotalSafety" />
+                      {companies.map(c => (
+                        <option key={c.id} value={c.name} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 
-                {/* SELETOR INTERATIVO DOS 2 MODELOS OFICIAIS */}
-                <div style={{
-                  marginBottom: '1rem',
-                  padding: '0.75rem',
-                  backgroundColor: 'var(--surface-hover)',
-                  borderRadius: '0.75rem',
-                  border: '1px solid var(--border)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Layers size={15} style={{ color: '#8b5cf6' }} />
-                      <span style={{ fontSize: '0.78rem', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Modelo Visual Oficial:
-                      </span>
-                    </div>
-                    <span style={{ 
-                      fontSize: '0.7rem', 
-                      fontWeight: '700', 
-                      color: certModel === 'modelo1' ? '#6d28d9' : '#ea580c',
-                      backgroundColor: certModel === 'modelo1' ? 'rgba(109, 40, 217, 0.1)' : 'rgba(234, 88, 12, 0.1)',
-                      padding: '0.15rem 0.6rem',
-                      borderRadius: '1rem'
-                    }}>
-                      {certModel === 'modelo1' ? '🟣 Modelo 1 Ativo (EcoCurvas Laterais)' : '⚡ Modelo 2 Ativo (Ondas & Colmeia Tech)'}
+                <div className="tc-field">
+                  <span className="tc-label">Modelo .pptx próprio</span>
+                  <div className="tc-file-row">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept=".pptx"
+                      onChange={handleTemplateUpload}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      id="btn-upload-template"
+                      type="button"
+                      className="tc-btn"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload size={14} />
+                      {customTemplateFile ? 'Trocar arquivo' : 'Carregar .pptx'}
+                    </button>
+                    {customTemplateFile && (
+                      <button type="button" className="tc-link tc-link--danger" style={{ marginTop: 0 }} onClick={removeCustomTemplate}>
+                        Restaurar padrão
+                      </button>
+                    )}
+                    <span className="tc-hint">
+                      {customTemplateFile
+                        ? `${customTemplateFile.name} (${(customTemplateFile.size / 1024).toFixed(1)} KB)`
+                        : 'Usando o modelo oficial do curso selecionado.'}
                     </span>
                   </div>
+                </div>
+              </div>
+            </details>
+          </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
-                    {/* Botão Modelo 1 */}
+          {/* ------------------------------------------------------------- */}
+          {/* COLUNA DIREITA: PRÉ-VISUALIZAÇÃO + EMISSÃO (fixa ao rolar)   */}
+          {/* ------------------------------------------------------------- */}
+          <aside className="tc-side">
+            <div className="tc-card tc-preview-card">
+              <div className="tc-preview-head">
+                <div className="tc-preview-title">
+                  <Eye size={16} />
+                  Pré-visualização
+                </div>
+                <div className="tc-preview-controls">
+                  <div className="tc-seg" role="group" aria-label="Modelo do certificado">
                     <button
+                      id="btn-model-1"
                       type="button"
+                      className={certModel === 'modelo1' ? 'is-active' : ''}
                       onClick={() => setCertModel('modelo1')}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        padding: '0.6rem 0.75rem',
-                        borderRadius: '0.6rem',
-                        border: certModel === 'modelo1' ? '2px solid #7c3aed' : '1px solid var(--border)',
-                        backgroundColor: certModel === 'modelo1' ? 'rgba(124, 58, 237, 0.08)' : 'var(--surface)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        textAlign: 'left'
-                      }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '0.2rem' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: '800', color: certModel === 'modelo1' ? '#6d28d9' : 'var(--text-primary)' }}>
-                          🟣 Modelo 1: EcoCurvas
-                        </span>
-                        {certModel === 'modelo1' && <CheckCircle2 size={13} style={{ color: '#7c3aed' }} />}
-                      </div>
-                      <span style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>
-                        Curvas laterais roxas, banner no topo, texto contínuo justificado, 3 assinaturas e verso em 1 coluna.
-                      </span>
+                      Modelo 1
                     </button>
-
-                    {/* Botão Modelo 2 */}
                     <button
+                      id="btn-model-2"
                       type="button"
+                      className={certModel === 'modelo2' ? 'is-active' : ''}
                       onClick={() => setCertModel('modelo2')}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        padding: '0.6rem 0.75rem',
-                        borderRadius: '0.6rem',
-                        border: certModel === 'modelo2' ? '2px solid #ea580c' : '1px solid var(--border)',
-                        backgroundColor: certModel === 'modelo2' ? 'rgba(234, 88, 12, 0.08)' : 'var(--surface)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        textAlign: 'left'
-                      }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '0.2rem' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: '800', color: certModel === 'modelo2' ? '#c2410c' : 'var(--text-primary)' }}>
-                          ⚡ Modelo 2: Ondas & Colmeia
-                        </span>
-                        {certModel === 'modelo2' && <CheckCircle2 size={13} style={{ color: '#ea580c' }} />}
-                      </div>
-                      <span style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>
-                        Ondas roxo/laranja, malha hexagonal, nome em Azul Real, 4 assinaturas e verso em 2 colunas.
-                      </span>
+                      Modelo 2
+                    </button>
+                  </div>
+                  <div className="tc-seg" role="group" aria-label="Lado do certificado">
+                    <button
+                      id="btn-preview-front"
+                      type="button"
+                      className={previewTab === 'frente' ? 'is-active' : ''}
+                      onClick={() => setPreviewTab('frente')}
+                    >
+                      Frente
+                    </button>
+                    <button
+                      id="btn-preview-back"
+                      type="button"
+                      className={previewTab === 'verso' ? 'is-active' : ''}
+                      onClick={() => setPreviewTab('verso')}
+                    >
+                      Verso
                     </button>
                   </div>
                 </div>
+              </div>
 
                 {/* MOLDURA DO CERTIFICADO MOCKUP REALISTA (EXATAMENTE COMO O PDF SELECIONADO) */}
                 <div style={{
@@ -2751,266 +1636,49 @@ const TrainingCertificatesPage = () => {
                     )
                   )}
                 </div>
+
+              {/* EMISSÃO */}
+              <div className="tc-generate">
+                <div className="tc-generate-summary">
+                  <div className="tc-stat">
+                    <strong>{validCount}</strong>
+                    <span>certificado{validCount !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="tc-stat">
+                    <strong>{validCount * 2}</strong>
+                    <span>slides (frente + verso)</span>
+                  </div>
+                  <div className="tc-stat">
+                    <strong>{signedCount}/{signatureRoles.length}</strong>
+                    <span>assinaturas da turma</span>
+                  </div>
+                </div>
+
+                <button
+                  id="btn-generate-pptx"
+                  type="button"
+                  className={`tc-generate-btn ${generating ? 'is-loading' : ''}`}
+                  onClick={handleGenerate}
+                  disabled={generating || validCount === 0}
+                >
+                  {generating ? (
+                    <>
+                      <Loader size={19} className="animate-spin" />
+                      Gerando {validCount} certificado{validCount !== 1 ? 's' : ''}...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={19} />
+                      Baixar certificados (.pptx)
+                    </>
+                  )}
+                </button>
+                {validCount === 0 && (
+                  <p className="tc-hint tc-center">Adicione ao menos um participante para gerar.</p>
+                )}
               </div>
-
-              {/* CARD DE ALUNOS PARTICIPANTES */}
-              <div style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '1rem',
-                padding: '1.4rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  marginBottom: '1rem', 
-                  flexWrap: 'wrap', 
-                  gap: '0.5rem',
-                  borderBottom: '1px solid var(--border)',
-                  paddingBottom: '0.75rem'
-                }}>
-                  <div>
-                    <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <Users size={18} style={{ color: '#0284c7' }} />
-                      Lista de Participantes ({colaboradores.length})
-                    </h2>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      {validCount} participante(s) com nome válido para emissão
-                    </span>
-                  </div>
-
-                  {/* Ações da Lista */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => setShowBatchModal(true)}
-                      style={{ 
-                        backgroundColor: 'var(--surface-hover)', 
-                        border: '1px solid var(--border)',
-                        fontSize: '0.78rem', 
-                        fontWeight: '600',
-                        padding: '0.45rem 0.75rem',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '0.35rem' 
-                      }}
-                      title="Colar texto em lote com vários participantes"
-                    >
-                      <ClipboardCopy size={13} style={{ color: '#0284c7' }} />
-                      Colar em Lote
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={addColaborador}
-                      style={{ 
-                        backgroundColor: 'rgba(2, 132, 199, 0.1)', 
-                        border: '1px solid rgba(2, 132, 199, 0.25)',
-                        color: '#0284c7',
-                        fontSize: '0.78rem', 
-                        fontWeight: '700',
-                        padding: '0.45rem 0.8rem',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '0.35rem' 
-                      }}
-                    >
-                      <Plus size={14} />
-                      Adicionar Aluno
-                    </button>
-
-                    {colaboradores.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={clearAllColaboradores}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          padding: '0.4rem',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                        title="Limpar todos os participantes"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Lista de Alunos com Scroll Suave */}
-                <div style={{ 
-                  maxHeight: '420px', 
-                  overflowY: 'auto', 
-                  paddingRight: '0.35rem',
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '0.55rem' 
-                }}>
-                  {colaboradores.map((colab, idx) => {
-                    const isCpfValid = colab.cpf && colab.cpf.replace(/\D/g, '').length === 11;
-                    return (
-                      <div 
-                        key={idx} 
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.55rem',
-                          backgroundColor: 'var(--surface-hover)',
-                          padding: '0.55rem 0.85rem',
-                          borderRadius: '0.75rem',
-                          border: '1px solid var(--border)',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {/* Avatar com Índice */}
-                        <div style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          backgroundColor: colab.nome.trim() ? 'rgba(2, 132, 199, 0.15)' : 'var(--border)',
-                          color: colab.nome.trim() ? '#0284c7' : 'var(--text-secondary)',
-                          fontSize: '0.72rem',
-                          fontWeight: '800',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          {idx + 1}
-                        </div>
-
-                        {/* Nome do Participante */}
-                        <input
-                          type="text"
-                          className="input"
-                          placeholder="Nome completo do participante"
-                          value={colab.nome}
-                          onChange={(e) => handleColabChange(idx, 'nome', e.target.value)}
-                          style={{ flex: 2, fontSize: '0.85rem', padding: '0.45rem 0.75rem' }}
-                        />
-
-                        {/* CPF com Indicador de Formato */}
-                        <div style={{ position: 'relative', flex: 1.2 }}>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="000.000.000-00"
-                            value={colab.cpf}
-                            onChange={(e) => handleColabChange(idx, 'cpf', formatCpf(e.target.value))}
-                            style={{ 
-                              width: '100%', 
-                              fontSize: '0.85rem', 
-                              padding: '0.45rem 0.75rem', 
-                              fontFamily: 'monospace',
-                              paddingRight: isCpfValid ? '1.8rem' : '0.75rem'
-                            }}
-                            maxLength={14}
-                          />
-                          {isCpfValid && (
-                            <Check 
-                              size={14} 
-                              style={{ 
-                                position: 'absolute', 
-                                right: '0.6rem', 
-                                top: '50%', 
-                                transform: 'translateY(-50%)', 
-                                color: '#10b981' 
-                              }} 
-                            />
-                          )}
-                        </div>
-
-                        {/* Botão Remover */}
-                        <button
-                          type="button"
-                          onClick={() => removeColaborador(idx)}
-                          style={{ 
-                            background: 'none', 
-                            border: 'none', 
-                            color: 'var(--text-secondary)', 
-                            cursor: 'pointer', 
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            transition: 'color 0.15s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                          title="Remover participante"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* BOTÃO PRINCIPAL DE GERAÇÃO PPTX */}
-                <div style={{ marginTop: '1.25rem', paddingTop: '1.15rem', borderTop: '1px solid var(--border)' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.75rem',
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)'
-                  }}>
-                    <span>Formato Oficial: <strong>Microsoft PowerPoint (.pptx)</strong></span>
-                    <span>Total de slides: <strong>{validCount * 2} slides</strong> (Frente + Verso)</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={generating || validCount === 0}
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.65rem',
-                      fontSize: '1rem',
-                      fontWeight: '800',
-                      color: '#ffffff',
-                      background: validCount === 0 
-                        ? 'var(--border)' 
-                        : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                      border: 'none',
-                      borderRadius: '0.85rem',
-                      cursor: validCount === 0 || generating ? 'not-allowed' : 'pointer',
-                      boxShadow: validCount === 0 ? 'none' : '0 10px 25px -5px rgba(2, 132, 199, 0.45)',
-                      transition: 'all 0.2s ease',
-                      opacity: generating ? 0.8 : 1
-                    }}
-                  >
-                    {generating ? (
-                      <>
-                        <Loader size={20} className="animate-spin" />
-                        Gerando Apresentação com {validCount} Certificados...
-                      </>
-                    ) : (
-                      <>
-                        <Download size={20} />
-                        Baixar Certificados em PowerPoint (.pptx)
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
             </div>
-
-          </div>
+          </aside>
         </div>
       )}
 
@@ -3111,6 +1779,17 @@ const TrainingCertificatesPage = () => {
                 <Eye size={15} />
                 Testar Formulário
               </a>
+
+              <button
+                id="btn-api-cpf-token"
+                type="button"
+                className="tc-icon-btn"
+                onClick={() => setShowTokenModal(true)}
+                title="Configurar token da API CPF (Receita)"
+                style={{ width: '40px', height: '40px' }}
+              >
+                <Key size={16} />
+              </button>
             </div>
           </div>
 
