@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { generateTrainingPPTX } from '../utils/trainingPptxGenerator';
 import { formatCpf } from '../services/cpfService';
-import { getProfiles } from '../services/storageService';
+import { getProfiles, getCompanies, getGroups } from '../services/storageService';
 import { 
   getTrainingClasses, saveTrainingClass, deleteTrainingClass,
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments 
@@ -17,32 +17,109 @@ import {
 
 const DEFAULT_API_TOKEN = '5ae973d7a997af13f0aaf2bf60e65803';
 
-// Presets inteligentes para preenchimento com 1 clique
+// Presets completos e inteligentes de Treinamentos Oficiais SST / NRs
 const COURSE_PRESETS = [
   {
+    category: 'Normas Regulamentadoras (NRs)',
     name: 'NR-35 Trabalho em Altura',
     duration: '8 horas',
     content: '1. Normas e regulamentações aplicáveis ao trabalho em altura (NR-35)\n2. Análise de Risco e condições impeditivas\n3. Sistemas, equipamentos e procedimentos de proteção coletiva e individual\n4. EPIs para trabalho em altura: seleção, inspeção, conservação e limitação de uso\n5. Condutas em situações de emergência e noções de primeiros socorros'
   },
   {
+    category: 'Normas Regulamentadoras (NRs)',
     name: 'NR-06 Equipamentos de Proteção Individual',
     duration: '4 horas',
     content: '1. Disposições gerais e exigências da Norma Regulamentadora NR-06\n2. Direitos e deveres do empregador e do trabalhador\n3. Tipos de EPIs e seleção adequada para cada risco operacional\n4. Procedimentos de inspeção, higienização, guarda e conservação periódica\n5. Critérios técnicos para substituição e descarte responsável'
   },
   {
-    name: 'NR-10 Segurança em Instalações Elétricas',
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-10 Segurança em Instalações e Serviços em Eletricidade',
     duration: '40 horas',
     content: '1. Introdução à segurança com eletricidade e riscos em instalações elétricas\n2. Técnicas de Análise de Risco no setor elétrico\n3. Medidas de controle do risco elétrico (desenergização, aterramento, barreiras)\n4. Normas Técnicas Brasileiras (NBR da ABNT e NR-10)\n5. Primeiros socorros e combate a princípios de incêndios com eletricidade'
   },
   {
-    name: 'NR-33 Segurança em Espaços Confinados',
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-10 SEP Sistema Elétrico de Potência',
+    duration: '40 horas',
+    content: '1. Organização do Sistema Elétrico de Potência (SEP)\n2. Trabalho sob tensão e métodos de trabalho (ao contato, ao potencial, à distância)\n3. Procedimentos de trabalho e liberação de instalações no SEP\n4. Técnicas de análise de risco e inspeção de equipamentos especiais\n5. Condições impeditivas, resgate de vítimas e primeiros socorros'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-33 Segurança em Espaços Confinados (Trabalhadores e Vigias)',
     duration: '16 horas',
     content: '1. Definições, identificação e reconhecimento de espaços confinados\n2. Critérios de indicação e uso de equipamentos de ventilação e medição de gases\n3. Procedimentos de Permissão de Entrada e Trabalho (PET)\n4. Monitoramento contínuo da atmosfera e controle dos riscos ocupacionais\n5. Técnicas de resgate e primeiros socorros em espaços confinados'
   },
   {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-33 Supervisor de Entrada em Espaço Confinado',
+    duration: '40 horas',
+    content: '1. Reconhecimento, avaliação e controle de riscos em espaços confinados\n2. Legislação de segurança e saúde no trabalho aplicável (NR-33 e NBR 16577)\n3. Emissão, preenchimento e encerramento da Permissão de Entrada e Trabalho (PET)\n4. Operação e calibração de detectores de gases e sistemas de insuflamento\n5. Operações de salvamento, plano de resgate e suporte básico à vida'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-01 Disposições Gerais e Gerenciamento de Riscos (GRO/PGR)',
+    duration: '4 horas',
+    content: '1. Campo de aplicação e princípios gerais da NR-01\n2. Identificação de perigos e inventário de riscos ocupacionais (GRO/PGR)\n3. Medidas preventivas, hierarquia de controle e plano de ação\n4. Direitos e deveres na gestão de segurança do trabalho\n5. Comunicação de incidentes e análise preliminar'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-05 CIPA - Prevenção de Acidentes e Assédio',
+    duration: '20 horas',
+    content: '1. Estudo do ambiente, condições de trabalho e riscos operacionais\n2. Metodologia de investigação e análise de acidentes e doenças do trabalho\n3. Prevenção e combate ao assédio sexual e a outras formas de violência no trabalho\n4. Noções sobre acidentes e medidas preventivas de saúde ocupacional\n5. Campanhas de segurança, SIPAT e mapa de riscos'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-11 Operador de Empilhadeira',
+    duration: '16 horas',
+    content: '1. Legislação aplicável (NR-11 e Código de Trânsito Brasileiro)\n2. Componentes mecânicos, elétricos e hidráulicos do equipamento\n3. Centro de gravidade, estabilidade e capacidade de carga\n4. Inspeção diária de segurança (Checklist de pré-uso)\n5. Manobras operacionais, empilhamento e desempilhamento de cargas'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-11 Operador de Ponte Rolante e Içamento',
+    duration: '16 horas',
+    content: '1. Conceitos fundamentais e dispositivos de segurança em pontes rolantes\n2. Acessórios de içamento (cintas, cabos de aço, manilhas e ganchos)\n3. Critérios para descarte de materiais de içamento e tabelas de carga\n4. Comunicação visual padronizada (sinais por gestos)\n5. Prática operacional de movimentação aérea e segurança'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-12 Segurança no Trabalho em Máquinas e Equipamentos',
+    duration: '16 horas',
+    content: '1. Princípios gerais e conceitos de proteção da NR-12\n2. Dispositivos de parada de emergência e intertravamentos de segurança\n3. Procedimentos de Bloqueio e Etiquetagem de Energias Perigosas (LOTO)\n4. Riscos adicionais (ruído, calor, substâncias químicas e projeção)\n5. Operação segura e procedimentos operacionais padronizados'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-18 Segurança e Saúde na Indústria da Construção',
+    duration: '4 horas',
+    content: '1. Comunicação prévia e diretrizes do plano de segurança na construção\n2. Proteções coletivas contra quedas em periferias de lajes e vãos\n3. Segurança em andaimes, plataformas e escavações\n4. Instalações elétricas provisórias em canteiros de obras\n5. Ordem, limpeza e descarte de resíduos'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-20 Segurança com Inflamáveis e Combustíveis (Básico)',
+    duration: '8 horas',
+    content: '1. Características, propriedades, perigos e riscos de inflamáveis e combustíveis\n2. Controles coletivos e individuais em áreas classificadas\n3. Fontes de ignição e métodos sistemáticos de prevenção\n4. Procedimentos básicos de emergência e combate a princípio de incêndio\n5. Estudo e aplicação da Permissão de Trabalho (PT)'
+  },
+  {
+    category: 'Normas Regulamentadoras (NRs)',
+    name: 'NR-20 Inflamáveis e Combustíveis (Intermediário)',
+    duration: '16 horas',
+    content: '1. Inflamáveis: propriedades, perigos e riscos químicos\n2. Instalações de transferência e estocagem de combustíveis\n3. Análise preliminar de riscos e métodos de controle operacional\n4. Proteção contra incêndios em tanques e tubulações\n5. Resposta a emergências com vazamentos e derramamentos'
+  },
+  {
+    category: 'Emergência & Primeiros Socorros',
     name: 'Brigada de Incêndio e Emergência',
     duration: '8 horas',
-    content: '1. Teoria do fogo e métodos de propagação\n2. Classes de incêndio e agentes extintores específicos\n3. Operação prática de extintores e linha de hidrantes\n4. Rotas de fuga, sinalização e plano de abandono de área\n5. Técnicas de primeiros socorros e imobilização de vítimas'
+    content: '1. Teoria do fogo e métodos de propagação térmica\n2. Classes de incêndio e agentes extintores específicos\n3. Operação prática de extintores portáteis e linha de hidrantes\n4. Rotas de fuga, sinalização de segurança e plano de abandono de área\n5. Primeiros socorros aplicados a queimaduras e inalação de fumaça'
+  },
+  {
+    category: 'Emergência & Primeiros Socorros',
+    name: 'Primeiros Socorros e Suporte Básico de Vida',
+    duration: '8 horas',
+    content: '1. Avaliação primária e secundária da vítima (Protocolo XABCDE)\n2. Reanimação Cardiopulmonar (RCP) e operação do DEA\n3. Controle de hemorragias graves e técnicas de contenção\n4. Imobilização de fraturas e transporte seguro de acidentados\n5. Desmaios, convulsões e engasgamento (Manobra de Heimlich)'
+  },
+  {
+    category: 'Operacional & Trânsito',
+    name: 'Direção Defensiva e Prevenção de Acidentes',
+    duration: '8 horas',
+    content: '1. Conceitos de Direção Defensiva e Código de Trânsito Brasileiro (CTB)\n2. Condições adversas (tempo, luz, trânsito, via, veículo e condutor)\n3. Distância de segurança, tempo de reação e frenagem\n4. Cuidados especiais com pedestres, ciclistas e veículos pesados\n5. Inspeção preventiva diária de veículos e ergonomia veicular'
   }
 ];
 
@@ -72,6 +149,9 @@ const TrainingCertificatesPage = () => {
   // Estados das Turmas e Inscrições
   const [turmas, setTurmas] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [selectedTurmaIdInGenerator, setSelectedTurmaIdInGenerator] = useState('');
   const [loadingData, setLoadingData] = useState(true);
   const [selectedTurmaFilter, setSelectedTurmaFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,15 +218,23 @@ const TrainingCertificatesPage = () => {
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [classList, studentList, profileList] = await Promise.all([
+      const [classList, studentList, profileList, companyList, groupList] = await Promise.all([
         getTrainingClasses(),
         getTrainingEnrollments(),
-        getProfiles()
+        getProfiles(),
+        getCompanies(),
+        getGroups()
       ]);
       setTurmas(classList || []);
       setEnrollments(studentList || []);
       if (profileList && profileList.length > 0) {
         setProfiles(profileList);
+      }
+      if (companyList && companyList.length > 0) {
+        setCompanies(companyList);
+      }
+      if (groupList && groupList.length > 0) {
+        setGroups(groupList);
       }
     } catch (e) {
       console.error('Erro ao carregar turmas, inscrições e instrutores:', e);
@@ -259,13 +347,15 @@ const TrainingCertificatesPage = () => {
 
   // Carrega alunos de uma turma direto no gerador de certificados
   const handleLoadTurmaIntoGenerator = (turma) => {
-    const studentsInTurma = enrollments.filter(e => e.turma_id === turma.id);
+    const studentsInTurma = enrollments.filter(e => String(e.turma_id) === String(turma.id));
 
     if (studentsInTurma.length === 0) {
       if (!window.confirm(`A turma "${turma.name}" não possui participantes inscritos ainda. Deseja carregar as configurações do curso no gerador mesmo assim?`)) {
         return;
       }
     }
+
+    setSelectedTurmaIdInGenerator(turma.id);
 
     // Atualiza o formulário do certificado com os dados da turma
     setFormData(prev => ({
@@ -289,17 +379,50 @@ const TrainingCertificatesPage = () => {
       })));
       setFeedback({ 
         type: 'success', 
-        text: `${studentsInTurma.length} participante(s) da turma "${turma.name}" carregados com sucesso!` 
+        text: `Turma "${turma.name}" vinculada com ${studentsInTurma.length} participante(s) carregados!` 
       });
     } else {
       setFeedback({ 
         type: 'info', 
-        text: `Dados da turma "${turma.name}" carregados no formulário!` 
+        text: `Configurações da turma "${turma.name}" carregadas no formulário do certificado!` 
       });
     }
 
     setActiveTab('generator');
     setTimeout(() => setFeedback(null), 4500);
+  };
+
+  const handleReloadTurmaStudents = async () => {
+    if (!selectedTurmaIdInGenerator) return;
+    try {
+      const allStudents = await getTrainingEnrollments();
+      setEnrollments(allStudents || []);
+      const studentsInTurma = (allStudents || []).filter(e => String(e.turma_id) === String(selectedTurmaIdInGenerator));
+      if (studentsInTurma.length > 0) {
+        setColaboradores(studentsInTurma.map(s => ({ nome: s.nome, cpf: s.cpf })));
+        setFeedback({ 
+          type: 'success', 
+          text: `Inscrições sincronizadas! (${studentsInTurma.length} participantes carregados)` 
+        });
+      } else {
+        setFeedback({ 
+          type: 'info', 
+          text: 'Nenhuma inscrição recente encontrada para esta turma.' 
+        });
+      }
+      setTimeout(() => setFeedback(null), 4000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleClearTurmaLink = () => {
+    setSelectedTurmaIdInGenerator('');
+    setFeedback({
+      type: 'info',
+      text: 'Vínculo com a turma desfeito. Você pode personalizar os campos livremente.'
+    });
+    setTimeout(() => setFeedback(null), 3000);
   };
 
   // Aplica um preset inteligente de curso
@@ -308,7 +431,8 @@ const TrainingCertificatesPage = () => {
       ...prev,
       curso: preset.name,
       duracao: preset.duration,
-      conteudo: preset.content
+      conteudo: preset.content,
+      descricao: `Certificamos que o participante concluiu com aproveitamento o treinamento com foco nas diretrizes e práticas técnicas estabelecidas na ${preset.name.split(' ')[0]}.`
     }));
     setFeedback({
       type: 'success',
@@ -889,45 +1013,180 @@ const TrainingCertificatesPage = () => {
             {/* Card: Carregador Rápido de Turma */}
             <div style={{
               backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
+              border: selectedTurmaIdInGenerator ? '1.5px solid #0284c7' : '1px solid var(--border)',
               borderRadius: '1rem',
               padding: '1.15rem 1.35rem',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+              boxShadow: selectedTurmaIdInGenerator ? '0 4px 14px rgba(2, 132, 199, 0.08)' : '0 2px 6px rgba(0,0,0,0.03)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              gap: '0.75rem'
+              gap: '0.85rem'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Users size={18} style={{ color: '#0284c7' }} />
                   <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                    Importar Alunos de uma Turma
+                    Vincular / Importar Alunos de uma Turma
                   </span>
                 </div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                  {turmas.length} turmas disponíveis
+                  {turmas.length} turmas cadastradas
                 </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div>
                 <select
                   className="input"
-                  style={{ fontSize: '0.85rem', flex: 1, padding: '0.55rem 0.75rem' }}
+                  value={selectedTurmaIdInGenerator || ''}
+                  style={{
+                    fontSize: '0.875rem',
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '0.65rem',
+                    border: '1.5px solid #0284c7',
+                    fontWeight: '600',
+                    backgroundColor: 'var(--surface)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
                   onChange={(e) => {
-                    const found = turmas.find(t => String(t.id) === String(e.target.value));
+                    const val = e.target.value;
+                    if (!val) {
+                      handleClearTurmaLink();
+                      return;
+                    }
+                    const found = turmas.find(t => String(t.id) === String(val));
                     if (found) handleLoadTurmaIntoGenerator(found);
                   }}
-                  defaultValue=""
                 >
-                  <option value="" disabled>Selecione a turma para carregar alunos e curso...</option>
-                  {turmas.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({enrollments.filter(e => e.turma_id === t.id).length} inscritos)
-                    </option>
-                  ))}
+                  <option value="">Selecione uma turma para carregar alunos e curso...</option>
+                  
+                  {turmas.some(t => t.status === 'Aberta' || !t.status) && (
+                    <optgroup label="🟢 Turmas Abertas (Inscrições Ativas)">
+                      {turmas
+                        .filter(t => t.status === 'Aberta' || !t.status)
+                        .map(t => {
+                          const count = enrollments.filter(e => String(e.turma_id) === String(t.id)).length;
+                          return (
+                            <option key={t.id} value={t.id}>
+                              {t.name} — {t.course_name || 'Geral'} ({count} aluno{count !== 1 ? 's' : ''})
+                            </option>
+                          );
+                        })}
+                    </optgroup>
+                  )}
+
+                  {turmas.some(t => t.status === 'Em Andamento') && (
+                    <optgroup label="🔵 Turmas em Andamento">
+                      {turmas
+                        .filter(t => t.status === 'Em Andamento')
+                        .map(t => {
+                          const count = enrollments.filter(e => String(e.turma_id) === String(t.id)).length;
+                          return (
+                            <option key={t.id} value={t.id}>
+                              {t.name} — {t.course_name || 'Geral'} ({count} aluno{count !== 1 ? 's' : ''})
+                            </option>
+                          );
+                        })}
+                    </optgroup>
+                  )}
+
+                  {turmas.some(t => t.status === 'Concluída') && (
+                    <optgroup label="⚪ Turmas Concluídas">
+                      {turmas
+                        .filter(t => t.status === 'Concluída')
+                        .map(t => {
+                          const count = enrollments.filter(e => String(e.turma_id) === String(t.id)).length;
+                          return (
+                            <option key={t.id} value={t.id}>
+                              {t.name} — {t.course_name || 'Geral'} ({count} aluno{count !== 1 ? 's' : ''})
+                            </option>
+                          );
+                        })}
+                    </optgroup>
+                  )}
                 </select>
               </div>
+
+              {selectedTurmaIdInGenerator && (() => {
+                const currentTurma = turmas.find(t => String(t.id) === String(selectedTurmaIdInGenerator));
+                const studentCount = enrollments.filter(e => String(e.turma_id) === String(selectedTurmaIdInGenerator)).length;
+                if (!currentTurma) return null;
+                return (
+                  <div style={{
+                    backgroundColor: 'rgba(2, 132, 199, 0.06)',
+                    border: '1px solid rgba(2, 132, 199, 0.25)',
+                    borderRadius: '0.65rem',
+                    padding: '0.65rem 0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CheckCircle size={16} style={{ color: '#0284c7' }} />
+                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#0369a1' }}>
+                        Turma ativa: {currentTurma.name}
+                      </span>
+                      <span style={{
+                        backgroundColor: '#0284c7',
+                        color: '#fff',
+                        fontSize: '0.7rem',
+                        fontWeight: '700',
+                        padding: '1px 7px',
+                        borderRadius: '1rem'
+                      }}>
+                        {studentCount} aluno{studentCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={handleReloadTurmaStudents}
+                        className="btn"
+                        title="Recarregar inscrições mais recentes da turma"
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          padding: '0.3rem 0.65rem',
+                          backgroundColor: '#fff',
+                          border: '1px solid rgba(2, 132, 199, 0.35)',
+                          color: '#0284c7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <RefreshCw size={12} />
+                        Sincronizar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleClearTurmaLink}
+                        className="btn"
+                        title="Desvincular e personalizar livremente"
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          padding: '0.3rem 0.65rem',
+                          backgroundColor: 'transparent',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <X size={12} />
+                        Desvincular
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Card: Arquivo de Modelo PPTX */}
@@ -1065,25 +1324,103 @@ const TrainingCertificatesPage = () => {
                   </span>
                 </div>
 
+                {/* Treinamento / Curso Oficial */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <BookOpen size={15} style={{ color: '#0284c7' }} />
+                      Treinamento Oficial / Norma Regulamentadora (NR) *
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: '700' }}>
+                      ⚡ Auto-preenchimento
+                    </span>
+                  </div>
+
+                  {/* SELECT PRINCIPAL DE CURSOS E NRs */}
+                  <select
+                    className="input"
+                    value={COURSE_PRESETS.some(p => p.name.toLowerCase() === formData.curso?.trim().toLowerCase()) ? formData.curso : 'custom'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'custom') {
+                        // mantém para edição
+                      } else {
+                        const found = COURSE_PRESETS.find(p => p.name === val);
+                        if (found) applyPreset(found);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '0.65rem',
+                      border: '1.5px solid #0284c7',
+                      backgroundColor: 'var(--surface)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    <option value="" disabled>Selecione uma Norma Regulamentadora ou Curso Padrão...</option>
+                    
+                    <optgroup label="📋 Normas Regulamentadoras (NRs)">
+                      {COURSE_PRESETS.filter(p => p.category === 'Normas Regulamentadoras (NRs)').map((p, idx) => (
+                        <option key={idx} value={p.name}>
+                          {p.name} ({p.duration})
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <optgroup label="🚑 Emergência, Brigada & Primeiros Socorros">
+                      {COURSE_PRESETS.filter(p => p.category === 'Emergência & Primeiros Socorros').map((p, idx) => (
+                        <option key={idx} value={p.name}>
+                          {p.name} ({p.duration})
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <optgroup label="🚗 Operacional, Direção & Trânsito">
+                      {COURSE_PRESETS.filter(p => p.category === 'Operacional & Trânsito').map((p, idx) => (
+                        <option key={idx} value={p.name}>
+                          {p.name} ({p.duration})
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <option value="custom">✏️ Outro Treinamento (digitar título personalizado)</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    name="curso"
+                    className="input"
+                    value={formData.curso}
+                    onChange={handleChange}
+                    placeholder="Ex: NR-35 Trabalho em Altura / Brigada de Incêndio"
+                    style={{ width: '100%', fontSize: '0.9rem', fontWeight: '600' }}
+                  />
+                </div>
+
                 {/* Chips de Seleção Rápida */}
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.4rem' }}>
-                    Preenchimento Rápido com 1 Clique:
+                  <label style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
+                    Atalhos Rápidos Mais Usados:
                   </label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    {COURSE_PRESETS.map((p, idx) => (
+                    {COURSE_PRESETS.slice(0, 7).map((p, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => applyPreset(p)}
                         style={{
                           backgroundColor: formData.curso === p.name ? 'rgba(2, 132, 199, 0.12)' : 'var(--surface-hover)',
-                          border: formData.curso === p.name ? '1px solid #0284c7' : '1px solid var(--border)',
+                          border: formData.curso === p.name ? '1.5px solid #0284c7' : '1px solid var(--border)',
                           color: formData.curso === p.name ? '#0284c7' : 'var(--text-primary)',
                           borderRadius: '1.25rem',
-                          padding: '0.3rem 0.7rem',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
+                          padding: '0.25rem 0.65rem',
+                          fontSize: '0.72rem',
+                          fontWeight: '700',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease'
                         }}
@@ -1094,29 +1431,30 @@ const TrainingCertificatesPage = () => {
                   </div>
                 </div>
 
-                {/* Nome do Curso */}
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>
-                    Nome Oficial do Treinamento / Curso *
-                  </label>
-                  <input
-                    type="text"
-                    name="curso"
-                    className="input"
-                    value={formData.curso}
-                    onChange={handleChange}
-                    placeholder="Ex: NR-35 Trabalho em Altura / Brigada de Incêndio"
-                    style={{ width: '100%', marginTop: '0.35rem', fontSize: '0.9rem', fontWeight: '600' }}
-                  />
-                </div>
-
                 {/* Carga Horária e Data */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                   <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
                       <Clock size={14} style={{ color: '#0284c7' }} />
                       Carga Horária *
                     </label>
+                    <select
+                      className="input"
+                      value={['4 horas', '8 horas', '16 horas', '20 horas', '40 horas'].includes(formData.duracao) ? formData.duracao : 'custom'}
+                      onChange={(e) => {
+                        if (e.target.value !== 'custom') {
+                          setFormData(prev => ({ ...prev, duracao: e.target.value }));
+                        }
+                      }}
+                      style={{ width: '100%', fontSize: '0.85rem', marginBottom: '0.35rem', borderRadius: '0.55rem' }}
+                    >
+                      <option value="4 horas">4 horas (Integração / NR-06)</option>
+                      <option value="8 horas">8 horas (1 dia - NR-35 / Brigada)</option>
+                      <option value="16 horas">16 horas (2 dias - NR-33 / NR-11)</option>
+                      <option value="20 horas">20 horas (NR-05 CIPA)</option>
+                      <option value="40 horas">40 horas (1 semana - NR-10 Básico / SEP)</option>
+                      <option value="custom">Outra carga horária (personalizada)...</option>
+                    </select>
                     <input
                       type="text"
                       name="duracao"
@@ -1124,7 +1462,7 @@ const TrainingCertificatesPage = () => {
                       value={formData.duracao}
                       onChange={handleChange}
                       placeholder="Ex: 8 horas, 16 horas"
-                      style={{ width: '100%', marginTop: '0.35rem' }}
+                      style={{ width: '100%' }}
                     />
                   </div>
                   <div>
@@ -1161,10 +1499,49 @@ const TrainingCertificatesPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
                       <Building size={14} style={{ color: '#0284c7' }} />
                       Empresa Solicitante
                     </label>
+                    <select
+                      className="input"
+                      value={
+                        companies.some(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase())
+                          ? companies.find(c => c.name.toLowerCase() === formData.empresa?.trim().toLowerCase()).id
+                          : (formData.empresa === 'TotalSafety' ? 'totalsafety' : 'custom')
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'totalsafety') {
+                          setFormData(prev => ({ ...prev, empresa: 'TotalSafety' }));
+                        } else if (val === 'custom') {
+                          // mantém para edição
+                        } else {
+                          const found = companies.find(c => String(c.id) === String(val));
+                          if (found) {
+                            setFormData(prev => ({ ...prev, empresa: found.name }));
+                          }
+                        }
+                      }}
+                      style={{ width: '100%', fontSize: '0.85rem', marginBottom: '0.35rem', borderRadius: '0.55rem' }}
+                    >
+                      <option value="totalsafety">🏢 TotalSafety (Padrão / Própria)</option>
+                      {companies.length > 0 && (
+                        <optgroup label="🏢 Empresas Cadastradas no TotalSafety">
+                          {[...companies]
+                            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+                            .map(c => {
+                              const grp = groups.find(g => g.id === c.groupId);
+                              return (
+                                <option key={c.id} value={c.id}>
+                                  {c.name} {grp ? `(${grp.name.replace(/^\d+\s*-\s*/, '')})` : ''}
+                                </option>
+                              );
+                            })}
+                        </optgroup>
+                      )}
+                      <option value="custom">✍️ Digitar outro nome de empresa...</option>
+                    </select>
                     <input
                       type="text"
                       name="empresa"
@@ -1172,7 +1549,7 @@ const TrainingCertificatesPage = () => {
                       value={formData.empresa}
                       onChange={handleChange}
                       placeholder="Ex: Nome da Empresa / TotalSafety"
-                      style={{ width: '100%', marginTop: '0.35rem' }}
+                      style={{ width: '100%' }}
                     />
                   </div>
                 </div>
@@ -1217,32 +1594,113 @@ const TrainingCertificatesPage = () => {
 
                 {/* Seletor Integrado com Usuários */}
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', marginBottom: '0.35rem', display: 'block' }}>
-                    Selecionar dos Usuários com Acesso ao Sistema:
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Selecionar dos Usuários com Acesso ao Sistema:</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>
+                      {profiles.length} instrutores disponíveis
+                    </span>
                   </label>
                   <select
                     className="input"
-                    value={profiles.some(p => p.name.trim() === formData.instrutorNome?.trim()) ? formData.instrutorNome : ''}
+                    value={profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase()) ? formData.instrutorNome : 'custom'}
                     onChange={(e) => {
-                      if (e.target.value) {
-                        const sel = profiles.find(p => p.name === e.target.value);
+                      const val = e.target.value;
+                      if (val === 'custom') {
+                        // Mantém o valor atual para edição livre
+                      } else if (val) {
+                        const sel = profiles.find(p => p.name === val);
                         setFormData(prev => ({
                           ...prev,
-                          instrutorNome: sel ? sel.name : e.target.value,
+                          instrutorNome: sel ? sel.name : val,
                           instrutorCargo: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instrutorCargo)
                         }));
                       }
                     }}
-                    style={{ width: '100%', fontSize: '0.875rem', fontWeight: '600' }}
+                    style={{
+                      width: '100%',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '0.65rem',
+                      border: '1.5px solid #0284c7',
+                      backgroundColor: 'var(--surface)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer'
+                    }}
                   >
-                    <option value="">Selecione um usuário do sistema...</option>
-                    {profiles.map(p => (
-                      <option key={p.id} value={p.name}>
-                        {p.name} {p.role ? `— ${p.role}` : ''}
-                      </option>
-                    ))}
+                    <option value="" disabled>Selecione um instrutor credenciado...</option>
+                    <optgroup label="👥 Usuários Cadastrados no Sistema TotalSafety">
+                      {profiles.map(p => (
+                        <option key={p.id} value={p.name}>
+                          {p.name} {p.role ? `— ${p.role}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <option value="custom">✏️ Outro Instrutor / Digitar Manualmente</option>
                   </select>
                 </div>
+
+                {/* Badge / Card Visual do Instrutor Selecionado */}
+                {formData.instrutorNome && (
+                  <div style={{
+                    backgroundColor: 'rgba(2, 132, 199, 0.05)',
+                    border: '1px solid rgba(2, 132, 199, 0.2)',
+                    borderRadius: '0.75rem',
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0284c7',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: '800',
+                      fontSize: '0.9rem',
+                      flexShrink: 0
+                    }}>
+                      {formData.instrutorNome.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                          {formData.instrutorNome}
+                        </span>
+                        {profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome.trim().toLowerCase()) ? (
+                          <span style={{
+                            backgroundColor: '#dcfce7',
+                            color: '#15803d',
+                            fontSize: '0.68rem',
+                            fontWeight: '700',
+                            padding: '1px 6px',
+                            borderRadius: '0.75rem'
+                          }}>
+                            ✓ Usuário do Sistema
+                          </span>
+                        ) : (
+                          <span style={{
+                            backgroundColor: '#fef3c7',
+                            color: '#b45309',
+                            fontSize: '0.68rem',
+                            fontWeight: '700',
+                            padding: '1px 6px',
+                            borderRadius: '0.75rem'
+                          }}>
+                            Instrutor Externo
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                        {formData.instrutorCargo || 'Instrutor e Responsável Técnico'} • {formData.instrutorRegistro || 'SRTE N° 0009823/RN'}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Campos do Instrutor */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>

@@ -67,7 +67,10 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
   const handleAddTraining = async (dataOrArray) => {
     const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
     for (const data of items) {
-      await addTraining({ ...data, companyId });
+      const res = await addTraining({ ...data, companyId });
+      if (!res) {
+        throw new Error('Não foi possível salvar o agendamento no banco de dados. Verifique a conexão e tente novamente.');
+      }
     }
     setShowModal(false);
     await loadData();

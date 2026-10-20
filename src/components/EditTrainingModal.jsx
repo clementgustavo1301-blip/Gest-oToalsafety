@@ -31,6 +31,7 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
   const [profiles, setProfiles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -50,43 +51,78 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!date || (!isExternalDemand && !selectedCompanyId) || (isExternalDemand && !externalCompanyName.trim()) || !title.trim()) return;
+    setValidationError('');
+
+    if (!date) {
+      setValidationError('Por favor, informe a data do treinamento.');
+      return;
+    }
+
+    if (!isExternalDemand && !selectedCompanyId) {
+      setValidationError('Por favor, selecione a Empresa TotalSafety.');
+      return;
+    }
+
+    if (isExternalDemand && !externalCompanyName.trim()) {
+      setValidationError('Por favor, informe o Nome da Empresa externa.');
+      return;
+    }
+
+    if (!title.trim()) {
+      setValidationError('Por favor, informe o Nome do Treinamento.');
+      return;
+    }
     
     setSaving(true);
-    
-    let finalDescription = description.trim();
-    if (!hasTravel) {
-      finalDescription += '\n[NO_TRAVEL]';
-    } else if (training.description && training.description.includes('[SHARED_TRIP]')) {
-      finalDescription += '\n[SHARED_TRIP]';
-    }
-    if (secondaryResponsibleId) {
-      finalDescription += `\n[RESP2_ID:${secondaryResponsibleId}]`;
-    }
+    try {
+      let finalDescription = description.trim();
+      if (!hasTravel) {
+        finalDescription += '\n[NO_TRAVEL]';
+      } else if (training.description && training.description.includes('[SHARED_TRIP]')) {
+        finalDescription += '\n[SHARED_TRIP]';
+      }
+      if (secondaryResponsibleId) {
+        finalDescription += `\n[RESP2_ID:${secondaryResponsibleId}]`;
+      }
 
-    const updatedData = {
-      title: title.trim(),
-      date,
-      time,
-      instructor: instructor.trim(),
-      description: finalDescription.trim(),
-      companyId: isExternalDemand ? null : selectedCompanyId,
-      responsibleId: responsibleId || null,
-      isExternal: isExternalDemand,
-      externalCompanyName: isExternalDemand ? externalCompanyName.trim() : null,
-      demandType: isExternalDemand ? 'externa' : 'totalsafety',
-    };
+      const updatedData = {
+        title: title.trim(),
+        date,
+        time,
+        instructor: instructor.trim(),
+        description: finalDescription.trim(),
+        companyId: isExternalDemand ? null : selectedCompanyId,
+        responsibleId: responsibleId || null,
+        isExternal: isExternalDemand,
+        externalCompanyName: isExternalDemand ? externalCompanyName.trim() : null,
+        demandType: isExternalDemand ? 'externa' : 'totalsafety',
+      };
 
-    await updateTraining(training.id, updatedData);
-    if (onSave) onSave();
-    setSaving(false);
-    onClose();
+      await updateTraining(training.id, updatedData);
+      if (onSave) onSave();
+      onClose();
+    } catch (err) {
+      console.error('Erro ao atualizar treinamento:', err);
+      setValidationError(err.message || 'Erro ao salvar alterações no treinamento.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-        <div className="modal-header">
+      <div 
+        className="modal-content" 
+        onClick={(e) => e.stopPropagation()} 
+        style={{ 
+          maxWidth: '540px',
+          maxHeight: '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        <div className="modal-header" style={{ flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
               width: '36px', height: '36px', borderRadius: 'var(--radius-md)',
@@ -105,8 +141,28 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
         {loadingData ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>Carregando dados...</div>
         ) : (
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+            
+            {validationError && (
+              <div style={{
+                margin: '0.75rem 1.25rem 0',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'var(--danger-light, #fee2e2)',
+                color: 'var(--danger, #ef4444)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                border: '1px solid var(--danger, #ef4444)'
+              }}>
+                <span>⚠️</span>
+                <span>{validationError}</span>
+              </div>
+            )}
+
+            <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
               {/* Demand Type Choice if not locked by deliverable */}
               {!training.deliverableId && (
@@ -321,12 +377,12 @@ const EditTrainingModal = ({ training, onClose, onSave }) => {
 
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ flexShrink: 0, borderTop: '1px solid var(--border)', padding: '1rem 1.25rem' }}>
               <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
               <button 
                 type="submit" 
                 className="btn btn-primary" 
-                disabled={saving || !date || !selectedCompanyId || !title.trim()}
+                disabled={saving}
               >
                 {saving ? 'Salvando...' : 'Salvar Alterações'}
               </button>
