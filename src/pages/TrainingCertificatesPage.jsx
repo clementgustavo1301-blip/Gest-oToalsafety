@@ -15,113 +15,13 @@ import {
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments 
 } from '../services/trainingClassesService';
 
+import { OFFICIAL_TRAINING_MODELS } from '../data/officialTrainingModels';
+
 const DEFAULT_API_TOKEN = '5ae973d7a997af13f0aaf2bf60e65803';
 
-// Presets completos e inteligentes de Treinamentos Oficiais SST / NRs
-const COURSE_PRESETS = [
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-35 Trabalho em Altura',
-    duration: '8 horas',
-    content: '1. Normas e regulamentações aplicáveis ao trabalho em altura (NR-35)\n2. Análise de Risco e condições impeditivas\n3. Sistemas, equipamentos e procedimentos de proteção coletiva e individual\n4. EPIs para trabalho em altura: seleção, inspeção, conservação e limitação de uso\n5. Condutas em situações de emergência e noções de primeiros socorros'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-06 Equipamentos de Proteção Individual',
-    duration: '4 horas',
-    content: '1. Disposições gerais e exigências da Norma Regulamentadora NR-06\n2. Direitos e deveres do empregador e do trabalhador\n3. Tipos de EPIs e seleção adequada para cada risco operacional\n4. Procedimentos de inspeção, higienização, guarda e conservação periódica\n5. Critérios técnicos para substituição e descarte responsável'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-10 Segurança em Instalações e Serviços em Eletricidade',
-    duration: '40 horas',
-    content: '1. Introdução à segurança com eletricidade e riscos em instalações elétricas\n2. Técnicas de Análise de Risco no setor elétrico\n3. Medidas de controle do risco elétrico (desenergização, aterramento, barreiras)\n4. Normas Técnicas Brasileiras (NBR da ABNT e NR-10)\n5. Primeiros socorros e combate a princípios de incêndios com eletricidade'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-10 SEP Sistema Elétrico de Potência',
-    duration: '40 horas',
-    content: '1. Organização do Sistema Elétrico de Potência (SEP)\n2. Trabalho sob tensão e métodos de trabalho (ao contato, ao potencial, à distância)\n3. Procedimentos de trabalho e liberação de instalações no SEP\n4. Técnicas de análise de risco e inspeção de equipamentos especiais\n5. Condições impeditivas, resgate de vítimas e primeiros socorros'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-33 Segurança em Espaços Confinados (Trabalhadores e Vigias)',
-    duration: '16 horas',
-    content: '1. Definições, identificação e reconhecimento de espaços confinados\n2. Critérios de indicação e uso de equipamentos de ventilação e medição de gases\n3. Procedimentos de Permissão de Entrada e Trabalho (PET)\n4. Monitoramento contínuo da atmosfera e controle dos riscos ocupacionais\n5. Técnicas de resgate e primeiros socorros em espaços confinados'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-33 Supervisor de Entrada em Espaço Confinado',
-    duration: '40 horas',
-    content: '1. Reconhecimento, avaliação e controle de riscos em espaços confinados\n2. Legislação de segurança e saúde no trabalho aplicável (NR-33 e NBR 16577)\n3. Emissão, preenchimento e encerramento da Permissão de Entrada e Trabalho (PET)\n4. Operação e calibração de detectores de gases e sistemas de insuflamento\n5. Operações de salvamento, plano de resgate e suporte básico à vida'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-01 Disposições Gerais e Gerenciamento de Riscos (GRO/PGR)',
-    duration: '4 horas',
-    content: '1. Campo de aplicação e princípios gerais da NR-01\n2. Identificação de perigos e inventário de riscos ocupacionais (GRO/PGR)\n3. Medidas preventivas, hierarquia de controle e plano de ação\n4. Direitos e deveres na gestão de segurança do trabalho\n5. Comunicação de incidentes e análise preliminar'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-05 CIPA - Prevenção de Acidentes e Assédio',
-    duration: '20 horas',
-    content: '1. Estudo do ambiente, condições de trabalho e riscos operacionais\n2. Metodologia de investigação e análise de acidentes e doenças do trabalho\n3. Prevenção e combate ao assédio sexual e a outras formas de violência no trabalho\n4. Noções sobre acidentes e medidas preventivas de saúde ocupacional\n5. Campanhas de segurança, SIPAT e mapa de riscos'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-11 Operador de Empilhadeira',
-    duration: '16 horas',
-    content: '1. Legislação aplicável (NR-11 e Código de Trânsito Brasileiro)\n2. Componentes mecânicos, elétricos e hidráulicos do equipamento\n3. Centro de gravidade, estabilidade e capacidade de carga\n4. Inspeção diária de segurança (Checklist de pré-uso)\n5. Manobras operacionais, empilhamento e desempilhamento de cargas'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-11 Operador de Ponte Rolante e Içamento',
-    duration: '16 horas',
-    content: '1. Conceitos fundamentais e dispositivos de segurança em pontes rolantes\n2. Acessórios de içamento (cintas, cabos de aço, manilhas e ganchos)\n3. Critérios para descarte de materiais de içamento e tabelas de carga\n4. Comunicação visual padronizada (sinais por gestos)\n5. Prática operacional de movimentação aérea e segurança'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-12 Segurança no Trabalho em Máquinas e Equipamentos',
-    duration: '16 horas',
-    content: '1. Princípios gerais e conceitos de proteção da NR-12\n2. Dispositivos de parada de emergência e intertravamentos de segurança\n3. Procedimentos de Bloqueio e Etiquetagem de Energias Perigosas (LOTO)\n4. Riscos adicionais (ruído, calor, substâncias químicas e projeção)\n5. Operação segura e procedimentos operacionais padronizados'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-18 Segurança e Saúde na Indústria da Construção',
-    duration: '4 horas',
-    content: '1. Comunicação prévia e diretrizes do plano de segurança na construção\n2. Proteções coletivas contra quedas em periferias de lajes e vãos\n3. Segurança em andaimes, plataformas e escavações\n4. Instalações elétricas provisórias em canteiros de obras\n5. Ordem, limpeza e descarte de resíduos'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-20 Segurança com Inflamáveis e Combustíveis (Básico)',
-    duration: '8 horas',
-    content: '1. Características, propriedades, perigos e riscos de inflamáveis e combustíveis\n2. Controles coletivos e individuais em áreas classificadas\n3. Fontes de ignição e métodos sistemáticos de prevenção\n4. Procedimentos básicos de emergência e combate a princípio de incêndio\n5. Estudo e aplicação da Permissão de Trabalho (PT)'
-  },
-  {
-    category: 'Normas Regulamentadoras (NRs)',
-    name: 'NR-20 Inflamáveis e Combustíveis (Intermediário)',
-    duration: '16 horas',
-    content: '1. Inflamáveis: propriedades, perigos e riscos químicos\n2. Instalações de transferência e estocagem de combustíveis\n3. Análise preliminar de riscos e métodos de controle operacional\n4. Proteção contra incêndios em tanques e tubulações\n5. Resposta a emergências com vazamentos e derramamentos'
-  },
-  {
-    category: 'Emergência & Primeiros Socorros',
-    name: 'Brigada de Incêndio e Emergência',
-    duration: '8 horas',
-    content: '1. Teoria do fogo e métodos de propagação térmica\n2. Classes de incêndio e agentes extintores específicos\n3. Operação prática de extintores portáteis e linha de hidrantes\n4. Rotas de fuga, sinalização de segurança e plano de abandono de área\n5. Primeiros socorros aplicados a queimaduras e inalação de fumaça'
-  },
-  {
-    category: 'Emergência & Primeiros Socorros',
-    name: 'Primeiros Socorros e Suporte Básico de Vida',
-    duration: '8 horas',
-    content: '1. Avaliação primária e secundária da vítima (Protocolo XABCDE)\n2. Reanimação Cardiopulmonar (RCP) e operação do DEA\n3. Controle de hemorragias graves e técnicas de contenção\n4. Imobilização de fraturas e transporte seguro de acidentados\n5. Desmaios, convulsões e engasgamento (Manobra de Heimlich)'
-  },
-  {
-    category: 'Operacional & Trânsito',
-    name: 'Direção Defensiva e Prevenção de Acidentes',
-    duration: '8 horas',
-    content: '1. Conceitos de Direção Defensiva e Código de Trânsito Brasileiro (CTB)\n2. Condições adversas (tempo, luz, trânsito, via, veículo e condutor)\n3. Distância de segurança, tempo de reação e frenagem\n4. Cuidados especiais com pedestres, ciclistas e veículos pesados\n5. Inspeção preventiva diária de veículos e ergonomia veicular'
-  }
-];
+// Catálogo Oficial de Modelos de Treinamentos e Certificados TotalSafety / EcoSafety
+const COURSE_PRESETS = OFFICIAL_TRAINING_MODELS;
+
 
 // Lista de usuários padrão do sistema (fallback resiliente)
 const FALLBACK_PROFILES = [
@@ -188,17 +88,19 @@ const TrainingCertificatesPage = () => {
   // ----------------------------------------------------
   // Estados do Gerador de Certificados (PPTX)
   // ----------------------------------------------------
+  const defaultOfficialModel = OFFICIAL_TRAINING_MODELS[0];
   const [formData, setFormData] = useState({
-    curso: 'NR-35 Trabalho em Altura',
-    descricao: 'Certificamos que o participante concluiu com aproveitamento o treinamento com foco nas diretrizes e práticas técnicas estabelecidas.',
+    curso: defaultOfficialModel ? (defaultOfficialModel.title || defaultOfficialModel.name) : 'NR-35 – TRABALHO EM ALTURA – NÍVEL BÁSICO',
+    descricao: defaultOfficialModel ? defaultOfficialModel.description : 'Projeto de treinamento com carga horária de 8 horas, desenvolvido em conformidade com a Norma Regulamentadora nº 35 (NR-35) e requisitos técnicos aplicáveis.',
     data: new Date().toISOString().split('T')[0],
-    duracao: '8 horas',
+    duracao: defaultOfficialModel ? defaultOfficialModel.duration : '8 horas',
+    validade: defaultOfficialModel ? defaultOfficialModel.validade : '24 meses',
     local: 'Mossoró - RN',
     empresa: 'TotalSafety',
     instrutorNome: 'Adeylton',
     instrutorCargo: 'Instrutor e Responsável Técnico',
     instrutorRegistro: 'SRTE N° 0009823/RN',
-    conteudo: '1. Normas e regulamentações aplicáveis ao trabalho em altura (NR-35)\n2. Análise de Risco e condições impeditivas\n3. Sistemas, equipamentos e procedimentos de proteção coletiva e individual\n4. EPIs para trabalho em altura: seleção, inspeção, conservação e limitação de uso\n5. Condutas em situações de emergência e noções de primeiros socorros'
+    conteudo: defaultOfficialModel ? defaultOfficialModel.content : '1. Conceitos, definições e requisitos da NR-35...'
   });
 
   const [colaboradores, setColaboradores] = useState([
@@ -428,18 +330,19 @@ const TrainingCertificatesPage = () => {
     setTimeout(() => setFeedback(null), 3000);
   };
 
-  // Aplica um preset inteligente de curso
+  // Aplica um modelo oficial inteligente de curso
   const applyPreset = (preset) => {
     setFormData(prev => ({
       ...prev,
-      curso: preset.name,
+      curso: preset.title || preset.name,
       duracao: preset.duration,
       conteudo: preset.content,
-      descricao: `Certificamos que o participante concluiu com aproveitamento o treinamento com foco nas diretrizes e práticas técnicas estabelecidas na ${preset.name.split(' ')[0]}.`
+      descricao: preset.description || `Projeto de treinamento com carga horária de ${preset.duration}, desenvolvido em conformidade com as diretrizes e requisitos técnicos da ${preset.name}.`,
+      validade: preset.validade || '24 meses'
     }));
     setFeedback({
       type: 'success',
-      text: `Treinamento ${preset.name} aplicado com conteúdo programático oficial!`
+      text: `Modelo oficial "${preset.name}" carregado com sucesso!`
     });
     setTimeout(() => setFeedback(null), 3500);
   };
@@ -586,6 +489,7 @@ const TrainingCertificatesPage = () => {
         descricao: formData.descricao,
         data: formData.data,
         duracao: formData.duracao,
+        validade: formData.validade,
         local: formData.local,
         empresa: formData.empresa,
         instrutorNome: formData.instrutorNome,
@@ -1358,13 +1262,23 @@ const TrainingCertificatesPage = () => {
                     <div style={{ position: 'relative' }}>
                       <select
                         className="input"
-                        value={COURSE_PRESETS.some(p => p.name.toLowerCase() === formData.curso?.trim().toLowerCase()) ? formData.curso : 'custom'}
+                        value={
+                          COURSE_PRESETS.some(p => 
+                            p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
+                            p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
+                          ) 
+                            ? COURSE_PRESETS.find(p => 
+                                p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
+                                p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
+                              ).id 
+                            : 'custom'
+                        }
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === 'custom') {
                             setIsCustomCourse(true);
                           } else {
-                            const found = COURSE_PRESETS.find(p => p.name === val);
+                            const found = COURSE_PRESETS.find(p => p.id === val);
                             if (found) applyPreset(found);
                           }
                         }}
@@ -1381,33 +1295,19 @@ const TrainingCertificatesPage = () => {
                           appearance: 'none'
                         }}
                       >
-                        <option value="" disabled>Selecione uma Norma Regulamentadora ou Curso Padrão...</option>
+                        <option value="" disabled>Selecione um modelo oficial de treinamento...</option>
                         
-                        <optgroup label="📋 Normas Regulamentadoras (NRs)">
-                          {COURSE_PRESETS.filter(p => p.category === 'Normas Regulamentadoras (NRs)').map((p, idx) => (
-                            <option key={idx} value={p.name}>
-                              {p.name} ({p.duration})
-                            </option>
-                          ))}
-                        </optgroup>
+                        {Array.from(new Set(COURSE_PRESETS.map(p => p.category))).map(cat => (
+                          <optgroup key={cat} label={`📂 ${cat}`}>
+                            {COURSE_PRESETS.filter(p => p.category === cat).map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
 
-                        <optgroup label="🚑 Emergência, Brigada & Primeiros Socorros">
-                          {COURSE_PRESETS.filter(p => p.category === 'Emergência & Primeiros Socorros').map((p, idx) => (
-                            <option key={idx} value={p.name}>
-                              {p.name} ({p.duration})
-                            </option>
-                          ))}
-                        </optgroup>
-
-                        <optgroup label="🚗 Operacional, Direção & Trânsito">
-                          {COURSE_PRESETS.filter(p => p.category === 'Operacional & Trânsito').map((p, idx) => (
-                            <option key={idx} value={p.name}>
-                              {p.name} ({p.duration})
-                            </option>
-                          ))}
-                        </optgroup>
-
-                        <option value="custom">✏️ Outro Treinamento (digitar título personalizado)</option>
+                        <option value="custom">✏️ Outro Treinamento (digitar título livre)...</option>
                       </select>
                       <div style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#0284c7' }}>
                         <ChevronDown size={18} />
@@ -1434,21 +1334,30 @@ const TrainingCertificatesPage = () => {
                       Atalhos Rápidos:
                     </span>
                     {[
-                      { label: 'NR-35 Altura', name: 'NR-35 Trabalho em Altura' },
-                      { label: 'NR-10 Elétrica', name: 'NR-10 Segurança em Instalações e Serviços em Eletricidade' },
-                      { label: 'NR-33 Confinado', name: 'NR-33 Segurança em Espaços Confinados (Trabalhadores e Vigias)' },
-                      { label: 'NR-06 EPI', name: 'NR-06 Equipamentos de Proteção Individual' },
-                      { label: 'Brigada Incêndio', name: 'Brigada de Incêndio e Emergência' },
-                      { label: '1º Socorros', name: 'Primeiros Socorros e Suporte Básico de Vida' },
-                      { label: 'NR-11 Empilhadeira', name: 'NR-11 Operador de Empilhadeira' }
+                      { label: 'NR-35 Básico (8h)', id: 'nr35-basico' },
+                      { label: 'NR-35 Avançado (24h)', id: 'nr35-avancado' },
+                      { label: 'NR-10 Elétrica (40h)', id: 'nr10-basico' },
+                      { label: 'NR-10 SEP (40h)', id: 'nr10-sep' },
+                      { label: 'NR-33 Vigia (16h)', id: 'nr33-trabalhador' },
+                      { label: 'NR-33 Supervisor (40h)', id: 'nr33-supervisor' },
+                      { label: 'NR-18 Construção (4h)', id: 'nr18-basico' },
+                      { label: 'NR-06 EPI (16h)', id: 'nr06-epi' },
+                      { label: 'Brigada Incêndio (24h)', id: 'brigada-incendio' },
+                      { label: 'APH (100h)', id: 'aph-100h' },
+                      { label: 'NR-11 Empilhadeira (16h)', id: 'nr11-empilhadeira' },
+                      { label: 'Inspetor EPI (16h)', id: 'inspetor-epi' },
+                      { label: '1º Socorros (8h)', id: 'primeiros-socorros' }
                     ].map((item, idx) => {
-                      const isSelected = formData.curso === item.name;
+                      const preset = COURSE_PRESETS.find(p => p.id === item.id);
+                      const isSelected = preset && (
+                        formData.curso === preset.title || 
+                        formData.curso === preset.name
+                      );
                       return (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => {
-                            const preset = COURSE_PRESETS.find(p => p.name === item.name);
                             if (preset) {
                               setIsCustomCourse(false);
                               applyPreset(preset);
@@ -1962,104 +1871,228 @@ const TrainingCertificatesPage = () => {
                   </div>
                 </div>
 
-                {/* Moldura do Certificado Mockup */}
+                {/* Moldura do Certificado Mockup Realista TotalSafety */}
                 <div style={{
-                  border: '2px solid rgba(2, 132, 199, 0.35)',
-                  borderRadius: '0.75rem',
-                  padding: '1.25rem 1.5rem',
+                  border: '1.5px solid rgba(147, 51, 234, 0.25)',
+                  borderRadius: '1rem',
                   backgroundColor: '#ffffff',
-                  boxShadow: 'inset 0 0 0 4px rgba(2, 132, 199, 0.05)',
-                  minHeight: '190px',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
+                  minHeight: '270px',
+                  position: 'relative',
+                  overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  textAlign: 'center',
-                  position: 'relative'
+                  fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
                 }}>
+                  {/* Curvas Vetoriais Decorativas Oficiais (Roxo + Laranja) */}
+                  {/* Canto Superior Direito */}
+                  <svg
+                    style={{ position: 'absolute', top: 0, right: 0, width: '120px', height: '120px', pointerEvents: 'none', zIndex: 1 }}
+                    viewBox="0 0 100 100"
+                    fill="none"
+                  >
+                    <path d="M10 0 C 40 40, 70 50, 100 60 L 100 0 Z" fill="url(#purpleGradTop)" />
+                    <path d="M40 0 C 65 30, 85 40, 100 45 L 100 0 Z" fill="#ea580c" opacity="0.85" />
+                    <defs>
+                      <linearGradient id="purpleGradTop" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#581c87" />
+                        <stop offset="100%" stopColor="#7c3aed" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+
+                  {/* Canto Inferior Esquerdo */}
+                  <svg
+                    style={{ position: 'absolute', bottom: 0, left: 0, width: '120px', height: '120px', pointerEvents: 'none', zIndex: 1 }}
+                    viewBox="0 0 100 100"
+                    fill="none"
+                  >
+                    <path d="M0 40 C 30 50, 60 60, 90 100 L 0 100 Z" fill="url(#purpleGradBot)" />
+                    <path d="M0 55 C 15 70, 35 85, 60 100 L 0 100 Z" fill="#ea580c" opacity="0.85" />
+                    <defs>
+                      <linearGradient id="purpleGradBot" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#581c87" />
+                        <stop offset="100%" stopColor="#7c3aed" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+
+                  {/* Marca d'água sutil de fundo */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: '4.5rem',
+                    fontWeight: '900',
+                    color: 'rgba(109, 40, 217, 0.03)',
+                    letterSpacing: '8px',
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    whiteSpace: 'nowrap',
+                    zIndex: 0
+                  }}>
+                    TOTALSAFETY
+                  </div>
+
                   {previewTab === 'frente' ? (
-                    <>
+                    <div style={{ position: 'relative', zIndex: 2, padding: '1.25rem 1.6rem', textAlign: 'center', display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                      {/* Topo do Certificado */}
                       <div>
                         <div style={{ 
-                          fontSize: '0.6875rem', 
-                          fontWeight: '800', 
-                          color: '#0284c7', 
-                          letterSpacing: '2px', 
+                          fontSize: '0.95rem', 
+                          fontWeight: '900', 
+                          color: '#4c1d95', 
+                          letterSpacing: '1.5px', 
                           textTransform: 'uppercase',
-                          marginBottom: '0.25rem'
+                          marginBottom: '0.15rem'
                         }}>
-                          TOTALSAFETY • CERTIFICADO DE CAPACITAÇÃO
+                          CERTIFICADO DE CAPACITAÇÃO
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                          Certificamos que
+                        <div style={{ fontSize: '0.72rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
+                          A {formData.empresa || 'TOTALSAFETY'} certifica que:
                         </div>
+
+                        {/* Nome do Participante em Azul Real */}
                         <div style={{ 
-                          fontSize: '1.1rem', 
+                          fontSize: '1.15rem', 
                           fontWeight: '800', 
-                          color: '#0f172a', 
-                          borderBottom: '1px solid #cbd5e1',
+                          color: '#1d4ed8', 
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
                           display: 'inline-block',
-                          padding: '0.25rem 1.5rem',
-                          margin: '0.25rem auto'
+                          padding: '0.15rem 1.15rem',
+                          margin: '0.15rem auto',
+                          borderBottom: '2px solid rgba(29, 78, 216, 0.2)'
                         }}>
                           {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '0.2rem' }}>
-                          CPF: <strong>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong> concluiu com êxito o treinamento:
+
+                        {/* Texto de Identificação do Participante */}
+                        <div style={{ fontSize: '0.7rem', color: '#334155', marginTop: '0.25rem', lineHeight: '1.4' }}>
+                          Portador do CPF: <strong>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aproveitamento no dia{' '}
+                          <strong>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de{' '}
+                          <strong>{formData.local || 'Mossoró - RN'}</strong>, o treinamento de:
                         </div>
+
+                        {/* Título Oficial do Treinamento */}
                         <div style={{ 
                           fontSize: '0.95rem', 
-                          fontWeight: '700', 
-                          color: '#0284c7', 
-                          marginTop: '0.35rem' 
+                          fontWeight: '800', 
+                          color: '#1e293b', 
+                          marginTop: '0.35rem',
+                          padding: '0.2rem 0.5rem',
+                          backgroundColor: 'rgba(2, 132, 199, 0.05)',
+                          borderRadius: '0.4rem',
+                          display: 'inline-block',
+                          maxWidth: '95%'
                         }}>
                           {formData.curso}
+                        </div>
+
+                        {/* Descrição / Amparo Legal do Treinamento */}
+                        {formData.descricao && (
+                          <div style={{ 
+                            fontSize: '0.65rem', 
+                            color: '#475569', 
+                            marginTop: '0.35rem', 
+                            lineHeight: '1.38', 
+                            maxWidth: '92%', 
+                            margin: '0.3rem auto 0 auto',
+                            textAlign: 'justify'
+                          }}>
+                            {formData.descricao}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Data / Local e Bloco de Assinaturas */}
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.4rem' }}>
+                        <div style={{ fontSize: '0.67rem', color: '#64748b', marginBottom: '0.55rem' }}>
+                          {formData.local || 'Mossoró - RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
+                        </div>
+
+                        {/* Grade de 3 Assinaturas */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr',
+                          gap: '0.65rem',
+                          fontSize: '0.62rem',
+                          color: '#475569',
+                          alignItems: 'end'
+                        }}>
+                          {/* Responsável Técnico */}
+                          <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '0.3rem' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: '800', color: '#1e293b', textTransform: 'uppercase' }}>
+                              RESPONSÁVEL TÉCNICO
+                            </div>
+                            <div style={{ fontSize: '0.6rem', color: '#64748b' }}>Eider Gomes do Nascimento</div>
+                            <div style={{ fontSize: '0.56rem', color: '#94a3b8' }}>MTE 0009995/RN</div>
+                          </div>
+
+                          {/* Aluno */}
+                          <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '0.3rem' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: '800', color: '#1e293b', textTransform: 'uppercase' }}>
+                              ALUNO
+                            </div>
+                            <div style={{ fontSize: '0.6rem', color: '#1d4ed8', fontWeight: '700' }}>
+                              {firstStudent?.nome ? firstStudent.nome : 'Participante'}
+                            </div>
+                          </div>
+
+                          {/* Instrutor */}
+                          <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '0.3rem' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: '800', color: '#1e293b', textTransform: 'uppercase' }}>
+                              INSTRUTOR
+                            </div>
+                            <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: '700' }}>
+                              {formData.instrutorNome || 'Adeylton'}
+                            </div>
+                            <div style={{ fontSize: '0.56rem', color: '#94a3b8' }}>
+                              {formData.instrutorRegistro || 'SRTE N° 0009823/RN'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Verso - Conteúdo Programático */
+                    <div style={{ position: 'relative', zIndex: 2, padding: '1.25rem 1.6rem', textAlign: 'left', display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ borderBottom: '1.5px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.5rem' }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#1e293b' }}>
+                            Programa: <span style={{ color: '#4c1d95' }}>{formData.curso}</span>
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', marginTop: '0.15rem' }}>
+                            Carga horária: {formData.duracao}
+                          </div>
+                        </div>
+
+                        <div style={{ 
+                          fontSize: '0.68rem', 
+                          color: '#334155', 
+                          lineHeight: '1.45', 
+                          whiteSpace: 'pre-line',
+                          maxHeight: '150px',
+                          overflowY: 'auto',
+                          paddingRight: '0.4rem'
+                        }}>
+                          {formData.conteudo}
                         </div>
                       </div>
 
                       <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginTop: '1rem',
-                        paddingTop: '0.65rem',
-                        borderTop: '1px dashed #e2e8f0',
-                        fontSize: '0.6875rem',
-                        color: '#64748b'
-                      }}>
-                        <div style={{ textAlign: 'left' }}>
-                          <div><strong>Data:</strong> {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</div>
-                          <div><strong>Carga:</strong> {formData.duracao} • {formData.local}</div>
-                        </div>
-
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: '700', color: '#0f172a' }}>{formData.instrutorNome}</div>
-                          <div style={{ fontSize: '0.65rem' }}>{formData.instrutorCargo}</div>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8' }}>{formData.instrutorRegistro}</div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ 
-                        fontSize: '0.6875rem', 
-                        fontWeight: '800', 
-                        color: '#0284c7', 
-                        letterSpacing: '1px', 
-                        textTransform: 'uppercase',
+                        marginTop: '0.65rem',
+                        paddingTop: '0.4rem',
+                        borderTop: '1px solid #e2e8f0',
                         textAlign: 'center',
-                        marginBottom: '0.5rem'
+                        fontSize: '0.62rem',
+                        fontWeight: '700',
+                        color: '#64748b',
+                        letterSpacing: '0.5px'
                       }}>
-                        CONTEÚDO PROGRAMÁTICO OFICIAL
-                      </div>
-                      <div style={{ 
-                        fontSize: '0.72rem', 
-                        color: '#334155', 
-                        lineHeight: '1.45', 
-                        whiteSpace: 'pre-line',
-                        maxHeight: '140px',
-                        overflowY: 'auto'
-                      }}>
-                        {formData.conteudo}
+                        {formData.empresa?.toUpperCase() || 'TOTALSAFETY'} • CNPJ: 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
                       </div>
                     </div>
                   )}

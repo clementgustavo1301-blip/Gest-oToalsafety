@@ -143,7 +143,7 @@ const AppLayout = () => {
               )
             } />
             <Route path="/training-certificates" element={
-              activeLink?.sector === 'Treinamento' ? (
+              (activeLink?.sector === 'Treinamento' || activeLink?.role === 'Admin' || activeLink?.sector === 'Diretoria' || activeLink?.sector === 'Admin') ? (
                 <TrainingCertificatesPage />
               ) : (
                 <Navigate to="/" replace />

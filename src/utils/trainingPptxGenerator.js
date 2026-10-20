@@ -12,6 +12,7 @@ export async function generateTrainingPPTX({
   descricao,
   data,
   duracao,
+  validade,
   local,
   empresa,
   instrutorNome,
@@ -222,6 +223,14 @@ export async function generateTrainingPPTX({
       // 10. Conteúdo Programático (se houver caixa com tag ou TextBox)
       if (conteudo) {
         xml = replaceText(xml, ['{{CONTEUDO}}', '[CONTEUDO]'], conteudo);
+      }
+
+      // 11. Validade do Certificado
+      if (validade) {
+        xml = replaceText(xml, [
+          '{{VALIDADE}}', '[VALIDADE]',
+          '24 MESES', '12 MESES', '24 meses', '12 meses'
+        ], validade);
       }
 
       const sNum = slideCounter++;
