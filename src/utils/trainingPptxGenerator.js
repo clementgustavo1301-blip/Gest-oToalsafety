@@ -7,6 +7,53 @@ import { getInstructorSignatureUrl } from '../data/officialTrainingModels';
  * substituindo tags e variáveis inteligentes.
  */
 
+/**
+ * Divide o conteúdo programático em 2 colunas equilibradas pelo peso visual das linhas,
+ * evitando que uma coluna fique muito maior que a outra ou corte no slide.
+ */
+export function balanceSyllabusColumns(rawText, maxCharsPerLine = 38) {
+  if (!rawText) return { col1: '', col2: '', totalLines: 0, maxLinesInCol: 0, totalWeight: 0 };
+  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length <= 1) {
+    return { col1: lines.join('\n'), col2: '', totalLines: lines.length, maxLinesInCol: lines.length, totalWeight: lines.length };
+  }
+
+  const weights = lines.map(l => Math.max(1, Math.ceil(l.length / maxCharsPerLine)));
+  const totalWeight = weights.reduce((acc, w) => acc + w, 0);
+
+  let bestSplit = Math.ceil(lines.length / 2);
+  let minDiff = Infinity;
+  let running = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    running += weights[i];
+    const diff = Math.abs(running - (totalWeight - running));
+    if (diff < minDiff) {
+      minDiff = diff;
+      bestSplit = i + 1;
+    }
+  }
+
+  bestSplit = Math.max(1, Math.min(lines.length - 1, bestSplit));
+
+  const col1Lines = lines.slice(0, bestSplit);
+  const col2Lines = lines.slice(bestSplit);
+
+  const col1Weight = weights.slice(0, bestSplit).reduce((a, b) => a + b, 0);
+  const col2Weight = weights.slice(bestSplit).reduce((a, b) => a + b, 0);
+  const maxLinesInCol = Math.max(col1Weight, col2Weight);
+
+  return {
+    col1: col1Lines.join('\n'),
+    col2: col2Lines.join('\n'),
+    col1Count: col1Lines.length,
+    col2Count: col2Lines.length,
+    totalLines: lines.length,
+    totalWeight,
+    maxLinesInCol
+  };
+}
+
 export async function generateTrainingPPTX({
   templateBuffer,
   certModel = 'modelo2', // 'modelo1' | 'modelo2'
@@ -230,18 +277,19 @@ export async function generateTrainingPPTX({
         ], instrutorRegistro);
       }
 
-      // 10. Conteúdo Programático (suporte a coluna única e 2 colunas para Modelo 2)
+      // 10. Conteúdo Programático (suporte a coluna única e 2 colunas balanceadas para Modelo 2)
       if (conteudo) {
         xml = replaceText(xml, ['{{CONTEUDO}}', '[CONTEUDO]'], conteudo);
 
-        // Divisão balanceada para o Modelo 2 (2 colunas)
-        const contentLines = conteudo.split('\n').filter(l => l.trim().length > 0);
-        const midPoint = Math.ceil(contentLines.length / 2);
-        const col1Text = contentLines.slice(0, midPoint).join('\n');
-        const col2Text = contentLines.slice(midPoint).join('\n');
+        // Divisão balanceada por peso visual para o Modelo 2 (2 colunas)
+        const balanced = balanceSyllabusColumns(conteudo, 38);
+        xml = replaceText(xml, ['{{CONTEUDO_COL1}}', '[CONTEUDO_COL1]'], balanced.col1 || conteudo);
+        xml = replaceText(xml, ['{{CONTEUDO_COL2}}', '[CONTEUDO_COL2]'], balanced.col2 || '');
 
-        xml = replaceText(xml, ['{{CONTEUDO_COL1}}', '[CONTEUDO_COL1]'], col1Text || conteudo);
-        xml = replaceText(xml, ['{{CONTEUDO_COL2}}', '[CONTEUDO_COL2]'], col2Text || '');
+        if (balanced.maxLinesInCol > 14) {
+          const newSz = balanced.maxLinesInCol > 20 ? '700' : '800';
+          xml = xml.replace(/(<a:rPr[^>]*\bsz=")(?:950|900)(")/g, `$1${newSz}$2`);
+        }
       }
 
       // 11. Validade do Certificado
@@ -251,6 +299,26 @@ export async function generateTrainingPPTX({
           '24 MESES', '12 MESES', '24 meses', '12 meses'
         ], validade);
       }
+
+      // 12. Ajustes dinâmicos de fonte (sz) para descrições longas no Slide 1
+      if (descricao && descricao.length > 250) {
+        const descSz = descricao.length > 400 ? '750' : '850';
+        xml = xml.replace(/(<a:rPr[^>]*\bsz=")1050(")/g, `$1${descSz}$2`);
+        xml = xml.replace(/(<a:rPr[^>]*\bsz=")1600(")/g, `$11350$2`);
+        xml = xml.replace(/(<a:rPr[^>]*\bsz=")1350(")/g, `$11050$2`);
+      }
+      if (colab.nome && colab.nome.length > 28) {
+        xml = xml.replace(/(<a:rPr[^>]*\bsz=")2200(")/g, `$11800$2`);
+      }
+
+      // 13. Ativar auto-ajuste nativo (normAutofit) no PowerPoint em todas as caixas de texto
+      xml = xml.replace(/<a:bodyPr\b([^>]*?)\/>/g, (match, attrs) => {
+        if (attrs.includes('normAutofit') || attrs.includes('spAutoFit')) return match;
+        return `<a:bodyPr${attrs}><a:normAutofit/></a:bodyPr>`;
+      });
+      xml = xml.replace(/<a:bodyPr\b([^>]*?)>(?![\s\S]*?<(?:a:normAutofit|a:spAutoFit))/g, (match, attrs) => {
+        return `<a:bodyPr${attrs}><a:normAutofit/>`;
+      });
 
       const sNum = slideCounter++;
       newZip.file(`ppt/slides/slide${sNum}.xml`, xml);

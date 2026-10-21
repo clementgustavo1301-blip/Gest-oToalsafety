@@ -8,7 +8,7 @@ import {
   Eye, CheckCircle, Clock, BookOpen, Briefcase, MapPin, Building,
   Smartphone, QrCode, PenTool, Share2
 } from 'lucide-react';
-import { generateTrainingPPTX } from '../utils/trainingPptxGenerator';
+import { generateTrainingPPTX, balanceSyllabusColumns } from '../utils/trainingPptxGenerator';
 import { formatCpf } from '../services/cpfService';
 import { getProfiles, getCompanies, getGroups } from '../services/storageService';
 import { 
@@ -31,6 +31,276 @@ const COURSE_PRESETS = OFFICIAL_TRAINING_MODELS;
 
 // Lista de instrutores e responsáveis técnicos oficiais extraídos diretamente dos certificados
 const FALLBACK_PROFILES = OFFICIAL_INSTRUCTORS;
+
+/**
+ * Determina dinamicamente as proporções, tamanhos de fonte, entrelinhas e espaçamentos
+ * para a Frente do Modelo 2 (Ondas Diagonais e Colmeia), garantindo que textos longos
+ * (como NR-35 Sistemas de Ancoragem com 440+ caracteres) nunca cortem, nunca empurrem
+ * as assinaturas para cima da onda diagonal inferior e mantenham a hierarquia visual impecável.
+ */
+export const getModelo2FrenteStyles = ({ curso = '', descricao = '', studentName = '' }) => {
+  const descLen = (descricao || '').length;
+  const courseLen = (curso || '').length;
+  const nameLen = (studentName || '').length;
+
+  const isExtraLong = descLen > 360 || (descLen > 240 && courseLen > 40);
+  const isLong = descLen > 200 || courseLen > 32;
+  const isMedium = descLen > 80;
+
+  if (isExtraLong) {
+    return {
+      topPadding: '1.2%',
+      titleSize: '0.86rem',
+      titleLetterSpacing: '1.2px',
+      subTitleSize: '0.58rem',
+      subTitleMargin: '0.12rem',
+      studentNameSize: nameLen > 30 ? '0.92rem' : '1.02rem',
+      studentNameMargin: '0.18rem 0',
+      cpfTextSize: '0.56rem',
+      cpfLineHeight: '1.22',
+      courseSize: '0.74rem',
+      courseMargin: '0.16rem 0',
+      descSize: '0.46rem',
+      descLineHeight: '1.18',
+      descMargin: '0.12rem auto',
+      dateSize: '0.54rem',
+      dateMarginTop: '0.16rem',
+      sigImageHeight: '17px',
+      sigLabelSize: '0.42rem',
+      sigNameSize: '0.40rem',
+      sigRegSize: '0.37rem',
+      sigPaddingBottom: '0.25rem',
+      sigPaddingX: '1.2rem',
+      sigGap: '0.25rem'
+    };
+  }
+
+  if (isLong) {
+    return {
+      topPadding: '3.0%',
+      titleSize: '0.92rem',
+      titleLetterSpacing: '1.4px',
+      subTitleSize: '0.64rem',
+      subTitleMargin: '0.2rem',
+      studentNameSize: nameLen > 30 ? '0.98rem' : '1.10rem',
+      studentNameMargin: '0.25rem 0',
+      cpfTextSize: '0.60rem',
+      cpfLineHeight: '1.30',
+      courseSize: '0.82rem',
+      courseMargin: '0.24rem 0',
+      descSize: '0.52rem',
+      descLineHeight: '1.24',
+      descMargin: '0.16rem auto',
+      dateSize: '0.58rem',
+      dateMarginTop: '0.25rem',
+      sigImageHeight: '18px',
+      sigLabelSize: '0.45rem',
+      sigNameSize: '0.42rem',
+      sigRegSize: '0.39rem',
+      sigPaddingBottom: '0.35rem',
+      sigPaddingX: '1.0rem',
+      sigGap: '0.30rem'
+    };
+  }
+
+  if (isMedium) {
+    return {
+      topPadding: '5.0%',
+      titleSize: '0.98rem',
+      titleLetterSpacing: '1.5px',
+      subTitleSize: '0.68rem',
+      subTitleMargin: '0.25rem',
+      studentNameSize: nameLen > 30 ? '1.05rem' : '1.16rem',
+      studentNameMargin: '0.32rem 0',
+      cpfTextSize: '0.63rem',
+      cpfLineHeight: '1.38',
+      courseSize: '0.88rem',
+      courseMargin: '0.30rem 0',
+      descSize: '0.58rem',
+      descLineHeight: '1.32',
+      descMargin: '0.20rem auto',
+      dateSize: '0.62rem',
+      dateMarginTop: '0.35rem',
+      sigImageHeight: '19px',
+      sigLabelSize: '0.47rem',
+      sigNameSize: '0.44rem',
+      sigRegSize: '0.41rem',
+      sigPaddingBottom: '0.4rem',
+      sigPaddingX: '0.8rem',
+      sigGap: '0.35rem'
+    };
+  }
+
+  return {
+    topPadding: '6.5%',
+    titleSize: '1.02rem',
+    titleLetterSpacing: '1.6px',
+    subTitleSize: '0.72rem',
+    subTitleMargin: '0.3rem',
+    studentNameSize: '1.20rem',
+    studentNameMargin: '0.4rem 0',
+    cpfTextSize: '0.66rem',
+    cpfLineHeight: '1.45',
+    courseSize: '0.92rem',
+    courseMargin: '0.35rem 0',
+    descSize: '0.61rem',
+    descLineHeight: '1.38',
+    descMargin: '0.2rem auto',
+    dateSize: '0.64rem',
+    dateMarginTop: '0.45rem',
+    sigImageHeight: '20px',
+    sigLabelSize: '0.48rem',
+    sigNameSize: '0.45rem',
+    sigRegSize: '0.43rem',
+    sigPaddingBottom: '0.4rem',
+    sigPaddingX: '0.5rem',
+    sigGap: '0.35rem'
+  };
+};
+
+/**
+ * Determina dinamicamente o dimensionamento do verso do Modelo 2 para exibir
+ * 100% dos módulos do conteúdo programático sem gerar barra de rolagem e sem cortes.
+ */
+export const getModelo2VersoStyles = (conteudo = '') => {
+  const { maxLinesInCol } = balanceSyllabusColumns(conteudo, 38);
+
+  if (maxLinesInCol > 20) {
+    return {
+      fontSize: '0.44rem',
+      lineHeight: '1.20',
+      gap: '0.85rem',
+      headerTitleSize: '0.68rem',
+      headerDurationSize: '0.58rem',
+      headerPadding: '0.2rem',
+      headerMargin: '0.25rem',
+      footerSize: '0.50rem',
+      footerPadding: '0.25rem'
+    };
+  }
+  if (maxLinesInCol > 15) {
+    return {
+      fontSize: '0.49rem',
+      lineHeight: '1.24',
+      gap: '0.95rem',
+      headerTitleSize: '0.72rem',
+      headerDurationSize: '0.62rem',
+      headerPadding: '0.25rem',
+      headerMargin: '0.3rem',
+      footerSize: '0.52rem',
+      footerPadding: '0.28rem'
+    };
+  }
+  if (maxLinesInCol > 10) {
+    return {
+      fontSize: '0.55rem',
+      lineHeight: '1.30',
+      gap: '1.0rem',
+      headerTitleSize: '0.74rem',
+      headerDurationSize: '0.64rem',
+      headerPadding: '0.3rem',
+      headerMargin: '0.35rem',
+      footerSize: '0.54rem',
+      footerPadding: '0.32rem'
+    };
+  }
+  return {
+    fontSize: '0.62rem',
+    lineHeight: '1.36',
+    gap: '1.1rem',
+    headerTitleSize: '0.75rem',
+    headerDurationSize: '0.65rem',
+    headerPadding: '0.3rem',
+    headerMargin: '0.4rem',
+    footerSize: '0.56rem',
+    footerPadding: '0.35rem'
+  };
+};
+
+/**
+ * Adaptação para a Frente do Modelo 1 (EcoCurvas Laterais)
+ */
+export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName = '' }) => {
+  const totalLen = (descricao || '').length + (curso || '').length + (studentName || '').length;
+
+  if (totalLen > 450) {
+    return {
+      headerMaxHeight: '44px',
+      bodySize: '0.52rem',
+      bodyLineHeight: '1.26',
+      bodyMargin: '0.15rem 0',
+      dateMarginTop: '0.20rem',
+      sigHeight: '18px',
+      sigTitleSize: '0.46rem',
+      sigNameSize: '0.44rem',
+      sigRegSize: '0.41rem',
+      sigGap: '0.3rem'
+    };
+  }
+  if (totalLen > 300) {
+    return {
+      headerMaxHeight: '50px',
+      bodySize: '0.58rem',
+      bodyLineHeight: '1.34',
+      bodyMargin: '0.22rem 0',
+      dateMarginTop: '0.28rem',
+      sigHeight: '20px',
+      sigTitleSize: '0.50rem',
+      sigNameSize: '0.47rem',
+      sigRegSize: '0.44rem',
+      sigGap: '0.35rem'
+    };
+  }
+  return {
+    headerMaxHeight: '56px',
+    bodySize: '0.67rem',
+    bodyLineHeight: '1.52',
+    bodyMargin: '0.3rem 0',
+    dateMarginTop: '0.4rem',
+    sigHeight: '24px',
+    sigTitleSize: '0.54rem',
+    sigNameSize: '0.51rem',
+    sigRegSize: '0.48rem',
+    sigGap: '0.45rem'
+  };
+};
+
+/**
+ * Adaptação para o Verso do Modelo 1
+ */
+export const getModelo1VersoStyles = (conteudo = '') => {
+  const { totalLines } = balanceSyllabusColumns(conteudo, 42);
+  const useTwoCols = totalLines > 10;
+
+  if (totalLines > 22) {
+    return {
+      useTwoCols: true,
+      fontSize: '0.46rem',
+      lineHeight: '1.22',
+      gap: '0.9rem',
+      headerSize: '0.70rem',
+      footerSize: '0.50rem'
+    };
+  }
+  if (totalLines > 10) {
+    return {
+      useTwoCols: true,
+      fontSize: '0.54rem',
+      lineHeight: '1.28',
+      gap: '1.0rem',
+      headerSize: '0.72rem',
+      footerSize: '0.52rem'
+    };
+  }
+  return {
+    useTwoCols: false,
+    fontSize: '0.63rem',
+    lineHeight: '1.45',
+    gap: '0',
+    headerSize: '0.74rem',
+    footerSize: '0.56rem'
+  };
+};
 
 const TrainingCertificatesPage = () => {
   // Controle de Abas: 'generator' | 'turmas'
@@ -837,6 +1107,20 @@ const TrainingCertificatesPage = () => {
   const validCount = colaboradores.filter(c => c.nome.trim()).length;
   const firstStudent = colaboradores.find(c => c.nome.trim());
 
+  // Estilos adaptativos dinâmicos para evitar cortes, rolagem ou sobreposição nos certificados
+  const m2FrenteStyles = getModelo2FrenteStyles({
+    curso: formData.curso,
+    descricao: formData.descricao,
+    studentName: firstStudent?.nome
+  });
+  const m2VersoStyles = getModelo2VersoStyles(formData.conteudo);
+  const m1FrenteStyles = getModelo1FrenteStyles({
+    curso: formData.curso,
+    descricao: formData.descricao,
+    studentName: firstStudent?.nome
+  });
+  const m1VersoStyles = getModelo1VersoStyles(formData.conteudo);
+
   // Dados derivados para o layout do gerador
   const selectedPreset = COURSE_PRESETS.find(p =>
     p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
@@ -1552,21 +1836,21 @@ const TrainingCertificatesPage = () => {
                           <img 
                             src="/certificate-templates/m1_header_transparent.png" 
                             alt="EcoSafety Certificado de Capacitação" 
-                            style={{ width: '100%', maxHeight: '56px', objectFit: 'contain' }} 
+                            style={{ width: '100%', maxHeight: m1FrenteStyles.headerMaxHeight, objectFit: 'contain' }} 
                           />
                         </div>
 
                         {/* Corpo: Texto Narrativo Justificado Contínuo (Roboto, Preto Absoluto #000000) */}
                         <div style={{ 
                           fontFamily: "'Roboto', sans-serif",
-                          fontSize: '0.67rem', 
-                          lineHeight: '1.52', 
+                          fontSize: m1FrenteStyles.bodySize, 
+                          lineHeight: m1FrenteStyles.bodyLineHeight, 
                           textAlign: 'justify', 
                           color: '#000000', 
-                          margin: '0.3rem 0' 
+                          margin: m1FrenteStyles.bodyMargin 
                         }}>
                           A ECOSAFETY certifica que: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong> e Matrícula: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.matricula || '266522'}</strong>, completou com aprovação no período de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.local || 'Mossoró/RN'}</strong>, o treinamento de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.curso}</strong>. {formData.descricao}
-                          <div style={{ marginTop: '0.4rem', textAlign: 'left', fontWeight: '400', color: '#000000' }}>
+                          <div style={{ marginTop: m1FrenteStyles.dateMarginTop, textAlign: 'left', fontWeight: '400', color: '#000000' }}>
                             {formData.local || 'Mossoró/RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                           </div>
                         </div>
@@ -1575,30 +1859,30 @@ const TrainingCertificatesPage = () => {
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: `1fr 1fr repeat(${Math.max(1, formData.instructors?.length || 1)}, 1fr)`,
-                          gap: '0.45rem',
+                          gap: m1FrenteStyles.sigGap,
                           alignItems: 'end',
                           textAlign: 'center',
-                          marginTop: '0.35rem',
+                          marginTop: '0.25rem',
                           fontFamily: "'Lato', sans-serif"
                         }}>
                           {/* Coluna 1: Responsável Técnico */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_eider_gomes.png"} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
+                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_eider_gomes.png"} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
                             <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: '0.51rem', fontWeight: '700', color: '#64268a' }}>Eider Gomes do Nascimento</div>
-                              <div style={{ fontSize: '0.48rem', color: '#64268a' }}>Registro: MTE0009995/RN</div>
+                              <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>RESPONSAVEL TÉCNICO</div>
+                              <div style={{ fontSize: m1FrenteStyles.sigNameSize, fontWeight: '700', color: '#64268a' }}>Eider Gomes do Nascimento</div>
+                              <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>Registro: MTE0009995/RN</div>
                             </div>
                           </div>
 
                           {/* Coluna 2: Aluno (PENDENTE) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.5rem', letterSpacing: '0.3px' }}>[ Assinatura Pendente ]</span>
+                            <div style={{ height: m1FrenteStyles.sigHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: m1FrenteStyles.sigRegSize, letterSpacing: '0.3px' }}>[ Assinatura Pendente ]</span>
                             </div>
                             <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a' }}>ALUNO:</div>
-                              <div style={{ fontSize: '0.51rem', color: '#64268a', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE'}</div>
+                              <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a' }}>ALUNO:</div>
+                              <div style={{ fontSize: m1FrenteStyles.sigNameSize, color: '#64268a', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE'}</div>
                             </div>
                           </div>
 
@@ -1608,13 +1892,13 @@ const TrainingCertificatesPage = () => {
                             const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
                             return (
                               <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <img src={sigImg} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
+                                <img src={sigImg} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
                                 <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
+                                  <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
                                     {formData.instructors?.length > 1 ? `INSTRUTOR #${idx + 1}:` : 'INSTRUTOR:'}
                                   </div>
-                                  <div style={{ fontSize: '0.51rem', color: '#64268a', fontWeight: '700' }}>{inst.name || 'Instrutor'}</div>
-                                  <div style={{ fontSize: '0.48rem', color: '#64268a' }}>{inst.registration ? `Registro: ${inst.registration}` : (formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP')}</div>
+                                  <div style={{ fontSize: m1FrenteStyles.sigNameSize, color: '#64268a', fontWeight: '700' }}>{inst.name || 'Instrutor'}</div>
+                                  <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>{inst.registration ? `Registro: ${inst.registration}` : (formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP')}</div>
                                 </div>
                               </div>
                             );
@@ -1622,39 +1906,61 @@ const TrainingCertificatesPage = () => {
                         </div>
                       </div>
                     ) : (
-                      /* MODELO 1 - VERSO (Conteúdo em 1 Coluna Limpa - Lato & Cinza Nobre #595959) */
+                      /* MODELO 1 - VERSO (Conteúdo Dinâmico sem barra de rolagem e sem cortes) */
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
-                        <div>
-                          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '0.35rem', marginBottom: '0.4rem' }}>
-                            <div style={{ fontSize: '0.74rem', fontWeight: '700', color: '#595959' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '0.25rem', marginBottom: '0.35rem' }}>
+                            <div style={{ fontSize: m1VersoStyles.headerSize, fontWeight: '700', color: '#595959' }}>
                               Programa: <span style={{ color: '#64268a' }}>{formData.curso}</span>
                             </div>
-                            <div style={{ fontSize: '0.66rem', color: '#595959', fontWeight: '400', marginTop: '2px' }}>
+                            <div style={{ fontSize: '0.62rem', color: '#595959', fontWeight: '400', marginTop: '1px' }}>
                               Carga horária: {formData.duracao}
                             </div>
                           </div>
 
-                          <div style={{ 
-                            fontSize: '0.63rem', 
-                            color: '#000000', 
-                            lineHeight: '1.45', 
-                            maxHeight: '190px', 
-                            overflowY: 'auto', 
-                            paddingRight: '0.4rem',
-                            whiteSpace: 'pre-line'
-                          }}>
-                            {formData.conteudo}
-                          </div>
+                          {(() => {
+                            const balanced = balanceSyllabusColumns(formData.conteudo, 42);
+                            if (m1VersoStyles.useTwoCols) {
+                              return (
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 1fr',
+                                  gap: m1VersoStyles.gap,
+                                  fontSize: m1VersoStyles.fontSize,
+                                  color: '#000000',
+                                  lineHeight: m1VersoStyles.lineHeight,
+                                  flex: 1,
+                                  overflow: 'hidden'
+                                }}>
+                                  <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col1}</div>
+                                  <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col2}</div>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div style={{ 
+                                fontSize: m1VersoStyles.fontSize, 
+                                color: '#000000', 
+                                lineHeight: m1VersoStyles.lineHeight, 
+                                flex: 1,
+                                overflow: 'hidden',
+                                whiteSpace: 'pre-line',
+                                wordBreak: 'break-word'
+                              }}>
+                                {formData.conteudo}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div style={{
                           textAlign: 'center',
-                          fontSize: '0.56rem',
+                          fontSize: m1VersoStyles.footerSize,
                           fontWeight: '700',
                           color: '#595959',
                           letterSpacing: '0.4px',
                           borderTop: '1px solid #e2e8f0',
-                          paddingTop: '0.35rem'
+                          paddingTop: '0.25rem'
                         }}>
                           ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
                         </div>
@@ -1667,84 +1973,87 @@ const TrainingCertificatesPage = () => {
                     previewTab === 'frente' ? (
                       /* MODELO 2 - FRENTE */
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
-                        {/* Topo do Certificado - Ajustado com respiro para a logo EcoSafety superior esquerda */}
-                        <div style={{ textAlign: 'center', paddingTop: '8.5%' }}>
+                        {/* Topo do Certificado - Ajustado dinamicamente para preservar respiro da logo EcoSafety */}
+                        <div style={{ textAlign: 'center', paddingTop: m2FrenteStyles.topPadding }}>
                           <div style={{ 
                             fontFamily: "'Montserrat', sans-serif",
-                            fontSize: '1.02rem', 
+                            fontSize: m2FrenteStyles.titleSize, 
                             fontWeight: '800', 
                             color: '#555555', 
-                            letterSpacing: '1.6px', 
+                            letterSpacing: m2FrenteStyles.titleLetterSpacing, 
                             textTransform: 'uppercase' 
                           }}>
                             CERTIFICADO DE CAPACITAÇÃO
                           </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: '400', color: '#000000', marginTop: '0.3rem' }}>
+                          <div style={{ fontSize: m2FrenteStyles.subTitleSize, fontWeight: '400', color: '#000000', marginTop: m2FrenteStyles.subTitleMargin }}>
                             A ECOSAFETY certifica que:
                           </div>
 
                           {/* Destaque do Nome em Azul Real Oficial #3340e6 com Lato Black 900 */}
                           <div style={{ 
                             fontFamily: "'Lato', sans-serif",
-                            fontSize: '1.2rem', 
+                            fontSize: m2FrenteStyles.studentNameSize, 
                             fontWeight: '900', 
                             color: '#3340e6', 
                             textTransform: 'uppercase',
-                            letterSpacing: '0.6px',
-                            margin: '0.4rem 0'
+                            letterSpacing: '0.5px',
+                            margin: m2FrenteStyles.studentNameMargin
                           }}>
                             {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
                           </div>
 
-                          <div style={{ fontSize: '0.66rem', color: '#000000', lineHeight: '1.45', maxWidth: '94%', margin: '0 auto' }}>
+                          <div style={{ fontSize: m2FrenteStyles.cpfTextSize, color: '#000000', lineHeight: m2FrenteStyles.cpfLineHeight, maxWidth: '96%', margin: '0 auto' }}>
                             Portador do CPF: <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
                             <strong style={{ color: '#000000' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na ECOSAFETY TREINAMENTOS, o treinamento de:
                           </div>
 
                           <div style={{ 
-                            fontSize: '0.92rem', 
+                            fontSize: m2FrenteStyles.courseSize, 
                             fontWeight: '800', 
                             color: '#3340e6', 
-                            margin: '0.35rem 0' 
+                            margin: m2FrenteStyles.courseMargin 
                           }}>
                             {formData.curso}
                           </div>
 
                           {formData.descricao && (
                             <div style={{ 
-                              fontSize: '0.61rem', 
+                              fontSize: m2FrenteStyles.descSize, 
                               color: '#000000', 
                               textAlign: 'justify', 
-                              lineHeight: '1.38', 
-                              maxWidth: '92%', 
-                              margin: '0.2rem auto' 
+                              lineHeight: m2FrenteStyles.descLineHeight, 
+                              maxWidth: '94%', 
+                              margin: m2FrenteStyles.descMargin 
                             }}>
                               {formData.descricao}
                             </div>
                           )}
 
-                          <div style={{ fontSize: '0.64rem', color: '#000000', marginTop: '0.45rem' }}>
+                          <div style={{ fontSize: m2FrenteStyles.dateSize, color: '#000000', marginTop: m2FrenteStyles.dateMarginTop }}>
                             {formData.local || 'Mossoró, RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                           </div>
                         </div>
 
-                        {/* Rodapé: 4 Assinaturas com Linhas e Textos em Preto Oficial #000000 */}
+                        {/* Rodapé: 4 Assinaturas com Linhas e Textos em Preto Oficial #000000 (Afastado da onda roxa) */}
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: '1fr 1fr 1fr 1fr',
-                          gap: '0.35rem',
+                          gap: m2FrenteStyles.sigGap,
                           alignItems: 'end',
                           textAlign: 'center',
-                          marginTop: '0.35rem',
+                          marginTop: '0.2rem',
+                          paddingBottom: m2FrenteStyles.sigPaddingBottom,
+                          paddingLeft: m2FrenteStyles.sigPaddingX,
+                          paddingRight: m2FrenteStyles.sigPaddingX,
                           fontFamily: "'Lato', sans-serif"
                         }}>
                           {/* Raimundo - Responsável Técnico Geral */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_raimundo_fernandes.png"} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_raimundo_fernandes.png"} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
                             <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '600' }}>Raimundo Fernandes de Oliveira Junior</div>
-                              <div style={{ fontSize: '0.43rem', color: '#595959' }}>Registro CREA – 211204597-0</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>Raimundo Fernandes de Oliveira Junior</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Registro CREA – 211204597-0</div>
                             </div>
                           </div>
 
@@ -1752,30 +2061,30 @@ const TrainingCertificatesPage = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             {currentTurmaSignatures?.coordinator?.dataUrl ? (
                               <>
-                                <img src={currentTurmaSignatures.coordinator.dataUrl} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <img src={currentTurmaSignatures.coordinator.dataUrl} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
                                 <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#000000', fontWeight: '600' }}>{currentTurmaSignatures.coordinator.signerName || 'Coordenação Técnica'}</div>
-                                  <div style={{ fontSize: '0.41rem', color: '#595959' }}>Registro Oficial</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>{currentTurmaSignatures.coordinator.signerName || 'Coordenação Técnica'}</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Registro Oficial</div>
                                 </div>
                               </>
                             ) : formData.curso?.toLowerCase().includes('aph') || formData.curso?.toLowerCase().includes('hospitalar') || formData.instrutorNome?.toLowerCase().includes('leiliana') ? (
                               <>
-                                <img src="/certificate-templates/signatures/sig_leiliana_nunes.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <img src="/certificate-templates/signatures/sig_leiliana_nunes.png" alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
                                 <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#000000', fontWeight: '600' }}>Leiliana Nunes de Lima Fernandes</div>
-                                  <div style={{ fontSize: '0.41rem', color: '#595959' }}>Registro Coren RN 333018</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>Leiliana Nunes de Lima Fernandes</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Registro Coren RN 333018</div>
                                 </div>
                               </>
                             ) : (
                               <>
-                                <img src="/certificate-templates/signatures/sig_cezar_augusto.png" alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <img src="/certificate-templates/signatures/sig_cezar_augusto.png" alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
                                 <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: '0.46rem', fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO / INSTRUTOR</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#595959' }}>Engenheiro Eletricista</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#000000', fontWeight: '600' }}>Cezar Augusto Galvão De P. Camêlo</div>
-                                  <div style={{ fontSize: '0.41rem', color: '#595959' }}>CREA-RN 211051104-4</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO / INSTRUTOR</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Engenheiro Eletricista</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>Cezar Augusto Galvão De P. Camêlo</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>CREA-RN 211051104-4</div>
                                 </div>
                               </>
                             )}
@@ -1783,12 +2092,12 @@ const TrainingCertificatesPage = () => {
 
                           {/* Aluno (PENDENTE - sem imagem de assinatura falsa) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <div style={{ height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontSize: '0.42rem', color: '#94a3b8', fontStyle: 'italic' }}>[ Assinatura Pendente ]</span>
+                            <div style={{ height: m2FrenteStyles.sigImageHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#94a3b8', fontStyle: 'italic' }}>[ Assinatura Pendente ]</span>
                             </div>
                             <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>ALUNO</div>
-                              <div style={{ fontSize: '0.45rem', color: '#3340e6', fontWeight: '700' }}>{firstStudent?.nome || 'Participante'}</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>ALUNO</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#3340e6', fontWeight: '700' }}>{firstStudent?.nome || 'Participante'}</div>
                             </div>
                           </div>
 
@@ -1798,13 +2107,13 @@ const TrainingCertificatesPage = () => {
                             const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
                             return (
                               <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <img src={sigImg} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <img src={sigImg} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
                                 <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>
+                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>
                                     {formData.instructors?.length > 1 ? `INSTRUTOR #${idx + 1}` : 'INSTRUTOR'}
                                   </div>
-                                  <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '700' }}>{inst.name || 'Eider Gomes do Nascimento'}</div>
-                                  <div style={{ fontSize: '0.43rem', color: '#595959' }}>{inst.registration || formData.instrutorRegistro || 'MTE0009995/RN'}</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '700' }}>{inst.name || 'Eider Gomes do Nascimento'}</div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>{inst.registration || formData.instrutorRegistro || 'MTE0009995/RN'}</div>
                                 </div>
                               </div>
                             );
@@ -1812,39 +2121,39 @@ const TrainingCertificatesPage = () => {
                         </div>
                       </div>
                     ) : (
-                      /* MODELO 2 - VERSO (Conteúdo em 2 Colunas Balanceadas - Calibri & Times New Roman) */
+                      /* MODELO 2 - VERSO (Conteúdo em 2 Colunas Balanceadas - Calibri & Times New Roman sem corte e sem scroll) */
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Calibri', 'Lato', sans-serif" }}>
-                        <div>
-                          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '0.3rem', marginBottom: '0.4rem' }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#595959' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ 
+                            borderBottom: '1px solid rgba(0,0,0,0.08)', 
+                            paddingBottom: m2VersoStyles.headerPadding, 
+                            marginBottom: m2VersoStyles.headerMargin 
+                          }}>
+                            <div style={{ fontSize: m2VersoStyles.headerTitleSize, fontWeight: '700', color: '#595959' }}>
                               Programa: <span style={{ color: '#3340e6' }}>{formData.curso}</span>
                             </div>
-                            <div style={{ fontSize: '0.65rem', color: '#595959', fontWeight: '400', marginTop: '2px' }}>
+                            <div style={{ fontSize: m2VersoStyles.headerDurationSize, color: '#595959', fontWeight: '400', marginTop: '1px' }}>
                               Carga horária: {formData.duracao}
                             </div>
                           </div>
 
-                          {/* 2 Colunas de Conteúdo com Times New Roman (Fiel ao PDF Original) */}
+                          {/* 2 Colunas de Conteúdo com Times New Roman Balanceadas */}
                           {(() => {
-                            const lines = (formData.conteudo || '').split('\n').filter(l => l.trim().length > 0);
-                            const mid = Math.ceil(lines.length / 2);
-                            const col1 = lines.slice(0, mid).join('\n');
-                            const col2 = lines.slice(mid).join('\n');
+                            const balanced = balanceSyllabusColumns(formData.conteudo, 38);
                             return (
                               <div style={{
                                 display: 'grid',
                                 gridTemplateColumns: '1fr 1fr',
-                                gap: '1.1rem',
+                                gap: m2VersoStyles.gap,
                                 fontFamily: "'Times New Roman', Times, serif",
-                                fontSize: '0.63rem',
+                                fontSize: m2VersoStyles.fontSize,
                                 color: '#000000',
-                                lineHeight: '1.38',
-                                maxHeight: '190px',
-                                overflowY: 'auto',
-                                paddingRight: '0.35rem'
+                                lineHeight: m2VersoStyles.lineHeight,
+                                flex: 1,
+                                overflow: 'hidden'
                               }}>
-                                <div style={{ whiteSpace: 'pre-line' }}>{col1}</div>
-                                <div style={{ whiteSpace: 'pre-line' }}>{col2}</div>
+                                <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col1}</div>
+                                <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col2}</div>
                               </div>
                             );
                           })()}
@@ -1852,12 +2161,12 @@ const TrainingCertificatesPage = () => {
 
                         <div style={{
                           textAlign: 'center',
-                          fontSize: '0.56rem',
+                          fontSize: m2VersoStyles.footerSize,
                           fontWeight: '600',
                           color: '#595959',
                           letterSpacing: '0.4px',
                           borderTop: '1px solid #e2e8f0',
-                          paddingTop: '0.35rem'
+                          paddingTop: m2VersoStyles.footerPadding
                         }}>
                           ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
                         </div>

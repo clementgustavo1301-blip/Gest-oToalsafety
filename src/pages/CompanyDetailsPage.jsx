@@ -8,11 +8,12 @@ import {
 import {
   getCompanyById, getGroups, getTrainingsByCompany,
   getDeliverablesByCompany, uploadDocument, getDocumentUrl, addDeliverable,
-  updateCompany
+  updateCompany, updateDeliverable
 } from '../services/storageService';
 import TrainingCalendar from '../components/TrainingCalendar';
 import DeliverablesViewer from '../components/DeliverablesViewer';
 import AddDeliverableModal from '../components/AddDeliverableModal';
+import EditDeliverableModal from '../components/EditDeliverableModal';
 import EditCompanyModal from '../components/EditCompanyModal';
 
 const TABS = [
@@ -31,6 +32,7 @@ const CompanyDetailsPage = () => {
   const [deliverables, setDeliverables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDeliverableModal, setShowDeliverableModal] = useState(false);
+  const [editingDeliverable, setEditingDeliverable] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
   const loadData = async (showLoading = true) => {
@@ -61,6 +63,12 @@ const CompanyDetailsPage = () => {
     await addDeliverable({ ...deliverableData, fileName, companyId });
     await loadData(false);
     setShowDeliverableModal(false);
+  };
+
+  const handleUpdateDeliverable = async (id, updates) => {
+    await updateDeliverable(id, updates);
+    await loadData(false);
+    setEditingDeliverable(null);
   };
 
   const handleEditCompany = async (id, updates) => {
@@ -531,11 +539,24 @@ const CompanyDetailsPage = () => {
                         <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)' }}>
                           {prog.title}
                         </h4>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.125rem', textTransform: 'capitalize' }}>
-                          Programa • Vencimento: {prog.dueDate ? new Date(prog.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem prazo'}
-                        </p>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                          <span>
+                            Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>
+                              {(prog.dataEmissao || prog.dataEnvio || prog.dueDate) 
+                                ? new Date(prog.dataEmissao || prog.dataEnvio || prog.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) 
+                                : 'Não informada'}
+                            </strong>
+                          </span>
+                          <span>
+                            Validade: <strong style={{ color: prog.validityDate && new Date(prog.validityDate) < new Date(new Date().setHours(0,0,0,0)) ? 'var(--danger)' : 'var(--text-primary)' }}>
+                              {prog.validityDate 
+                                ? new Date(prog.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) 
+                                : (prog.dueDate ? new Date(prog.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não informada')}
+                            </strong>
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <span style={{
                           fontSize: '0.75rem', padding: '0.125rem 0.5rem',
                           borderRadius: '1rem', backgroundColor: style.bg,
@@ -557,6 +578,19 @@ const CompanyDetailsPage = () => {
                             <FileText size={14} />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setEditingDeliverable(prog)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.25rem',
+                            padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)',
+                            backgroundColor: 'transparent', border: '1px solid var(--border)',
+                            fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '500', cursor: 'pointer'
+                          }}
+                          title="Editar Programa / Datas"
+                        >
+                          <Edit3 size={13} /> Editar
+                        </button>
                       </div>
                     </div>
                   );
@@ -581,6 +615,15 @@ const CompanyDetailsPage = () => {
           initialType="programa"
           onClose={() => setShowDeliverableModal(false)} 
           onSave={handleAddDeliverable} 
+        />
+      )}
+
+      {editingDeliverable && (
+        <EditDeliverableModal
+          deliverable={editingDeliverable}
+          companyId={companyId}
+          onClose={() => setEditingDeliverable(null)}
+          onSave={handleUpdateDeliverable}
         />
       )}
 

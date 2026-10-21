@@ -362,9 +362,18 @@ export async function addCompany(company) {
 
   const res1 = await supabase.from('companies').insert([extendedPayload]).select().single();
   if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.code === 'PGRST204')) {
-    const res2 = await supabase.from('companies').insert([basePayload]).select().single();
-    data = res2.data;
-    error = res2.error;
+    const fallbackPayload = { ...extendedPayload };
+    delete fallbackPayload.gestao_cipa;
+    delete fallbackPayload.gestao_epi;
+    const res2 = await supabase.from('companies').insert([fallbackPayload]).select().single();
+    if (res2.error && res2.error.message && (res2.error.message.includes('column') || res2.error.code === 'PGRST204')) {
+      const res3 = await supabase.from('companies').insert([basePayload]).select().single();
+      data = res3.data;
+      error = res3.error;
+    } else {
+      data = res2.data;
+      error = res2.error;
+    }
   } else {
     data = res1.data;
     error = res1.error;
@@ -472,19 +481,25 @@ export async function updateCompany(companyId, updates) {
 
   const res1 = await supabase.from('companies').update(snakeUpdates).eq('id', companyId).select().single();
   if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.code === 'PGRST204')) {
-    // Retira colunas novas se o banco ainda não as tiver
+    // Se falhar por causa de gestao_cipa/gestao_epi, tenta salvar com gestao_pgr e gestao_sipat
     const safeUpdates = { ...snakeUpdates };
-    delete safeUpdates.supervisor;
-    delete safeUpdates.tecnico_responsavel;
-    delete safeUpdates.visitas_tecnicas;
     delete safeUpdates.gestao_cipa;
     delete safeUpdates.gestao_epi;
-    delete safeUpdates.gestao_pgr;
-    delete safeUpdates.gestao_sipat;
 
     const res2 = await supabase.from('companies').update(safeUpdates).eq('id', companyId).select().single();
-    data = res2.data;
-    error = res2.error;
+    if (res2.error && res2.error.message && (res2.error.message.includes('column') || res2.error.code === 'PGRST204')) {
+      delete safeUpdates.gestao_pgr;
+      delete safeUpdates.gestao_sipat;
+      delete safeUpdates.supervisor;
+      delete safeUpdates.tecnico_responsavel;
+      delete safeUpdates.visitas_tecnicas;
+      const res3 = await supabase.from('companies').update(safeUpdates).eq('id', companyId).select().single();
+      data = res3.data;
+      error = res3.error;
+    } else {
+      data = res2.data;
+      error = res2.error;
+    }
   } else {
     data = res1.data;
     error = res1.error;
@@ -774,6 +789,10 @@ export async function getDeliverablesByContract(contractId) {
 }
 
 export async function addDeliverable(deliverable) {
+  const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
+  const validityVal = deliverable.validityDate || null;
+  const revisaoVal = deliverable.ultimaRevisao || null;
+
   // 1. Get the company's group_id
   const { data: company } = await supabase.from('companies').select('group_id').eq('id', deliverable.companyId).single();
   
@@ -793,18 +812,17 @@ export async function addDeliverable(deliverable) {
           .maybeSingle();
           
         if (!existing) {
-          const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
           const insertPayload = {
             company_id: gc.id,
             contract_id: gc.id === deliverable.companyId ? deliverable.contractId : null,
             title: deliverable.title,
             type: deliverable.type,
-            status: deliverable.status,
+            status: deliverable.status || 'pendente',
             due_date: emissaoVal,
             data_envio: emissaoVal,
             data_emissao: emissaoVal,
-            validity_date: deliverable.validityDate || null,
-            ultima_revisao: deliverable.ultimaRevisao || null,
+            validity_date: validityVal,
+            ultima_revisao: revisaoVal,
             delivered_date: deliverable.deliveredDate,
             file_name: deliverable.fileName,
             reason: deliverable.reason,
@@ -815,8 +833,6 @@ export async function addDeliverable(deliverable) {
           let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
           if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
             delete insertPayload.data_emissao;
-            delete insertPayload.data_envio;
-            delete insertPayload.ultima_revisao;
             insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
           }
 
@@ -825,25 +841,45 @@ export async function addDeliverable(deliverable) {
           if (gc.id === deliverable.companyId && insRes.data) {
             createdDeliverable = insRes.data;
           }
-        } else if (gc.id === deliverable.companyId) {
-           const { data } = await supabase.from('deliverables').select('*').eq('id', existing.id).single();
-           createdDeliverable = data;
+        } else {
+          // Já existe entregável com este título no grupo: atualiza emissão, validade e status
+          const updatePayload = {
+            due_date: emissaoVal,
+            data_envio: emissaoVal,
+            data_emissao: emissaoVal,
+            validity_date: validityVal,
+            ultima_revisao: revisaoVal,
+            status: deliverable.status || 'pendente',
+          };
+          if (deliverable.description !== undefined) updatePayload.description = deliverable.description;
+          if (deliverable.responsibleId !== undefined) updatePayload.responsible_id = deliverable.responsibleId;
+          if (deliverable.fileName) updatePayload.file_name = deliverable.fileName;
+          if (deliverable.deliveredDate) updatePayload.delivered_date = deliverable.deliveredDate;
+
+          let upRes = await supabase.from('deliverables').update(updatePayload).eq('id', existing.id).select().single();
+          if (upRes.error && upRes.error.message && (upRes.error.message.includes('column') || upRes.error.code === 'PGRST204')) {
+            delete updatePayload.data_emissao;
+            upRes = await supabase.from('deliverables').update(updatePayload).eq('id', existing.id).select().single();
+          }
+
+          if (gc.id === deliverable.companyId) {
+            createdDeliverable = upRes.data || existing;
+          }
         }
       }
       
       if (!createdDeliverable) {
-         const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
          const insertPayload = {
             company_id: deliverable.companyId,
             contract_id: deliverable.contractId,
             title: deliverable.title,
             type: deliverable.type,
-            status: deliverable.status,
+            status: deliverable.status || 'pendente',
             due_date: emissaoVal,
             data_envio: emissaoVal,
             data_emissao: emissaoVal,
-            validity_date: deliverable.validityDate || null,
-            ultima_revisao: deliverable.ultimaRevisao || null,
+            validity_date: validityVal,
+            ultima_revisao: revisaoVal,
             delivered_date: deliverable.deliveredDate,
             file_name: deliverable.fileName,
             reason: deliverable.reason,
@@ -853,8 +889,6 @@ export async function addDeliverable(deliverable) {
          let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
          if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
             delete insertPayload.data_emissao;
-            delete insertPayload.data_envio;
-            delete insertPayload.ultima_revisao;
             insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
          }
          createdDeliverable = insRes.data;
@@ -864,18 +898,17 @@ export async function addDeliverable(deliverable) {
   }
 
   // Fallback
-  const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
   const insertPayload = {
     company_id: deliverable.companyId,
     contract_id: deliverable.contractId,
     title: deliverable.title,
     type: deliverable.type,
-    status: deliverable.status,
+    status: deliverable.status || 'pendente',
     due_date: emissaoVal,
     data_envio: emissaoVal,
     data_emissao: emissaoVal,
-    validity_date: deliverable.validityDate || null,
-    ultima_revisao: deliverable.ultimaRevisao || null,
+    validity_date: validityVal,
+    ultima_revisao: revisaoVal,
     delivered_date: deliverable.deliveredDate,
     file_name: deliverable.fileName,
     reason: deliverable.reason,
@@ -885,8 +918,6 @@ export async function addDeliverable(deliverable) {
   let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
   if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
     delete insertPayload.data_emissao;
-    delete insertPayload.data_envio;
-    delete insertPayload.ultima_revisao;
     insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
   }
   if (insRes.error) { console.error('Error adding deliverable:', insRes.error); return null; }
@@ -924,8 +955,6 @@ export async function updateDeliverable(deliverableId, updates) {
   if (error && error.message && (error.message.includes('column') || error.code === 'PGRST204')) {
     const safeUpdates = { ...snakeUpdates };
     delete safeUpdates.data_emissao;
-    delete safeUpdates.data_envio;
-    delete safeUpdates.ultima_revisao;
     const fbRes = await supabase.from('deliverables').update(safeUpdates).eq('id', deliverableId).select().single();
     data = fbRes.data;
     error = fbRes.error;
