@@ -14,8 +14,9 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const [description, setDescription] = useState(deliverable?.description || '');
   const [type, setType] = useState(deliverable?.type || 'programa');
   const [contractId, setContractId] = useState(deliverable?.contractId || '');
-  const [dueDate, setDueDate] = useState(deliverable?.dueDate || '');
+  const [dataEnvio, setDataEnvio] = useState(deliverable?.dataEmissao || deliverable?.dataEnvio || deliverable?.dueDate || '');
   const [validityDate, setValidityDate] = useState(deliverable?.validityDate || '');
+  const [ultimaRevisao, setUltimaRevisao] = useState(deliverable?.ultimaRevisao || '');
   const [deliveredDate, setDeliveredDate] = useState(deliverable?.deliveredDate || '');
   const [status, setStatus] = useState(deliverable?.status || 'pendente');
   const [responsibleId, setResponsibleId] = useState(deliverable?.responsibleId || '');
@@ -28,7 +29,6 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   useEffect(() => {
     async function load() {
       setLoadingData(true);
-      // fallback if companyId isn't provided directly
       const compId = companyId || deliverable?.companyId || deliverable?.company_id;
       const [profs] = await Promise.all([
         getProfiles(),
@@ -47,7 +47,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !dataEnvio) return;
     
     setSaving(true);
     await onSave(deliverable.id, {
@@ -55,8 +55,13 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
       description: description.trim() || null,
       type,
       contractId: contractId || null,
-      dueDate: dueDate || null,
+      dueDate: dataEnvio,
+      dataEnvio,
+      dataEmissao: dataEnvio,
+      data_emissao: dataEnvio,
+      data_envio: dataEnvio,
       validityDate: validityDate || null,
+      ultimaRevisao: ultimaRevisao || null,
       deliveredDate: deliveredDate || null,
       responsibleId: responsibleId || null,
       status
@@ -87,11 +92,11 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
           <div style={{ padding: '3rem', textAlign: 'center' }}>Carregando dados...</div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '75vh', overflowY: 'auto' }}>
               
               {/* Deliverable Select */}
               <div>
-                <label className="modal-label" htmlFor="dlv-select">Entregável</label>
+                <label className="modal-label" htmlFor="dlv-select">Entregável Padronizado</label>
                 <select
                   id="dlv-select"
                   value={selectedDeliverable}
@@ -99,55 +104,50 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                     const val = e.target.value;
                     setSelectedDeliverable(val);
                     if (val === 'outro') {
-                      setTitle(deliverable?.title || '');
-                    } else {
-                      setTitle(val);
-                      const match = STANDARD_DELIVERABLES.find((d) => d.value === val);
-                      if (match) {
-                        setType(match.defaultType);
+                      // Mantém o título se já houver algo
+                    } else if (val) {
+                      const found = STANDARD_DELIVERABLES.find(d => d.value === val);
+                      if (found) {
+                        setTitle(found.label);
+                        setType(found.defaultType);
+                        if (found.description && !description) setDescription(found.description);
                       }
                     }
                   }}
                   className="modal-input"
-                  required
                   disabled={saving}
                 >
-                  <option value="" disabled>Selecione o entregável...</option>
-                  {STANDARD_DELIVERABLES.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
+                  <option value="">Selecione um entregável...</option>
+                  {STANDARD_DELIVERABLES.map(d => (
+                    <option key={d.value} value={d.value}>{d.label} ({d.defaultType})</option>
                   ))}
-                  <option value="outro">Outro (Digitar manualmente)</option>
+                  <option value="outro">Outro (personalizado)</option>
                 </select>
               </div>
 
-              {/* Title (if 'outro') */}
-              {selectedDeliverable === 'outro' && (
-                <div>
-                  <label className="modal-label" htmlFor="dlv-title">Título do Documento</label>
-                  <input
-                    id="dlv-title"
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="modal-input"
-                    autoFocus
-                    required
-                    disabled={saving}
-                  />
-                </div>
-              )}
+              {/* Title */}
+              <div>
+                <label className="modal-label" htmlFor="dlv-title">Título do Entregável *</label>
+                <input
+                  id="dlv-title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="modal-input"
+                  required
+                  disabled={saving}
+                />
+              </div>
 
               {/* Description */}
               <div>
-                <label className="modal-label" htmlFor="dlv-desc">Descrição / Detalhes</label>
+                <label className="modal-label" htmlFor="dlv-desc">Descrição / Observações</label>
                 <textarea
                   id="dlv-desc"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="modal-input"
-                  rows="3"
+                  rows="2"
                   disabled={saving}
                   style={{ resize: 'vertical' }}
                 />
@@ -189,43 +189,59 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                 </div>
               </div>
 
-              {/* Dates & Status */}
-              <div className="grid-responsive-2">
+              {/* Status */}
+              <div>
+                <label className="modal-label" htmlFor="dlv-status">Status</label>
+                <select
+                  id="dlv-status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="modal-input"
+                  disabled={saving}
+                >
+                  <option value="pendente">Pendente</option>
+                  <option value="em_elaboracao">Em Elaboração</option>
+                  <option value="agendado">Agendado</option>
+                  <option value="entregue">Entregue</option>
+                  <option value="feito">Feito</option>
+                  <option value="adiado">Adiado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+
+              {/* Datas: Data de Emissão (OBRIGATÓRIO), Validade (NÃO OBRIGATÓRIO), Última Revisão (NÃO OBRIGATÓRIO) */}
+              <div style={{
+                padding: '1rem',
+                backgroundColor: 'var(--surface-hover, #f8fafc)',
+                borderRadius: 'var(--radius-md, 8px)',
+                border: '1px solid var(--border, #e2e8f0)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}>
                 <div>
-                  <label className="modal-label" htmlFor="dlv-due">Data Limite (Prazo)</label>
+                  <label className="modal-label" htmlFor="dlv-envio" style={{ fontWeight: '600' }}>
+                    Data de Emissão <span style={{ color: '#ef4444', fontWeight: 'bold' }}>* (Obrigatório)</span>
+                  </label>
                   <input
-                    id="dlv-due"
+                    id="dlv-envio"
                     type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    value={dataEnvio}
+                    onChange={(e) => setDataEnvio(e.target.value)}
                     className="modal-input"
+                    required
                     disabled={saving}
                   />
+                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                    Data de emissão prevista ou realizada do documento ao cliente.
+                  </span>
                 </div>
-                <div>
-                  <label className="modal-label" htmlFor="dlv-status">Status</label>
-                  <select
-                    id="dlv-status"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="modal-input"
-                    disabled={saving}
-                  >
-                    <option value="pendente">Pendente</option>
-                    <option value="em_elaboracao">Em Elaboração</option>
-                    <option value="agendado">Agendado</option>
-                    <option value="entregue">Entregue</option>
-                    <option value="feito">Feito</option>
-                    <option value="adiado">Adiado</option>
-                    <option value="cancelado">Cancelado</option>
-                  </select>
-                </div>
-              </div>
-              
-              {type !== 'treinamento' && (
+
                 <div className="grid-responsive-2">
                   <div>
-                    <label className="modal-label" htmlFor="dlv-validity">Validade do Documento</label>
+                    <label className="modal-label" htmlFor="dlv-validity">
+                      Data de Validade (Opcional)
+                    </label>
                     <input
                       id="dlv-validity"
                       type="date"
@@ -234,44 +250,52 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                       className="modal-input"
                       disabled={saving}
                     />
+                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                      Não obrigatório
+                    </span>
                   </div>
+
                   <div>
-                    <label className="modal-label" htmlFor="dlv-delivered">Data de Entrega</label>
+                    <label className="modal-label" htmlFor="dlv-revisao">
+                      Última Revisão (Opcional)
+                    </label>
                     <input
-                      id="dlv-delivered"
+                      id="dlv-revisao"
                       type="date"
-                      value={deliveredDate}
-                      onChange={(e) => setDeliveredDate(e.target.value)}
+                      value={ultimaRevisao}
+                      onChange={(e) => setUltimaRevisao(e.target.value)}
                       className="modal-input"
                       disabled={saving}
                     />
+                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                      Não obrigatório
+                    </span>
                   </div>
                 </div>
-              )}
+              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginTop: type !== 'treinamento' ? '0' : '1rem' }}>
-                <div>
-                  <label className="modal-label" htmlFor="dlv-responsible">Responsável (Técnico)</label>
-                  <select
-                    id="dlv-responsible"
-                    value={responsibleId}
-                    onChange={(e) => setResponsibleId(e.target.value)}
-                    className="modal-input"
-                    disabled={saving}
-                  >
-                    <option value="">Nenhum</option>
-                    {profiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
-                    ))}
-                  </select>
-                </div>
+              {/* Responsável */}
+              <div>
+                <label className="modal-label" htmlFor="dlv-responsible">Responsável (Técnico)</label>
+                <select
+                  id="dlv-responsible"
+                  value={responsibleId}
+                  onChange={(e) => setResponsibleId(e.target.value)}
+                  className="modal-input"
+                  disabled={saving}
+                >
+                  <option value="">Nenhum</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                  ))}
+                </select>
               </div>
 
             </div>
 
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={!title.trim() || saving}>
+              <button type="submit" className="btn btn-primary" disabled={!title.trim() || !dataEnvio || saving}>
                 {saving ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>

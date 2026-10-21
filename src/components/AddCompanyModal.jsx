@@ -10,10 +10,24 @@ function formatCNPJ(value) {
     .replace(/(\d{4})(\d)/, '$1-$2');
 }
 
-const AddCompanyModal = ({ onClose, onSave }) => {
+const AddCompanyModal = ({ onClose, onSave, group = null }) => {
   const [name, setName] = useState('');
   const [cnpj, setCnpj] = useState('');
+  const [responsible, setResponsible] = useState(
+    group?.tecnicoResponsavel || group?.tecnico_responsavel || ''
+  );
+  const [responsibleId, setResponsibleId] = useState('');
+  const [supportResponsible, setSupportResponsible] = useState(
+    group?.supervisor || ''
+  );
+  const [supportResponsibleId, setSupportResponsibleId] = useState('');
+  const [visitasTecnicas, setVisitasTecnicas] = useState(
+    (group?.visitasTecnicas && group.visitasTecnicas !== 'N/A') ? group.visitasTecnicas : (group?.visitas_tecnicas || '30')
+  );
+  const [gestaoCipa, setGestaoCipa] = useState('pendente');
+  const [gestaoEpi, setGestaoEpi] = useState('pendente');
   const [contact, setContact] = useState('');
+  const [profiles, setProfiles] = useState([]);
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('TotalSafety');
   const [region, setRegion] = useState('Natal');
@@ -24,6 +38,25 @@ const AddCompanyModal = ({ onClose, onSave }) => {
   const [fetchingCEP, setFetchingCEP] = useState(false);
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
+
+  useEffect(() => {
+    async function loadProfiles() {
+      const profs = await getProfiles();
+      setProfiles(profs || []);
+      if (group) {
+        if (group.supervisor) {
+          const sp = profs?.find(p => p.name === group.supervisor);
+          if (sp) setSupportResponsibleId(sp.id);
+        }
+        const tecName = group.tecnicoResponsavel || group.tecnico_responsavel;
+        if (tecName) {
+          const tp = profs?.find(p => p.name === tecName);
+          if (tp) setResponsibleId(tp.id);
+        }
+      }
+    }
+    loadProfiles();
+  }, [group]);
 
   const fetchCnpjData = async (cnpjStr) => {
     const clean = cnpjStr.replace(/\D/g, '');
@@ -129,7 +162,32 @@ const AddCompanyModal = ({ onClose, onSave }) => {
     e.preventDefault();
     if (!name.trim() || !cnpj.trim()) return;
     setLoading(true);
-    await onSave({ name: name.trim(), cnpj, contact: contact.trim(), phone: phone.trim(), address: address.trim(), category, region, latitude, longitude });
+    await onSave({ 
+      name: name.trim(), 
+      cnpj, 
+      contact: contact.trim(), 
+      responsible: responsible.trim(),
+      tecnicoResponsavel: responsible.trim(),
+      responsibleId,
+      supportResponsible: supportResponsible.trim(),
+      supervisor: supportResponsible.trim(),
+      supportResponsibleId,
+      visitasTecnicas,
+      gestaoCipa,
+      gestaoEpi,
+      gestaoPgr: gestaoCipa,
+      gestaoSipat: gestaoEpi,
+      gestao_cipa: gestaoCipa,
+      gestao_epi: gestaoEpi,
+      gestao_pgr: gestaoCipa,
+      gestao_sipat: gestaoEpi,
+      phone: phone.trim(), 
+      address: address.trim(), 
+      category, 
+      region, 
+      latitude, 
+      longitude 
+    });
     setLoading(false);
   };
 
@@ -154,6 +212,24 @@ const AddCompanyModal = ({ onClose, onSave }) => {
 
         <form onSubmit={handleSubmit}>
           <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {group && (
+              <div style={{
+                padding: '0.75rem 1rem',
+                backgroundColor: '#eff6ff',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid #bfdbfe',
+                fontSize: '0.8125rem',
+                color: '#1e40af',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.625rem'
+              }}>
+                <Building2 size={16} color="var(--primary)" />
+                <span>
+                  Empresa vinculada ao grupo <strong>{group.name}</strong>. O Supervisor ({group.supervisor || 'Definido no grupo'}) e o Técnico Responsável ({group.tecnicoResponsavel || group.tecnico_responsavel || 'Definido no grupo'}) são herdados do grupo.
+                </span>
+              </div>
+            )}
             <div>
               <label className="modal-label" htmlFor="company-name">Razão Social</label>
               <input
@@ -190,21 +266,138 @@ const AddCompanyModal = ({ onClose, onSave }) => {
                 Digite o CNPJ completo para buscar os dados automaticamente via Receita Federal.
               </span>
             </div>
+            {/* Equipe Responsável TotalSafety */}
+            <div style={{ padding: '1rem', backgroundColor: 'var(--surface-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserCheck size={16} color="var(--primary)" /> Equipe TotalSafety (Supervisor / Técnico Responsável)
+              </div>
+              <div className="grid-responsive-2">
+                <div>
+                  <label className="modal-label" htmlFor="company-responsible">
+                    Técnico Responsável
+                  </label>
+                  <select
+                    id="company-responsible"
+                    value={responsible}
+                    onChange={(e) => {
+                      setResponsible(e.target.value);
+                      const p = profiles.find(prof => prof.name === e.target.value);
+                      setResponsibleId(p ? p.id : '');
+                    }}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="">Selecione o técnico responsável titular...</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.name}>{p.name} {p.sector ? `(${p.sector})` : ''}</option>
+                    ))}
+                    {responsible && !profiles.some(p => p.name === responsible) && (
+                      <option value={responsible}>{responsible} (Personalizado)</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-support-responsible">
+                    Supervisor
+                  </label>
+                  <select
+                    id="company-support-responsible"
+                    value={supportResponsible}
+                    onChange={(e) => {
+                      setSupportResponsible(e.target.value);
+                      const p = profiles.find(prof => prof.name === e.target.value);
+                      setSupportResponsibleId(p ? p.id : '');
+                    }}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="">Selecione o supervisor...</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.name}>{p.name} {p.sector ? `(${p.sector})` : ''}</option>
+                    ))}
+                    {supportResponsible && !profiles.some(p => p.name === supportResponsible) && (
+                      <option value={supportResponsible}>{supportResponsible} (Personalizado)</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Gestão SST & Visitas Técnicas */}
+            <div style={{ padding: '1rem', backgroundColor: 'var(--surface-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle2 size={16} color="var(--primary)" /> Gestão SST & Visitas Técnicas
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label className="modal-label" htmlFor="company-visitas">
+                    Visitas Técnicas
+                  </label>
+                  <select
+                    id="company-visitas"
+                    value={visitasTecnicas}
+                    onChange={(e) => setVisitasTecnicas(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="7">7 dias (Semanal)</option>
+                    <option value="15">15 dias (Quinzenal)</option>
+                    <option value="30">30 dias (Mensal)</option>
+                    <option value="60">60 dias (Bimestral)</option>
+                    <option value="N/A">N/A (Não se aplica)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-gestao-cipa">
+                    Gestão de CIPA
+                  </label>
+                  <select
+                    id="company-gestao-cipa"
+                    value={gestaoCipa}
+                    onChange={(e) => setGestaoCipa(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="implementado">Implementado</option>
+                    <option value="nao_implementado">Não Implementado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-gestao-epi">
+                    Gestão de EPI
+                  </label>
+                  <select
+                    id="company-gestao-epi"
+                    value={gestaoEpi}
+                    onChange={(e) => setGestaoEpi(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="implementado">Implementado</option>
+                    <option value="nao_implementado">Não Implementado</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Contato do Cliente */}
             <div className="grid-responsive-2">
               <div>
-                <label className="modal-label" htmlFor="company-contact">Contato</label>
+                <label className="modal-label" htmlFor="company-contact">Contato na Empresa (Ponto Focal)</label>
                 <input
                   id="company-contact"
                   type="text"
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
-                  placeholder="Nome do responsável"
+                  placeholder="Nome do contato / representante (ex: RH, Gerente)"
                   className="modal-input"
                   disabled={loading}
                 />
               </div>
               <div>
-                <label className="modal-label" htmlFor="company-phone">Telefone</label>
+                <label className="modal-label" htmlFor="company-phone">Telefone de Contato</label>
                 <input
                   id="company-phone"
                   type="text"

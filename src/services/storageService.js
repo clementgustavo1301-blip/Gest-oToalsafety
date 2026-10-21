@@ -2,19 +2,99 @@ import { supabase } from '../lib/supabase';
 
 // --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
 
+export function parseContactData(rawContact) {
+  if (!rawContact) return { contact: '', responsible: '', supportResponsible: '', responsibleId: '', supportResponsibleId: '' };
+  try {
+    if (typeof rawContact === 'string' && rawContact.trim().startsWith('{') && rawContact.trim().endsWith('}')) {
+      const parsed = JSON.parse(rawContact);
+      return {
+        contact: parsed.contact || parsed.clientContact || '',
+        responsible: parsed.responsible || '',
+        supportResponsible: parsed.supportResponsible || '',
+        responsibleId: parsed.responsibleId || '',
+        supportResponsibleId: parsed.supportResponsibleId || '',
+      };
+    }
+  } catch (e) {
+    // fallback
+  }
+  return { contact: rawContact, responsible: '', supportResponsible: '', responsibleId: '', supportResponsibleId: '' };
+}
+
+export function serializeContactData({ contact, responsible, supportResponsible, responsibleId, supportResponsibleId }) {
+  if (!responsible && !supportResponsible && !responsibleId && !supportResponsibleId) {
+    return contact || '';
+  }
+  return JSON.stringify({
+    contact: contact || '',
+    responsible: responsible || '',
+    supportResponsible: supportResponsible || '',
+    responsibleId: responsibleId || '',
+    supportResponsibleId: supportResponsibleId || '',
+  });
+}
+
+
+function normalizeName(str) {
+  if (!str) return '';
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function isSamePerson(nameA, nameB) {
+  if (!nameA || !nameB) return false;
+  const a = normalizeName(nameA);
+  const b = normalizeName(nameB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  const partsA = a.split(/\s+/).filter(Boolean);
+  const partsB = b.split(/\s+/).filter(Boolean);
+
+  if (partsA[0] === partsB[0]) {
+    if (partsA.length === 1 || partsB.length === 1) return true;
+    if (partsA[partsA.length - 1] === partsB[partsB.length - 1]) return true;
+  }
+  return false;
+}
+
+function mapGroup(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    supervisor: row.supervisor || '',
+    tecnicoResponsavel: row.tecnico_responsavel || '',
+    visitasTecnicas: row.visitas_tecnicas || 'N/A',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function mapCompany(row) {
   if (!row) return null;
   const rawCat = row.category || 'TotalSafety';
   const parts = rawCat.split(' - ');
   const catName = parts[0];
   const regName = parts.length > 1 ? parts[1] : 'Natal';
+  const contactInfo = parseContactData(row.contact);
 
   return {
     id: row.id,
     groupId: row.group_id,
     name: row.name,
     cnpj: row.cnpj,
-    contact: row.contact,
+    contact: contactInfo.contact,
+    responsible: row.tecnico_responsavel || contactInfo.responsible,
+    responsibleId: contactInfo.responsibleId,
+    supportResponsible: row.supervisor || contactInfo.supportResponsible,
+    supportResponsibleId: contactInfo.supportResponsibleId,
+    supervisor: row.supervisor || contactInfo.supportResponsible || '',
+    tecnicoResponsavel: row.tecnico_responsavel || contactInfo.responsible || '',
+    visitasTecnicas: row.visitas_tecnicas || '',
+    gestaoCipa: row.gestao_cipa || row.gestao_pgr || 'pendente',
+    gestaoEpi: row.gestao_epi || row.gestao_sipat || 'pendente',
+    gestaoPgr: row.gestao_cipa || row.gestao_pgr || 'pendente',
+    gestaoSipat: row.gestao_epi || row.gestao_sipat || 'pendente',
     phone: row.phone,
     category: catName,
     region: regName,
@@ -48,9 +128,12 @@ function mapDeliverable(row) {
     title: row.title,
     type: row.type,
     status: row.status || 'pendente',
-    dueDate: row.due_date,
+    dueDate: row.data_emissao || row.data_envio || row.due_date,
+    dataEnvio: row.data_emissao || row.data_envio || row.due_date || row.delivered_date,
+    dataEmissao: row.data_emissao || row.data_envio || row.due_date || row.delivered_date,
     validityDate: row.validity_date,
     deliveredDate: row.delivered_date,
+    ultimaRevisao: row.ultima_revisao,
     fileName: row.file_name,
     reason: row.reason,
     description: row.description,
@@ -96,19 +179,96 @@ function mapTraining(row) {
 export async function getGroups() {
   const { data, error } = await supabase.from('groups').select('*').order('created_at', { ascending: true });
   if (error) { console.error('Error fetching groups:', error); return []; }
-  return data;
+  return data.map(mapGroup);
 }
 
 export async function addGroup(group) {
-  const { data, error } = await supabase.from('groups').insert([{ name: group.name }]).select().single();
-  if (error) { console.error('Error adding group:', error); return null; }
-  return data;
+  const basePayload = { name: group.name };
+  const extendedPayload = {
+    name: group.name,
+    supervisor: group.supervisor || null,
+    tecnico_responsavel: group.tecnicoResponsavel || group.tecnico_responsavel || null,
+    visitas_tecnicas: group.visitasTecnicas || group.visitas_tecnicas || 'N/A'
+  };
+
+  const res1 = await supabase.from('groups').insert([extendedPayload]).select().single();
+  if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.code === 'PGRST204')) {
+    const res2 = await supabase.from('groups').insert([basePayload]).select().single();
+    if (res2.error) { console.error('Error adding group:', res2.error); return null; }
+    return mapGroup(res2.data);
+  }
+  if (res1.error) { console.error('Error adding group:', res1.error); return null; }
+  return mapGroup(res1.data);
 }
 
 export async function updateGroup(groupId, updates) {
-  const { data, error } = await supabase.from('groups').update(updates).eq('id', groupId).select().single();
-  if (error) { console.error('Error updating group:', error); return null; }
-  return data;
+  const payload = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.supervisor !== undefined) payload.supervisor = updates.supervisor;
+  if (updates.tecnicoResponsavel !== undefined) payload.tecnico_responsavel = updates.tecnicoResponsavel;
+  if (updates.tecnico_responsavel !== undefined) payload.tecnico_responsavel = updates.tecnico_responsavel;
+  if (updates.visitasTecnicas !== undefined) payload.visitas_tecnicas = updates.visitasTecnicas;
+  if (updates.visitas_tecnicas !== undefined) payload.visitas_tecnicas = updates.visitas_tecnicas;
+
+  let groupResult = null;
+  const res1 = await supabase.from('groups').update(payload).eq('id', groupId).select().single();
+  if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.code === 'PGRST204')) {
+    const res2 = await supabase.from('groups').update({ name: updates.name }).eq('id', groupId).select().single();
+    if (res2.error) { console.error('Error updating group:', res2.error); return null; }
+    groupResult = mapGroup(res2.data);
+  } else if (res1.error) {
+    console.error('Error updating group:', res1.error);
+    return null;
+  } else {
+    groupResult = mapGroup(res1.data);
+  }
+
+  // Sincroniza automaticamente TODAS as empresas daquele grupo
+  // garantindo que tenham o mesmo Supervisor, Técnico Responsável e Visitas
+  try {
+    const newSupervisor = updates.supervisor !== undefined ? updates.supervisor : undefined;
+    const newTecnico = updates.tecnicoResponsavel !== undefined
+      ? updates.tecnicoResponsavel
+      : (updates.tecnico_responsavel !== undefined ? updates.tecnico_responsavel : undefined);
+    const newVisitas = updates.visitasTecnicas !== undefined
+      ? updates.visitasTecnicas
+      : (updates.visitas_tecnicas !== undefined ? updates.visitas_tecnicas : undefined);
+
+    if (newSupervisor !== undefined || newTecnico !== undefined || newVisitas !== undefined) {
+      const companyUpdates = {};
+      if (newSupervisor !== undefined) companyUpdates.supervisor = newSupervisor;
+      if (newTecnico !== undefined) companyUpdates.tecnico_responsavel = newTecnico;
+      if (newVisitas !== undefined && newVisitas !== 'N/A') companyUpdates.visitas_tecnicas = newVisitas;
+
+      if (Object.keys(companyUpdates).length > 0) {
+        await supabase.from('companies').update(companyUpdates).eq('group_id', groupId);
+      }
+
+      // Busca perfis para manter os IDs responsibleId e supportResponsibleId atualizados no JSON de contact
+      const { data: profs } = await supabase.from('profiles').select('id, name');
+      const supProf = newSupervisor ? profs?.find(p => isSamePerson(p.name, newSupervisor)) : null;
+      const tecProf = newTecnico ? profs?.find(p => isSamePerson(p.name, newTecnico)) : null;
+
+      const { data: groupCompanies } = await supabase.from('companies').select('id, contact').eq('group_id', groupId);
+      if (groupCompanies && groupCompanies.length > 0) {
+        for (const comp of groupCompanies) {
+          const info = parseContactData(comp.contact);
+          const serialized = serializeContactData({
+            contact: info.contact,
+            responsible: newTecnico !== undefined ? newTecnico : info.responsible,
+            responsibleId: tecProf?.id || (newTecnico !== undefined ? '' : info.responsibleId),
+            supportResponsible: newSupervisor !== undefined ? newSupervisor : info.supportResponsible,
+            supportResponsibleId: supProf?.id || (newSupervisor !== undefined ? '' : info.supportResponsibleId),
+          });
+          await supabase.from('companies').update({ contact: serialized }).eq('id', comp.id);
+        }
+      }
+    }
+  } catch (syncErr) {
+    console.error('Erro ao sincronizar empresas do grupo:', syncErr);
+  }
+
+  return groupResult;
 }
 
 export async function deleteGroup(groupId) {
@@ -136,17 +296,80 @@ export async function getCompanyById(companyId) {
 }
 
 export async function addCompany(company) {
-  const { data, error } = await supabase.from('companies').insert([{
+  let effSupervisor = company.supervisor || null;
+  let effTecnico = company.tecnicoResponsavel || company.tecnico_responsavel || company.responsible || null;
+  let effVisitas = company.visitasTecnicas || company.visitas_tecnicas || null;
+  let effRespId = company.responsibleId || '';
+  let effSuppId = company.supportResponsibleId || '';
+
+  // Se a empresa pertencer a um grupo, herda Supervisor, Técnico Responsável e Visitas do grupo
+  if (company.groupId) {
+    try {
+      const { data: grp } = await supabase.from('groups').select('*').eq('id', company.groupId).maybeSingle();
+      if (grp) {
+        if (grp.supervisor) effSupervisor = grp.supervisor;
+        if (grp.tecnico_responsavel) effTecnico = grp.tecnico_responsavel;
+        if (grp.visitas_tecnicas && grp.visitas_tecnicas !== 'N/A') effVisitas = grp.visitas_tecnicas;
+
+        const { data: profs } = await supabase.from('profiles').select('id, name');
+        if (effSupervisor && !effSuppId) {
+          const sp = profs?.find(p => isSamePerson(p.name, effSupervisor));
+          if (sp) effSuppId = sp.id;
+        }
+        if (effTecnico && !effRespId) {
+          const tp = profs?.find(p => isSamePerson(p.name, effTecnico));
+          if (tp) effRespId = tp.id;
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao herdar dados do grupo para a nova empresa:', e);
+    }
+  }
+
+  const contactStr = serializeContactData({
+    contact: company.contact,
+    responsible: effTecnico,
+    supportResponsible: effSupervisor,
+    responsibleId: effRespId,
+    supportResponsibleId: effSuppId,
+  });
+
+  const basePayload = {
     group_id: company.groupId,
     name: company.name,
     cnpj: company.cnpj,
-    contact: company.contact,
+    contact: contactStr,
     phone: company.phone,
     address: company.address,
     category: `${company.category || 'TotalSafety'} - ${company.region || 'Natal'}`,
     latitude: company.latitude,
     longitude: company.longitude
-  }]).select().single();
+  };
+
+  const extendedPayload = {
+    ...basePayload,
+    supervisor: effSupervisor,
+    tecnico_responsavel: effTecnico,
+    visitas_tecnicas: effVisitas,
+    gestao_cipa: company.gestaoCipa || company.gestao_cipa || company.gestaoPgr || company.gestao_pgr || 'pendente',
+    gestao_epi: company.gestaoEpi || company.gestao_epi || company.gestaoSipat || company.gestao_sipat || 'pendente',
+    gestao_pgr: company.gestaoCipa || company.gestao_cipa || company.gestaoPgr || company.gestao_pgr || 'pendente',
+    gestao_sipat: company.gestaoEpi || company.gestao_epi || company.gestaoSipat || company.gestao_sipat || 'pendente',
+  };
+
+  let data = null;
+  let error = null;
+
+  const res1 = await supabase.from('companies').insert([extendedPayload]).select().single();
+  if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.code === 'PGRST204')) {
+    const res2 = await supabase.from('companies').insert([basePayload]).select().single();
+    data = res2.data;
+    error = res2.error;
+  } else {
+    data = res1.data;
+    error = res1.error;
+  }
+
   if (error) { 
     console.error('Error adding company:', error); 
     if (error.code === '23505') {
@@ -157,7 +380,6 @@ export async function addCompany(company) {
     return null; 
   }
 
-
   return mapCompany(data);
 }
 
@@ -165,8 +387,69 @@ export async function updateCompany(companyId, updates) {
   const snakeUpdates = {};
   if (updates.name !== undefined) snakeUpdates.name = updates.name;
   if (updates.cnpj !== undefined) snakeUpdates.cnpj = updates.cnpj;
-  if (updates.contact !== undefined) snakeUpdates.contact = updates.contact;
   if (updates.phone !== undefined) snakeUpdates.phone = updates.phone;
+
+  if (updates.supervisor !== undefined) snakeUpdates.supervisor = updates.supervisor;
+  if (updates.tecnicoResponsavel !== undefined) snakeUpdates.tecnico_responsavel = updates.tecnicoResponsavel;
+  if (updates.tecnico_responsavel !== undefined) snakeUpdates.tecnico_responsavel = updates.tecnico_responsavel;
+  if (updates.visitasTecnicas !== undefined) snakeUpdates.visitas_tecnicas = updates.visitasTecnicas;
+  if (updates.visitas_tecnicas !== undefined) snakeUpdates.visitas_tecnicas = updates.visitas_tecnicas;
+  if (updates.gestaoCipa !== undefined) {
+    snakeUpdates.gestao_cipa = updates.gestaoCipa;
+    snakeUpdates.gestao_pgr = updates.gestaoCipa;
+  }
+  if (updates.gestao_cipa !== undefined) {
+    snakeUpdates.gestao_cipa = updates.gestao_cipa;
+    snakeUpdates.gestao_pgr = updates.gestao_cipa;
+  }
+  if (updates.gestaoEpi !== undefined) {
+    snakeUpdates.gestao_epi = updates.gestaoEpi;
+    snakeUpdates.gestao_sipat = updates.gestaoEpi;
+  }
+  if (updates.gestao_epi !== undefined) {
+    snakeUpdates.gestao_epi = updates.gestao_epi;
+    snakeUpdates.gestao_sipat = updates.gestao_epi;
+  }
+  if (updates.gestaoPgr !== undefined) {
+    snakeUpdates.gestao_pgr = updates.gestaoPgr;
+    snakeUpdates.gestao_cipa = updates.gestaoPgr;
+  }
+  if (updates.gestao_pgr !== undefined) {
+    snakeUpdates.gestao_pgr = updates.gestao_pgr;
+    snakeUpdates.gestao_cipa = updates.gestao_pgr;
+  }
+  if (updates.gestaoSipat !== undefined) {
+    snakeUpdates.gestao_sipat = updates.gestaoSipat;
+    snakeUpdates.gestao_epi = updates.gestaoSipat;
+  }
+  if (updates.gestao_sipat !== undefined) {
+    snakeUpdates.gestao_sipat = updates.gestao_sipat;
+    snakeUpdates.gestao_epi = updates.gestao_sipat;
+  }
+
+  if (
+    updates.contact !== undefined ||
+    updates.responsible !== undefined ||
+    updates.supportResponsible !== undefined ||
+    updates.responsibleId !== undefined ||
+    updates.supportResponsibleId !== undefined
+  ) {
+    const { data: current } = await supabase.from('companies').select('contact').eq('id', companyId).single();
+    const currentInfo = parseContactData(current?.contact);
+    const newContact = updates.contact !== undefined ? updates.contact : currentInfo.contact;
+    const newResp = updates.responsible !== undefined ? updates.responsible : (updates.tecnicoResponsavel !== undefined ? updates.tecnicoResponsavel : currentInfo.responsible);
+    const newRespId = updates.responsibleId !== undefined ? updates.responsibleId : currentInfo.responsibleId;
+    const newSupp = updates.supportResponsible !== undefined ? updates.supportResponsible : (updates.supervisor !== undefined ? updates.supervisor : currentInfo.supportResponsible);
+    const newSuppId = updates.supportResponsibleId !== undefined ? updates.supportResponsibleId : currentInfo.supportResponsibleId;
+
+    snakeUpdates.contact = serializeContactData({
+      contact: newContact,
+      responsible: newResp,
+      supportResponsible: newSupp,
+      responsibleId: newRespId,
+      supportResponsibleId: newSuppId,
+    });
+  }
   if (updates.address !== undefined) snakeUpdates.address = updates.address;
   if (updates.latitude !== undefined) snakeUpdates.latitude = updates.latitude;
   if (updates.longitude !== undefined) snakeUpdates.longitude = updates.longitude;
@@ -184,8 +467,88 @@ export async function updateCompany(companyId, updates) {
     snakeUpdates.category = `${newCat} - ${newReg}`;
   }
 
-  const { data, error } = await supabase.from('companies').update(snakeUpdates).eq('id', companyId).select().single();
+  let data = null;
+  let error = null;
+
+  const res1 = await supabase.from('companies').update(snakeUpdates).eq('id', companyId).select().single();
+  if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.code === 'PGRST204')) {
+    // Retira colunas novas se o banco ainda não as tiver
+    const safeUpdates = { ...snakeUpdates };
+    delete safeUpdates.supervisor;
+    delete safeUpdates.tecnico_responsavel;
+    delete safeUpdates.visitas_tecnicas;
+    delete safeUpdates.gestao_cipa;
+    delete safeUpdates.gestao_epi;
+    delete safeUpdates.gestao_pgr;
+    delete safeUpdates.gestao_sipat;
+
+    const res2 = await supabase.from('companies').update(safeUpdates).eq('id', companyId).select().single();
+    data = res2.data;
+    error = res2.error;
+  } else {
+    data = res1.data;
+    error = res1.error;
+  }
+
   if (error) { console.error('Error updating company:', error); return null; }
+
+  // Se a empresa pertencer a um grupo e foi alterado Supervisor, Técnico Responsável ou Visitas Técnicas,
+  // propaga automaticamente para o grupo e para TODAS as outras empresas daquele grupo
+  const targetGroupId = data?.group_id;
+  const newSupervisor = updates.supervisor !== undefined ? updates.supervisor : (updates.supportResponsible !== undefined ? updates.supportResponsible : undefined);
+  const newTecnico = updates.tecnicoResponsavel !== undefined
+    ? updates.tecnicoResponsavel
+    : (updates.tecnico_responsavel !== undefined ? updates.tecnico_responsavel : (updates.responsible !== undefined ? updates.responsible : undefined));
+  const newVisitas = updates.visitasTecnicas !== undefined
+    ? updates.visitasTecnicas
+    : (updates.visitas_tecnicas !== undefined ? updates.visitas_tecnicas : undefined);
+
+  if (targetGroupId && (newSupervisor !== undefined || newTecnico !== undefined || newVisitas !== undefined)) {
+    try {
+      // 1. Atualiza o grupo (groups)
+      const groupUpdates = {};
+      if (newSupervisor !== undefined) groupUpdates.supervisor = newSupervisor;
+      if (newTecnico !== undefined) groupUpdates.tecnico_responsavel = newTecnico;
+      if (newVisitas !== undefined && newVisitas !== 'N/A') groupUpdates.visitas_tecnicas = newVisitas;
+
+      if (Object.keys(groupUpdates).length > 0) {
+        await supabase.from('groups').update(groupUpdates).eq('id', targetGroupId);
+      }
+
+      // 2. Atualiza todas as outras empresas do mesmo grupo (siblings)
+      const siblingUpdates = {};
+      if (newSupervisor !== undefined) siblingUpdates.supervisor = newSupervisor;
+      if (newTecnico !== undefined) siblingUpdates.tecnico_responsavel = newTecnico;
+      if (newVisitas !== undefined && newVisitas !== 'N/A') siblingUpdates.visitas_tecnicas = newVisitas;
+
+      if (Object.keys(siblingUpdates).length > 0) {
+        await supabase.from('companies').update(siblingUpdates).eq('group_id', targetGroupId);
+      }
+
+      // 3. Atualiza o JSON do campo contact nas outras empresas do mesmo grupo
+      const { data: profs } = await supabase.from('profiles').select('id, name');
+      const supProf = newSupervisor ? profs?.find(p => isSamePerson(p.name, newSupervisor)) : null;
+      const tecProf = newTecnico ? profs?.find(p => isSamePerson(p.name, newTecnico)) : null;
+
+      const { data: siblings } = await supabase.from('companies').select('id, contact').eq('group_id', targetGroupId);
+      if (siblings && siblings.length > 0) {
+        for (const sib of siblings) {
+          const info = parseContactData(sib.contact);
+          const serialized = serializeContactData({
+            contact: info.contact,
+            responsible: newTecnico !== undefined ? newTecnico : info.responsible,
+            responsibleId: tecProf?.id || (newTecnico !== undefined ? '' : info.responsibleId),
+            supportResponsible: newSupervisor !== undefined ? newSupervisor : info.supportResponsible,
+            supportResponsibleId: supProf?.id || (newSupervisor !== undefined ? '' : info.supportResponsibleId),
+          });
+          await supabase.from('companies').update({ contact: serialized }).eq('id', sib.id);
+        }
+      }
+    } catch (groupSyncErr) {
+      console.warn('Erro ao sincronizar dados com o grupo e empresas irmãs:', groupSyncErr);
+    }
+  }
+
   return mapCompany(data);
 }
 
@@ -212,7 +575,7 @@ export async function getTrainings() {
 }
 
 export async function getTrainingsByCompany(companyId) {
-  const { data, error } = await supabase.from('trainings').select('*').eq('company_id', companyId);
+  const { data, error } = await supabase.from('trainings').select('*').eq('company_id', companyId).order('date', { ascending: true });
   if (error) { console.error('Error fetching trainings by company:', error); return []; }
   return data.map(mapTraining);
 }
@@ -430,25 +793,37 @@ export async function addDeliverable(deliverable) {
           .maybeSingle();
           
         if (!existing) {
-          const { data, error } = await supabase.from('deliverables').insert([{
+          const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
+          const insertPayload = {
             company_id: gc.id,
             contract_id: gc.id === deliverable.companyId ? deliverable.contractId : null,
             title: deliverable.title,
             type: deliverable.type,
             status: deliverable.status,
-            due_date: deliverable.dueDate,
-            validity_date: deliverable.validityDate,
+            due_date: emissaoVal,
+            data_envio: emissaoVal,
+            data_emissao: emissaoVal,
+            validity_date: deliverable.validityDate || null,
+            ultima_revisao: deliverable.ultimaRevisao || null,
             delivered_date: deliverable.deliveredDate,
             file_name: deliverable.fileName,
             reason: deliverable.reason,
             description: deliverable.description,
             responsible_id: deliverable.responsibleId || null,
-          }]).select().single();
+          };
           
-          if (error) console.error('Error adding deliverable to group company:', error);
+          let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
+          if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
+            delete insertPayload.data_emissao;
+            delete insertPayload.data_envio;
+            delete insertPayload.ultima_revisao;
+            insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
+          }
+
+          if (insRes.error) console.error('Error adding deliverable to group company:', insRes.error);
           
-          if (gc.id === deliverable.companyId && data) {
-            createdDeliverable = data;
+          if (gc.id === deliverable.companyId && insRes.data) {
+            createdDeliverable = insRes.data;
           }
         } else if (gc.id === deliverable.companyId) {
            const { data } = await supabase.from('deliverables').select('*').eq('id', existing.id).single();
@@ -457,43 +832,65 @@ export async function addDeliverable(deliverable) {
       }
       
       if (!createdDeliverable) {
-         const { data } = await supabase.from('deliverables').insert([{
+         const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
+         const insertPayload = {
             company_id: deliverable.companyId,
             contract_id: deliverable.contractId,
             title: deliverable.title,
             type: deliverable.type,
             status: deliverable.status,
-            due_date: deliverable.dueDate,
-            validity_date: deliverable.validityDate,
+            due_date: emissaoVal,
+            data_envio: emissaoVal,
+            data_emissao: emissaoVal,
+            validity_date: deliverable.validityDate || null,
+            ultima_revisao: deliverable.ultimaRevisao || null,
             delivered_date: deliverable.deliveredDate,
             file_name: deliverable.fileName,
             reason: deliverable.reason,
             description: deliverable.description,
             responsible_id: deliverable.responsibleId || null,
-         }]).select().single();
-         createdDeliverable = data;
+         };
+         let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
+         if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
+            delete insertPayload.data_emissao;
+            delete insertPayload.data_envio;
+            delete insertPayload.ultima_revisao;
+            insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
+         }
+         createdDeliverable = insRes.data;
       }
       return mapDeliverable(createdDeliverable);
     }
   }
 
   // Fallback
-  const { data, error } = await supabase.from('deliverables').insert([{
+  const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
+  const insertPayload = {
     company_id: deliverable.companyId,
     contract_id: deliverable.contractId,
     title: deliverable.title,
     type: deliverable.type,
     status: deliverable.status,
-    due_date: deliverable.dueDate,
-    validity_date: deliverable.validityDate,
+    due_date: emissaoVal,
+    data_envio: emissaoVal,
+    data_emissao: emissaoVal,
+    validity_date: deliverable.validityDate || null,
+    ultima_revisao: deliverable.ultimaRevisao || null,
     delivered_date: deliverable.deliveredDate,
     file_name: deliverable.fileName,
     reason: deliverable.reason,
     description: deliverable.description,
     responsible_id: deliverable.responsibleId || null,
-  }]).select().single();
-  if (error) { console.error('Error adding deliverable:', error); return null; }
-  return mapDeliverable(data);
+  };
+  let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
+  if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
+    delete insertPayload.data_emissao;
+    delete insertPayload.data_envio;
+    delete insertPayload.ultima_revisao;
+    insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
+  }
+  if (insRes.error) { console.error('Error adding deliverable:', insRes.error); return null; }
+  return mapDeliverable(insRes.data);
 }
 
 export async function updateDeliverable(deliverableId, updates) {
@@ -508,15 +905,31 @@ export async function updateDeliverable(deliverableId, updates) {
   if (updates.description !== undefined) snakeUpdates.description = updates.description;
   if (updates.type !== undefined) snakeUpdates.type = updates.type;
   if (updates.contractId !== undefined) snakeUpdates.contract_id = updates.contractId;
-  if (updates.dueDate !== undefined) snakeUpdates.due_date = updates.dueDate;
+  const emissaoVal = updates.dataEmissao !== undefined ? updates.dataEmissao : updates.dataEnvio;
+  if (emissaoVal !== undefined) {
+    snakeUpdates.data_emissao = emissaoVal;
+    snakeUpdates.data_envio = emissaoVal;
+    snakeUpdates.due_date = emissaoVal;
+  }
+  if (updates.dueDate !== undefined && emissaoVal === undefined) snakeUpdates.due_date = updates.dueDate;
   if (updates.validityDate !== undefined) snakeUpdates.validity_date = updates.validityDate;
+  if (updates.ultimaRevisao !== undefined) snakeUpdates.ultima_revisao = updates.ultimaRevisao;
   if (updates.status !== undefined) snakeUpdates.status = updates.status;
   if (updates.reason !== undefined) snakeUpdates.reason = updates.reason;
   if (updates.fileName !== undefined) snakeUpdates.file_name = updates.fileName;
   if (updates.deliveredDate !== undefined) snakeUpdates.delivered_date = updates.deliveredDate;
   if (updates.responsibleId !== undefined) snakeUpdates.responsible_id = updates.responsibleId;
 
-  const { data, error } = await supabase.from('deliverables').update(snakeUpdates).eq('id', deliverableId).select().single();
+  let { data, error } = await supabase.from('deliverables').update(snakeUpdates).eq('id', deliverableId).select().single();
+  if (error && error.message && (error.message.includes('column') || error.code === 'PGRST204')) {
+    const safeUpdates = { ...snakeUpdates };
+    delete safeUpdates.data_emissao;
+    delete safeUpdates.data_envio;
+    delete safeUpdates.ultima_revisao;
+    const fbRes = await supabase.from('deliverables').update(safeUpdates).eq('id', deliverableId).select().single();
+    data = fbRes.data;
+    error = fbRes.error;
+  }
   if (error) { console.error('Error updating deliverable:', error); return null; }
 
 

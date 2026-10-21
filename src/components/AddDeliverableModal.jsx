@@ -3,14 +3,15 @@ import { X, FileText } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
 
-const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
+const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'programa' }) => {
   const [selectedDeliverable, setSelectedDeliverable] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState('programa');
+  const [type, setType] = useState(initialType);
   const [contractId, setContractId] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dataEnvio, setDataEnvio] = useState('');
   const [validityDate, setValidityDate] = useState('');
+  const [ultimaRevisao, setUltimaRevisao] = useState('');
   const [deliveredDate, setDeliveredDate] = useState('');
   const [responsibleId, setResponsibleId] = useState('');
   const [file, setFile] = useState(null);
@@ -40,7 +41,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !dueDate) return;
+    if (!title.trim() || !dataEnvio) return;
     
     setSaving(true);
     
@@ -49,9 +50,15 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
       description: description.trim() || null,
       type,
       contractId: contractId || null,
+      dueDate: dataEnvio,
+      dataEnvio,
+      dataEmissao: dataEnvio,
+      data_emissao: dataEnvio,
+      data_envio: dataEnvio,
       validityDate: validityDate || null,
+      ultimaRevisao: ultimaRevisao || null,
       status: file ? 'entregue' : 'pendente',
-      deliveredDate: deliveredDate || (file ? new Date().toISOString() : null),
+      deliveredDate: deliveredDate || dataEnvio || (file ? new Date().toISOString() : null),
       responsibleId: responsibleId || null,
       fileName: null,
       file: file
@@ -60,13 +67,14 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
     const itemsToSave = [];
     
     if ((type === 'treinamento' || type === 'visita_tecnica') && recurrence !== 'none') {
-       let currentDueDate = new Date(dueDate);
+       let currentDueDate = new Date(dataEnvio);
        for (let i = 0; i <= repeatCount; i++) {
            let dateStr = currentDueDate.toISOString().split('T')[0];
            
            itemsToSave.push({
                ...baseItem,
                dueDate: dateStr,
+               dataEnvio: dateStr,
            });
 
            if (recurrence === 'weekly' || recurrence === 'weekly_same_day') {
@@ -95,7 +103,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
            }
        }
     } else {
-       itemsToSave.push({ ...baseItem, dueDate });
+       itemsToSave.push({ ...baseItem, dueDate: dataEnvio, dataEnvio });
     }
 
     await onSave(itemsToSave);
@@ -114,7 +122,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
             }}>
               <FileText size={18} color="white" />
             </div>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Registrar Entregável</h2>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Novo Entregável</h2>
           </div>
           <button onClick={onClose} style={{ padding: '0.375rem', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)' }}>
             <X size={20} />
@@ -125,11 +133,11 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
           <div style={{ padding: '3rem', textAlign: 'center' }}>Carregando dados...</div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '75vh', overflowY: 'auto' }}>
               
               {/* Deliverable Select */}
               <div>
-                <label className="modal-label" htmlFor="dlv-select">Entregável</label>
+                <label className="modal-label" htmlFor="dlv-select">Entregável Padronizado</label>
                 <select
                   id="dlv-select"
                   value={selectedDeliverable}
@@ -138,56 +146,52 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                     setSelectedDeliverable(val);
                     if (val === 'outro') {
                       setTitle('');
-                    } else {
-                      setTitle(val);
-                      const match = STANDARD_DELIVERABLES.find((d) => d.value === val);
-                      if (match) {
-                        setType(match.defaultType);
+                      setDescription('');
+                    } else if (val) {
+                      const found = STANDARD_DELIVERABLES.find(d => d.value === val);
+                      if (found) {
+                        setTitle(found.label);
+                        setType(found.defaultType);
+                        if (found.description) setDescription(found.description);
                       }
                     }
                   }}
                   className="modal-input"
-                  required
                   disabled={saving}
                 >
-                  <option value="" disabled>Selecione o entregável...</option>
-                  {STANDARD_DELIVERABLES.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
+                  <option value="">Selecione um entregável...</option>
+                  {STANDARD_DELIVERABLES.map(d => (
+                    <option key={d.value} value={d.value}>{d.label} ({d.defaultType})</option>
                   ))}
-                  <option value="outro">Outro (Digitar manualmente)</option>
+                  <option value="outro">Outro (personalizado)</option>
                 </select>
               </div>
 
-              {/* Title (if 'outro') */}
-              {selectedDeliverable === 'outro' && (
-                <div>
-                  <label className="modal-label" htmlFor="dlv-title">Título do Documento</label>
-                  <input
-                    id="dlv-title"
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Digite o título do entregável..."
-                    className="modal-input"
-                    autoFocus
-                    required
-                    disabled={saving}
-                  />
-                </div>
-              )}
+              {/* Title */}
+              <div>
+                <label className="modal-label" htmlFor="dlv-title">Título do Entregável *</label>
+                <input
+                  id="dlv-title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: PGR - Programa de Gerenciamento de Riscos"
+                  className="modal-input"
+                  required
+                  disabled={saving}
+                />
+              </div>
 
               {/* Description */}
               <div>
-                <label className="modal-label" htmlFor="dlv-desc">Descrição / Detalhes (Opcional)</label>
+                <label className="modal-label" htmlFor="dlv-desc">Descrição / Observações</label>
                 <textarea
                   id="dlv-desc"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Detalhes ou anotações sobre este entregável..."
+                  placeholder="Detalhes adicionais do laudo, programa ou visita..."
                   className="modal-input"
-                  rows="3"
+                  rows="2"
                   disabled={saving}
                   style={{ resize: 'vertical' }}
                 />
@@ -221,7 +225,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                     className="modal-input"
                     disabled={saving}
                   >
-                    <option value="">Sem vínculo (Opcional)</option>
+                    <option value="">Sem vínculo</option>
                     {contracts.map(c => (
                       <option key={c.id} value={c.id}>{c.contractNumber}</option>
                     ))}
@@ -229,23 +233,39 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                 </div>
               </div>
 
-              {/* Dates */}
-              <div className="grid-responsive-2">
+              {/* Datas: Data de Emissão (OBRIGATÓRIO), Validade (NÃO OBRIGATÓRIO), Última Revisão (NÃO OBRIGATÓRIO) */}
+              <div style={{
+                padding: '1rem',
+                backgroundColor: 'var(--surface-hover, #f8fafc)',
+                borderRadius: 'var(--radius-md, 8px)',
+                border: '1px solid var(--border, #e2e8f0)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}>
                 <div>
-                  <label className="modal-label" htmlFor="dlv-due">Data Limite (Prazo)</label>
+                  <label className="modal-label" htmlFor="dlv-envio" style={{ fontWeight: '600' }}>
+                    Data de Emissão <span style={{ color: '#ef4444', fontWeight: 'bold' }}>* (Obrigatório)</span>
+                  </label>
                   <input
-                    id="dlv-due"
+                    id="dlv-envio"
                     type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    value={dataEnvio}
+                    onChange={(e) => setDataEnvio(e.target.value)}
                     className="modal-input"
                     required
                     disabled={saving}
                   />
+                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                    Data de emissão prevista ou realizada do documento ao cliente.
+                  </span>
                 </div>
-                {type !== 'treinamento' && (
+
+                <div className="grid-responsive-2">
                   <div>
-                    <label className="modal-label" htmlFor="dlv-validity">Validade do Documento</label>
+                    <label className="modal-label" htmlFor="dlv-validity">
+                      Data de Validade (Opcional)
+                    </label>
                     <input
                       id="dlv-validity"
                       type="date"
@@ -254,42 +274,48 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                       className="modal-input"
                       disabled={saving}
                     />
+                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                      Não obrigatório
+                    </span>
                   </div>
-                )}
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="modal-label" htmlFor="dlv-responsible">Responsável (Técnico)</label>
-                  <select
-                    id="dlv-responsible"
-                    value={responsibleId}
-                    onChange={(e) => setResponsibleId(e.target.value)}
-                    className="modal-input"
-                    disabled={saving}
-                  >
-                    <option value="">Nenhum</option>
-                    {profiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="modal-label" htmlFor="dlv-revisao">
+                      Última Revisão (Opcional)
+                    </label>
+                    <input
+                      id="dlv-revisao"
+                      type="date"
+                      value={ultimaRevisao}
+                      onChange={(e) => setUltimaRevisao(e.target.value)}
+                      className="modal-input"
+                      disabled={saving}
+                    />
+                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                      Não obrigatório
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
-                <div>
-                  <label className="modal-label" htmlFor="dlv-delivered">Data de Entrega (Opcional)</label>
-                  <input
-                    id="dlv-delivered"
-                    type="date"
-                    value={deliveredDate}
-                    onChange={(e) => setDeliveredDate(e.target.value)}
-                    className="modal-input"
-                    disabled={saving}
-                  />
-                </div>
+              {/* Responsável */}
+              <div>
+                <label className="modal-label" htmlFor="dlv-responsible">Responsável (Técnico)</label>
+                <select
+                  id="dlv-responsible"
+                  value={responsibleId}
+                  onChange={(e) => setResponsibleId(e.target.value)}
+                  className="modal-input"
+                  disabled={saving}
+                >
+                  <option value="">Nenhum</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                  ))}
+                </select>
               </div>
 
+              {/* Repetição para Treinamento / Visita Técnica */}
               {(type === 'treinamento' || type === 'visita_tecnica') && (
                 <div style={{ padding: '1rem', backgroundColor: 'var(--surface-light)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
                   <label className="modal-label">Repetição (Opcional)</label>
@@ -299,12 +325,12 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                     onChange={(e) => setRecurrence(e.target.value)}
                     disabled={saving}
                   >
-                  <option value="none">Não repetir (padrão)</option>
-                  <option value="weekly">Semanalmente (a cada 7 dias)</option>
-                  <option value="weekly_same_day">Semanalmente (no mesmo dia da semana)</option>
-                  <option value="monthly">Mensalmente (no mesmo dia da semana)</option>
-                  <option value="custom">Personalizado (a cada X dias)</option>
-                  <option value="custom_same_day">Personalizado (a cada X dias no mesmo dia da semana)</option>
+                    <option value="none">Não repetir (padrão)</option>
+                    <option value="weekly">Semanalmente (a cada 7 dias)</option>
+                    <option value="weekly_same_day">Semanalmente (no mesmo dia da semana)</option>
+                    <option value="monthly">Mensalmente (no mesmo dia da semana)</option>
+                    <option value="custom">Personalizado (a cada X dias)</option>
+                    <option value="custom_same_day">Personalizado (a cada X dias no mesmo dia da semana)</option>
                   </select>
 
                   {recurrence !== 'none' && (
@@ -323,7 +349,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                         </div>
                       )}
                       <div>
-                        <label className="modal-label">Nº de ocorrências futuras (além da 1ª)</label>
+                        <label className="modal-label">Quantas repetições?</label>
                         <input
                           type="number"
                           min="1"
@@ -339,31 +365,26 @@ const AddDeliverableModal = ({ companyId, onClose, onSave }) => {
                 </div>
               )}
 
+              {/* Arquivo PDF */}
               <div>
-                <label className="modal-label">Anexar PDF Inicial (Opcional)</label>
+                <label className="modal-label" htmlFor="dlv-file">Documento (PDF)</label>
                 <input
+                  id="dlv-file"
                   type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={(e) => setFile(e.target.files[0])}
+                  accept=".pdf"
+                  onChange={(e) => setFile(e.target.files[0] || null)}
                   className="modal-input"
-                  style={{ padding: '0.5rem', cursor: 'pointer' }}
                   disabled={saving}
+                  style={{ padding: '0.5rem' }}
                 />
               </div>
-
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                {file 
-                  ? <span>O item será cadastrado como <strong style={{color: 'var(--secondary-hover)'}}>Entregue</strong>.</span>
-                  : <span>O item será cadastrado como <strong>Pendente</strong>.</span>
-                }
-              </p>
 
             </div>
 
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={!title.trim() || !dueDate || saving}>
-                {saving ? 'Registrando...' : 'Registrar'}
+              <button type="submit" className="btn btn-primary" disabled={!title.trim() || !dataEnvio || saving}>
+                {saving ? 'Salvando...' : 'Adicionar Entregável'}
               </button>
             </div>
           </form>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, MapPin, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, Building2, MapPin, Loader2, CheckCircle2, UserCheck, LifeBuoy } from 'lucide-react';
+import { getProfiles } from '../services/storageService';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -44,10 +45,18 @@ function LocationMarker({ position, setPosition }) {
   );
 }
 
-const EditCompanyModal = ({ company, onClose, onSave }) => {
+const EditCompanyModal = ({ company, group = null, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [cnpj, setCnpj] = useState('');
+  const [responsible, setResponsible] = useState('');
+  const [responsibleId, setResponsibleId] = useState('');
+  const [supportResponsible, setSupportResponsible] = useState('');
+  const [supportResponsibleId, setSupportResponsibleId] = useState('');
+  const [visitasTecnicas, setVisitasTecnicas] = useState('N/A');
+  const [gestaoCipa, setGestaoCipa] = useState('pendente');
+  const [gestaoEpi, setGestaoEpi] = useState('pendente');
   const [contact, setContact] = useState('');
+  const [profiles, setProfiles] = useState([]);
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('TotalSafety');
   const [region, setRegion] = useState('Natal');
@@ -171,9 +180,29 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
   };
 
   useEffect(() => {
+    async function loadProfiles() {
+      const profs = await getProfiles();
+      setProfiles(profs || []);
+    }
+    loadProfiles();
+  }, []);
+
+  useEffect(() => {
     if (company) {
       setName(company.name || '');
       setCnpj(company.cnpj || '');
+      // Se a empresa pertencer a um grupo com Supervisor/Técnico, alinha com o grupo
+      const effResp = group?.tecnicoResponsavel || group?.tecnico_responsavel || company.tecnicoResponsavel || company.responsible || '';
+      const effSupp = group?.supervisor || company.supervisor || company.supportResponsible || '';
+      const effVis = (group?.visitasTecnicas && group.visitasTecnicas !== 'N/A') ? group.visitasTecnicas : (company.visitasTecnicas || group?.visitas_tecnicas || 'N/A');
+
+      setResponsible(effResp);
+      setResponsibleId(company.responsibleId || '');
+      setSupportResponsible(effSupp);
+      setSupportResponsibleId(company.supportResponsibleId || '');
+      setVisitasTecnicas(effVis);
+      setGestaoCipa(company.gestaoCipa || company.gestaoPgr || 'pendente');
+      setGestaoEpi(company.gestaoEpi || company.gestaoSipat || 'pendente');
       setContact(company.contact || '');
       setPhone(company.phone || '');
       setAddress(company.address || '');
@@ -183,7 +212,7 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
         setPosition({ lat: company.latitude, lng: company.longitude });
       }
     }
-  }, [company]);
+  }, [company, group]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -192,6 +221,23 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
     await onSave(company.id, { 
       name: name.trim(), 
       cnpj, 
+      responsible: responsible.trim(),
+      tecnicoResponsavel: responsible.trim(),
+      tecnico_responsavel: responsible.trim(),
+      responsibleId,
+      supportResponsible: supportResponsible.trim(),
+      supervisor: supportResponsible.trim(),
+      supportResponsibleId,
+      visitasTecnicas,
+      visitas_tecnicas: visitasTecnicas,
+      gestaoCipa,
+      gestao_cipa: gestaoCipa,
+      gestaoEpi,
+      gestao_epi: gestaoEpi,
+      gestaoPgr: gestaoCipa,
+      gestao_pgr: gestaoCipa,
+      gestaoSipat: gestaoEpi,
+      gestao_sipat: gestaoEpi,
       contact: contact.trim(), 
       phone: phone.trim(), 
       address: address.trim(),
@@ -270,21 +316,157 @@ const EditCompanyModal = ({ company, onClose, onSave }) => {
               </div>
             </div>
             
+            {/* Equipe Responsável TotalSafety */}
+            <div style={{ padding: '1rem', backgroundColor: 'var(--surface-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              {group && (group.supervisor || group.tecnicoResponsavel || group.tecnico_responsavel) && (
+                <div style={{
+                  padding: '0.625rem 0.875rem',
+                  backgroundColor: '#eff6ff',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid #bfdbfe',
+                  fontSize: '0.75rem',
+                  color: '#1e40af',
+                  marginBottom: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <Building2 size={15} color="var(--primary)" />
+                  <span>
+                    Empresa integrante do grupo <strong>{group.name}</strong>. Supervisor e Técnico Responsável sincronizados com o grupo.
+                  </span>
+                </div>
+              )}
+              <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserCheck size={16} color="var(--primary)" /> Equipe TotalSafety (Supervisor / Técnico Responsável)
+              </div>
+              <div className="grid-responsive-2">
+                <div>
+                  <label className="modal-label" htmlFor="company-responsible">
+                    Técnico Responsável
+                  </label>
+                  <select
+                    id="company-responsible"
+                    value={responsible}
+                    onChange={(e) => {
+                      setResponsible(e.target.value);
+                      const p = profiles.find(prof => prof.name === e.target.value);
+                      setResponsibleId(p ? p.id : '');
+                    }}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="">Selecione o técnico responsável titular...</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.name}>{p.name} {p.sector ? `(${p.sector})` : ''}</option>
+                    ))}
+                    {responsible && !profiles.some(p => p.name === responsible) && (
+                      <option value={responsible}>{responsible} (Personalizado)</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-support-responsible">
+                    Supervisor
+                  </label>
+                  <select
+                    id="company-support-responsible"
+                    value={supportResponsible}
+                    onChange={(e) => {
+                      setSupportResponsible(e.target.value);
+                      const p = profiles.find(prof => prof.name === e.target.value);
+                      setSupportResponsibleId(p ? p.id : '');
+                    }}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="">Selecione o supervisor...</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.name}>{p.name} {p.sector ? `(${p.sector})` : ''}</option>
+                    ))}
+                    {supportResponsible && !profiles.some(p => p.name === supportResponsible) && (
+                      <option value={supportResponsible}>{supportResponsible} (Personalizado)</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Gestão SST & Visitas Técnicas */}
+            <div style={{ padding: '1rem', backgroundColor: 'var(--surface-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle2 size={16} color="var(--primary)" /> Gestão SST & Visitas Técnicas
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label className="modal-label" htmlFor="company-visitas">
+                    Visitas Técnicas
+                  </label>
+                  <select
+                    id="company-visitas"
+                    value={visitasTecnicas}
+                    onChange={(e) => setVisitasTecnicas(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="7">7 dias (Semanal)</option>
+                    <option value="15">15 dias (Quinzenal)</option>
+                    <option value="30">30 dias (Mensal)</option>
+                    <option value="60">60 dias (Bimestral)</option>
+                    <option value="N/A">N/A (Não se aplica)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-gestao-cipa">
+                    Gestão de CIPA
+                  </label>
+                  <select
+                    id="company-gestao-cipa"
+                    value={gestaoCipa}
+                    onChange={(e) => setGestaoCipa(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="implementado">Implementado</option>
+                    <option value="nao_implementado">Não Implementado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-gestao-epi">
+                    Gestão de EPI
+                  </label>
+                  <select
+                    id="company-gestao-epi"
+                    value={gestaoEpi}
+                    onChange={(e) => setGestaoEpi(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="implementado">Implementado</option>
+                    <option value="nao_implementado">Não Implementado</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Contato do Cliente */}
             <div className="grid-responsive-2">
               <div>
-                <label className="modal-label" htmlFor="company-contact">Contato</label>
+                <label className="modal-label" htmlFor="company-contact">Contato na Empresa (Ponto Focal)</label>
                 <input
                   id="company-contact"
                   type="text"
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
-                  placeholder="Nome do responsável"
+                  placeholder="Nome do contato / representante (ex: RH, Gerente)"
                   className="modal-input"
                   disabled={loading}
                 />
               </div>
               <div>
-                <label className="modal-label" htmlFor="company-phone">Telefone</label>
+                <label className="modal-label" htmlFor="company-phone">Telefone de Contato</label>
                 <input
                   id="company-phone"
                   type="text"

@@ -496,12 +496,15 @@ const DeliverablesViewer = ({ companyId }) => {
                 )}
                 {/* Meta details if in list mode to save space */}
                 {viewMode === 'list' && (
-                  <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                    {d.dueDate && <span>Vencimento: {new Date(d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
+                  <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                    {(d.dataEmissao || d.dataEnvio || d.dueDate) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio || d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
                     {d.validityDate && (
                       <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>
                         Validade: {new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} {isExpired && '⚠️ Vencido'}
                       </span>
+                    )}
+                    {d.ultimaRevisao && (
+                      <span>Revisão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.ultimaRevisao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>
                     )}
                     {d.deliveredDate && <span>Entregue em: {new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
                     <span>Contrato: {contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A'}</span>
@@ -526,8 +529,8 @@ const DeliverablesViewer = ({ companyId }) => {
               {viewMode === 'grid' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Data Limite:</span>
-                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{d.dueDate ? new Date(d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''}</span>
+                    <span>Data de Emissão:</span>
+                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{(d.dataEmissao || d.dataEnvio || d.dueDate) ? new Date(d.dataEmissao || d.dataEnvio || d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}</span>
                   </div>
                   {d.validityDate && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -535,6 +538,12 @@ const DeliverablesViewer = ({ companyId }) => {
                       <span style={{ fontWeight: '600', color: isExpired ? 'var(--danger)' : 'var(--primary)' }}>
                         {new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} {isExpired && '⚠️'}
                       </span>
+                    </div>
+                  )}
+                  {d.ultimaRevisao && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Última Revisão:</span>
+                      <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{new Date(d.ultimaRevisao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
                     </div>
                   )}
                   {d.deliveredDate && (
