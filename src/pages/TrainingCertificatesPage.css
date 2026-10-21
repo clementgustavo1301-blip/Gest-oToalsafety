@@ -706,34 +706,42 @@ textarea.tc-input {
 
 /* ---------- Gerar ---------- */
 .tc-generate {
-  margin-top: 1rem;
+  margin-top: 0.85rem;
 }
 
+/* Resumo compacto (número + rótulo na mesma linha) para manter o botão visível */
 .tc-generate-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.7rem;
 }
 
 .tc-stat {
-  padding: 0.55rem 0.7rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
   border-radius: 9px;
   background: var(--tc-muted-bg);
   border: 1px solid var(--border);
 }
 
 .tc-stat strong {
-  display: block;
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1.2;
+  flex-shrink: 0;
 }
 
 .tc-stat span {
   font-size: 0.7rem;
   color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tc-generate-btn {
@@ -772,3 +780,548 @@ textarea.tc-input {
 .tc-generate .tc-hint {
   margin-top: 0.5rem;
 }
+
+/* =========================================================================
+   ABA TURMAS & INSCRIÇÕES — mesmos tokens da aba de geração
+   ========================================================================= */
+.tc-turmas {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.tc-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.tc-section-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.tc-section-head p {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+.tc-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--tc-accent-soft);
+  color: var(--tc-accent);
+}
+
+.tc-btn--lg {
+  font-size: 0.84rem;
+  padding: 0.58rem 1rem;
+  border-radius: 9px;
+}
+
+.tc-btn--primary.tc-btn--lg {
+  box-shadow: 0 4px 12px -3px rgba(2, 132, 199, 0.45);
+}
+
+/* ---------- Portal público (faixa compacta) ---------- */
+.tc-portal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--tc-radius);
+  border: 1px solid rgba(2, 132, 199, 0.22);
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.07) 0%, rgba(15, 23, 42, 0.02) 100%);
+}
+
+.tc-portal-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.tc-portal-tag {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--tc-accent);
+  color: #fff;
+}
+
+.tc-portal-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.tc-portal h3 {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+/* URL + botão de copiar unidos num único controle */
+.tc-url-field {
+  display: flex;
+  align-items: stretch;
+  max-width: 520px;
+  margin-top: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.tc-url-field code {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tc-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tc-url-field button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  min-width: 118px;
+  justify-content: center;
+  padding: 0 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--tc-accent);
+  transition: var(--transition);
+}
+
+.tc-url-field button:hover { background: var(--tc-accent-strong); }
+.tc-url-field button.is-copied { background: var(--success); }
+
+.tc-portal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+a.tc-btn { text-decoration: none; }
+
+@media (max-width: 760px) {
+  .tc-portal { grid-template-columns: 1fr; }
+}
+
+/* ---------- Cards de turma ---------- */
+.tc-turma-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 480px) {
+  .tc-turma-grid { grid-template-columns: 1fr; }
+}
+
+.tc-turma-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem 1.2rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--tc-radius);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tc-turma-card:hover {
+  border-color: rgba(2, 132, 199, 0.35);
+  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.14);
+}
+
+.tc-turma-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tc-turma-tools {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.tc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--tc-accent-soft);
+  color: var(--tc-accent);
+}
+
+.tc-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.tc-status--progress {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.tc-status--done {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
+
+.tc-turma-title h3 {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.tc-turma-title p {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--tc-accent);
+  margin-top: 0.15rem;
+}
+
+.tc-meta {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.tc-meta li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.tc-meta li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.tc-meta strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tc-turma-foot {
+  margin-top: auto;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tc-turma-foot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tc-enrolled-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 0.2rem 0.35rem;
+  margin-left: -0.35rem;
+  border-radius: 6px;
+  transition: var(--transition);
+}
+
+.tc-enrolled-link svg { color: var(--tc-accent); }
+.tc-enrolled-link strong { color: var(--text-primary); }
+
+.tc-enrolled-link:hover {
+  background: var(--tc-accent-soft);
+  color: var(--tc-accent);
+}
+
+.tc-turma-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.tc-turma-actions .tc-btn--primary {
+  grid-column: 1 / -1;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+/* ---------- Estado vazio / carregando ---------- */
+.tc-empty {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--tc-radius);
+}
+
+.tc-empty--flat {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.tc-empty-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 0.75rem;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tc-accent);
+  background: var(--tc-accent-soft);
+}
+
+.tc-empty h3 {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tc-empty p {
+  font-size: 0.82rem;
+  max-width: 440px;
+  margin: 0.3rem auto 1rem;
+  line-height: 1.5;
+}
+
+.tc-empty-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ---------- Tabela de inscritos ---------- */
+.tc-table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--tc-muted-bg);
+}
+
+.tc-search {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 340px;
+}
+
+.tc-search svg {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.tc-search .tc-input { padding-left: 2.1rem; }
+
+.tc-toolbar select.tc-input {
+  width: auto;
+  flex: 0 1 260px;
+  min-width: 180px;
+}
+
+.tc-toolbar .tc-input {
+  padding-top: 0.48rem;
+  padding-bottom: 0.48rem;
+  font-size: 0.83rem;
+}
+
+.tc-toolbar-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tc-table-wrap { overflow-x: auto; }
+
+.tc-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.84rem;
+}
+
+.tc-table th {
+  padding: 0.65rem 1rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.tc-table td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.tc-table tbody tr:last-child td { border-bottom: none; }
+.tc-table tbody tr { transition: background-color 0.15s ease; }
+.tc-table tbody tr:hover { background: var(--tc-muted-bg); }
+
+.tc-table .tc-col-end { text-align: right; }
+
+.tc-person {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 200px;
+}
+
+.tc-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--tc-accent);
+  background: var(--tc-accent-soft);
+}
+
+.tc-person-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tc-person-sub {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.tc-cell-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tc-accent);
+  white-space: nowrap;
+}
+
+.tc-cell-muted {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tc-table select.tc-input {
+  width: auto;
+  max-width: 220px;
+  font-size: 0.8rem;
+  padding: 0.35rem 1.9rem 0.35rem 0.6rem;
+}
+
+/* ---------- Modais do Sistema (Treinamento & Turmas) ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  animation: tcFadeIn 0.15s ease-out;
+}
+
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--tc-radius-sm, 6px);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-close:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary);
+  border-color: var(--tc-accent);
+}
+
+@keyframes tcFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+

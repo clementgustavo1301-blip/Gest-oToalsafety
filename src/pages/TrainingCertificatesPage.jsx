@@ -1914,533 +1914,406 @@ const TrainingCertificatesPage = () => {
       {/* ========================================================================= */}
       {/* ABA 2: TURMAS & INSCRIÇÕES OFICIAIS                                       */}
       {/* ========================================================================= */}
-      {activeTab === 'turmas' && (
-        <div>
-          {/* Card Hero: Link Público Geral */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(15, 23, 42, 0.03) 100%)',
-            border: '1px solid rgba(2, 132, 199, 0.25)',
-            borderRadius: '1.15rem',
-            padding: '1.35rem 1.6rem',
-            marginBottom: '1.75rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-          }}>
+      {activeTab === 'turmas' && (() => {
+        const hasActiveFilters = Boolean(searchQuery.trim()) || selectedTurmaFilter !== 'all';
+        const turmaStatusClass = (status) =>
+          status === 'Concluída' ? 'tc-status--done' : status === 'Em Andamento' ? 'tc-status--progress' : '';
+        const showTurmaEnrollments = (turmaId) => {
+          setSearchQuery('');
+          setSelectedTurmaFilter(String(turmaId));
+          document.getElementById('tc-enrollments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        const clearEnrollmentFilters = () => {
+          setSearchQuery('');
+          setSelectedTurmaFilter('all');
+        };
+
+        return (
+        <div className="tc-turmas">
+          {/* Faixa compacta: Link Público Geral de Inscrição */}
+          <section className="tc-portal" aria-labelledby="tc-portal-title">
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.35rem' }}>
-                <span style={{ 
-                  backgroundColor: '#0284c7', 
-                  color: '#fff', 
-                  fontSize: '0.72rem', 
-                  fontWeight: '700', 
-                  padding: '2px 10px', 
-                  borderRadius: '1rem',
-                  textTransform: 'uppercase'
-                }}>
-                  Portal Público de Participação
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: '#10b981', fontWeight: '700' }}>
-                  <ShieldCheck size={15} />
-                  Validação Oficial Receita (CPF A)
+              <div className="tc-portal-tags">
+                <span className="tc-portal-tag">Portal público de participação</span>
+                <span className="tc-portal-verified">
+                  <ShieldCheck size={14} />
+                  Validação oficial Receita (CPF)
                 </span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                Envie o link para os alunos preencherem a lista de presença com CPF e Data de Nascimento:
+              <h3 id="tc-portal-title">
+                Envie o link para os alunos preencherem a lista de presença com CPF e data de nascimento.
               </h3>
-              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <code style={{ 
-                  backgroundColor: 'var(--surface)', 
-                  border: '1px solid var(--border)', 
-                  padding: '0.45rem 0.95rem', 
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#0284c7',
-                  fontWeight: '700',
-                  fontFamily: 'monospace'
-                }}>
-                  {window.location.origin}/inscricao
-                </code>
+              <div className="tc-url-field">
+                <code title={`${window.location.origin}/inscricao`}>{window.location.origin}/inscricao</code>
+                <button
+                  id="btn-copy-public-link"
+                  type="button"
+                  className={copiedKey === 'banner-general' ? 'is-copied' : ''}
+                  onClick={() => copyPublicLink(null, 'banner-general')}
+                >
+                  {copiedKey === 'banner-general' ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedKey === 'banner-general' ? 'Copiado!' : 'Copiar link'}
+                </button>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => copyPublicLink(null, 'banner-general')}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.45rem', 
-                  fontSize: '0.875rem',
-                  fontWeight: '700',
-                  padding: '0.65rem 1.15rem',
-                  backgroundColor: '#0284c7',
-                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-                }}
-              >
-                {copiedKey === 'banner-general' ? <Check size={16} /> : <Copy size={16} />}
-                {copiedKey === 'banner-general' ? 'Copiado para a Área de Transferência!' : 'Copiar Link Público'}
-              </button>
-
+            <div className="tc-portal-actions">
               <a
+                id="btn-test-public-form"
                 href="/inscricao"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn"
-                style={{
-                  backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  padding: '0.65rem 1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  textDecoration: 'none'
-                }}
+                className="tc-btn tc-btn--lg"
               >
                 <Eye size={15} />
-                Testar Formulário
+                Testar formulário
               </a>
-
               <button
                 id="btn-api-cpf-token"
                 type="button"
                 className="tc-icon-btn"
                 onClick={() => setShowTokenModal(true)}
                 title="Configurar token da API CPF (Receita)"
-                style={{ width: '40px', height: '40px' }}
+                aria-label="Configurar token da API CPF (Receita)"
               >
                 <Key size={16} />
               </button>
             </div>
-          </div>
+          </section>
 
           {/* Seção de Turmas Cadastradas */}
-          <div style={{ marginBottom: '2.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.15rem' }}>
+          <section aria-labelledby="tc-turmas-title">
+            <div className="tc-section-head">
               <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-                  Turmas de Treinamento ({turmas.length})
+                <h2 id="tc-turmas-title">
+                  Turmas de treinamento
+                  <span className="tc-count">{turmas.length}</span>
                 </h2>
-                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  Cada turma possui link próprio, instrutor do sistema e exportação direta de certificados.
-                </p>
+                <p>Cada turma possui link próprio, instrutor do sistema e emissão direta de certificados.</p>
               </div>
-
               <button
+                id="btn-new-turma"
                 type="button"
-                className="btn btn-primary"
+                className="tc-btn tc-btn--primary tc-btn--lg"
                 onClick={handleOpenNewTurma}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.45rem', 
-                  fontSize: '0.875rem',
-                  fontWeight: '700',
-                  backgroundColor: '#0284c7',
-                  padding: '0.6rem 1.15rem',
-                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-                }}
               >
                 <Plus size={16} />
-                Nova Turma
+                Nova turma
               </button>
             </div>
 
             {loadingData ? (
-              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                <Loader size={26} className="animate-spin" style={{ margin: '0 auto 0.65rem', color: '#0284c7' }} />
-                Carregando turmas...
+              <div className="tc-empty">
+                <Loader size={24} className="animate-spin" style={{ margin: '0 auto 0.6rem', color: 'var(--tc-accent)' }} />
+                <p style={{ margin: 0 }}>Carregando turmas...</p>
               </div>
             ) : turmas.length === 0 ? (
-              <div style={{
-                padding: '3rem 2rem',
-                textAlign: 'center',
-                backgroundColor: 'var(--surface)',
-                border: '1px dashed var(--border)',
-                borderRadius: '1.25rem'
-              }}>
-                <Award size={40} style={{ color: 'var(--text-secondary)', margin: '0 auto 0.85rem', opacity: 0.4 }} />
-                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
-                  Nenhuma turma criada ainda
-                </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.35rem', marginBottom: '1.25rem' }}>
-                  Crie sua primeira turma selecionando um instrutor do sistema para gerar links de presença e certificados em lote.
-                </p>
+              <div className="tc-empty">
+                <div className="tc-empty-icon">
+                  <Award size={24} />
+                </div>
+                <h3>Nenhuma turma criada ainda</h3>
+                <p>Crie sua primeira turma selecionando um instrutor do sistema para gerar links de presença e certificados em lote.</p>
                 <button
+                  id="btn-create-first-turma"
                   type="button"
-                  className="btn btn-primary"
+                  className="tc-btn tc-btn--primary tc-btn--lg"
                   onClick={handleOpenNewTurma}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.875rem', fontWeight: '700', backgroundColor: '#0284c7' }}
                 >
                   <Plus size={16} />
-                  Criar Primeira Turma
+                  Criar primeira turma
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.15rem' }}>
+              <div className="tc-turma-grid">
                 {turmas.map(turma => {
                   const studentCount = enrollments.filter(e => e.turma_id === turma.id).length;
                   return (
-                    <div
-                      key={turma.id}
-                      style={{
-                        backgroundColor: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '1rem',
-                        padding: '1.35rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        gap: '1rem',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                        transition: 'transform 0.15s, box-shadow 0.15s'
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-                          <span style={{
-                            backgroundColor: turma.status === 'Concluída' ? '#f1f5f9' : 'rgba(2, 132, 199, 0.1)',
-                            color: turma.status === 'Concluída' ? '#64748b' : '#0284c7',
-                            fontSize: '0.72rem',
-                            fontWeight: '700',
-                            padding: '3px 10px',
-                            borderRadius: '1rem',
-                            textTransform: 'uppercase'
-                          }}>
-                            {turma.status || 'Aberta'}
-                          </span>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleEditTurma(turma)}
-                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
-                              title="Editar Turma"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteTurma(turma.id, turma.name)}
-                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px' }}
-                              title="Excluir Turma"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0.65rem 0 0.35rem' }}>
-                          {turma.name}
-                        </h3>
-                        {turma.course_name && turma.course_name !== turma.name && (
-                          <div style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: '700', marginBottom: '0.45rem' }}>
-                            {turma.course_name}
-                          </div>
-                        )}
-
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          {turma.instructors && turma.instructors.length > 0 ? (
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-                              <User size={14} style={{ color: '#0284c7', marginTop: '2px', flexShrink: 0 }} />
-                              <div>
-                                <strong>{turma.instructors.length > 1 ? `Instrutores (${turma.instructors.length}):` : 'Instrutor:'}</strong>{' '}
-                                {turma.instructors.map(i => i.name).join(' • ')}
-                              </div>
-                            </div>
-                          ) : turma.instructor_name ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <User size={14} style={{ color: '#0284c7' }} />
-                              <span><strong>Instrutor:</strong> {turma.instructor_name}</span>
-                            </div>
-                          ) : null}
-                          {turma.company && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <Building size={14} style={{ color: 'var(--text-secondary)' }} />
-                              <span><strong>Empresa:</strong> {turma.company}</span>
-                            </div>
-                          )}
-                          {turma.start_date && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-                              <span><strong>Data:</strong> {new Date(turma.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} • {turma.duration || '8h'}</span>
-                            </div>
-                          )}
+                    <article key={turma.id} className="tc-turma-card">
+                      <div className="tc-turma-top">
+                        <span className={`tc-status ${turmaStatusClass(turma.status)}`}>
+                          {turma.status || 'Aberta'}
+                        </span>
+                        <div className="tc-turma-tools">
+                          <button
+                            type="button"
+                            className="tc-icon-btn tc-icon-btn--sm"
+                            onClick={() => handleEditTurma(turma)}
+                            title="Editar turma"
+                            aria-label={`Editar turma ${turma.name}`}
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="tc-icon-btn tc-icon-btn--sm tc-icon-btn--danger"
+                            onClick={() => handleDeleteTurma(turma.id, turma.name)}
+                            title="Excluir turma"
+                            aria-label={`Excluir turma ${turma.name}`}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       </div>
 
-                      <div style={{
-                        paddingTop: '0.85rem',
-                        borderTop: '1px solid var(--border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Users size={15} style={{ color: '#0284c7' }} />
-                          <strong style={{ color: 'var(--text-primary)' }}>{studentCount}</strong> inscritos
-                        </div>
+                      <div className="tc-turma-title">
+                        <h3>{turma.name}</h3>
+                        {turma.course_name && turma.course_name !== turma.name && (
+                          <p>{turma.course_name}</p>
+                        )}
+                      </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <ul className="tc-meta">
+                        {turma.instructors && turma.instructors.length > 0 ? (
+                          <li>
+                            <User size={14} />
+                            <span>
+                              <strong>{turma.instructors.length > 1 ? `Instrutores (${turma.instructors.length}):` : 'Instrutor:'}</strong>{' '}
+                              {turma.instructors.map(i => i.name).join(' • ')}
+                            </span>
+                          </li>
+                        ) : turma.instructor_name ? (
+                          <li>
+                            <User size={14} />
+                            <span><strong>Instrutor:</strong> {turma.instructor_name}</span>
+                          </li>
+                        ) : null}
+                        {turma.company && (
+                          <li>
+                            <Building size={14} />
+                            <span><strong>Empresa:</strong> {turma.company}</span>
+                          </li>
+                        )}
+                        {turma.start_date && (
+                          <li>
+                            <Calendar size={14} />
+                            <span><strong>Data:</strong> {new Date(turma.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} • {turma.duration || '8h'}</span>
+                          </li>
+                        )}
+                      </ul>
+
+                      <div className="tc-turma-foot">
+                        <div className="tc-turma-foot-row">
                           <button
                             type="button"
-                            className="btn"
+                            className="tc-enrolled-link"
+                            onClick={() => showTurmaEnrollments(turma.id)}
+                            title="Ver inscritos desta turma na lista de presença"
+                          >
+                            <Users size={15} />
+                            <strong>{studentCount}</strong> inscrito{studentCount !== 1 ? 's' : ''}
+                          </button>
+                        </div>
+                        <div className="tc-turma-actions">
+                          <button
+                            type="button"
+                            className="tc-btn"
+                            onClick={() => copyPublicLink(turma.id, `turma-${turma.id}`)}
+                            title="Copiar link de inscrição específico desta turma"
+                          >
+                            {copiedKey === `turma-${turma.id}` ? <Check size={14} style={{ color: 'var(--success)' }} /> : <Copy size={14} />}
+                            {copiedKey === `turma-${turma.id}` ? 'Link copiado' : 'Link da turma'}
+                          </button>
+                          <button
+                            type="button"
+                            className="tc-btn"
                             onClick={() => handleOpenQrModal(turma)}
-                            style={{ 
-                              fontSize: '0.78rem', 
-                              padding: '0.4rem 0.75rem', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '0.3rem',
-                              backgroundColor: 'rgba(124, 58, 237, 0.08)',
-                              border: '1px solid rgba(124, 58, 237, 0.3)',
-                              color: '#7c3aed',
-                              fontWeight: '700'
-                            }}
                             title="Gerar e gerenciar links exclusivos de assinatura desta turma"
                           >
                             <Smartphone size={14} />
-                            Links de Assinatura
+                            Links de assinatura
                           </button>
-
                           <button
                             type="button"
-                            className="btn"
-                            onClick={() => copyPublicLink(turma.id, `turma-${turma.id}`)}
-                            style={{ 
-                              fontSize: '0.78rem', 
-                              padding: '0.4rem 0.75rem', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '0.3rem',
-                              backgroundColor: 'var(--surface-hover)',
-                              border: '1px solid var(--border)',
-                              fontWeight: '600'
-                            }}
-                            title="Copiar link de inscrição específico desta turma"
-                          >
-                            {copiedKey === `turma-${turma.id}` ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
-                            {copiedKey === `turma-${turma.id}` ? 'Link Copiado' : 'Link da Turma'}
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn btn-primary"
+                            className="tc-btn tc-btn--primary"
                             onClick={() => handleLoadTurmaIntoGenerator(turma)}
-                            style={{ 
-                              fontSize: '0.78rem', 
-                              padding: '0.4rem 0.85rem', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '0.35rem',
-                              backgroundColor: '#0284c7',
-                              fontWeight: '700'
-                            }}
                             title="Carregar alunos desta turma no gerador de certificados"
                           >
                             <Award size={14} />
-                            Emitir PPTX
+                            Emitir certificados (.pptx)
                           </button>
                         </div>
                       </div>
-                    </div>
+                    </article>
                   );
                 })}
               </div>
             )}
-          </div>
+          </section>
 
           {/* Seção da Tabela de Inscritos */}
-          <div>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between', 
-              flexWrap: 'wrap', 
-              gap: '1rem', 
-              marginBottom: '1.15rem' 
-            }}>
+          <section id="tc-enrollments" aria-labelledby="tc-enrollments-title" style={{ scrollMarginTop: '1rem' }}>
+            <div className="tc-section-head">
               <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-                  Participantes & Lista de Presença ({filteredEnrollments.length})
+                <h2 id="tc-enrollments-title">
+                  Participantes &amp; lista de presença
+                  <span className="tc-count">
+                    {hasActiveFilters ? `${filteredEnrollments.length} de ${enrollments.length}` : enrollments.length}
+                  </span>
                 </h2>
-                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  Dados em tempo real obtidos com CPF e Data de Nascimento via Receita Federal.
-                </p>
+                <p>Dados em tempo real obtidos com CPF e data de nascimento via Receita Federal.</p>
               </div>
+            </div>
 
-              {/* Filtros e Busca */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-                <div style={{ position: 'relative' }}>
-                  <Search size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+            <div className="tc-card tc-table-card">
+              {/* Barra de filtros integrada à tabela */}
+              <div className="tc-toolbar">
+                <div className="tc-search">
+                  <Search size={15} />
                   <input
+                    id="tc-enrollment-search"
                     type="text"
                     placeholder="Buscar por nome ou CPF..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input"
-                    style={{ paddingLeft: '2.2rem', width: '240px', fontSize: '0.85rem' }}
+                    className="tc-input"
+                    aria-label="Buscar participante por nome ou CPF"
                   />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Filter size={15} style={{ color: 'var(--text-secondary)' }} />
-                  <select
-                    value={selectedTurmaFilter}
-                    onChange={(e) => setSelectedTurmaFilter(e.target.value)}
-                    className="input"
-                    style={{ fontSize: '0.85rem' }}
-                  >
-                    <option value="all">Todas as Turmas ({enrollments.length})</option>
-                    <option value="unassigned">Sem Turma Vinculada ({enrollments.filter(e => !e.turma_id).length})</option>
-                    {turmas.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({enrollments.filter(e => e.turma_id === t.id).length})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={loadData}
-                  title="Atualizar lista em tempo real"
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    padding: '0.6rem',
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--border)'
-                  }}
+                <select
+                  id="tc-enrollment-filter"
+                  value={selectedTurmaFilter}
+                  onChange={(e) => setSelectedTurmaFilter(e.target.value)}
+                  className="tc-input"
+                  aria-label="Filtrar por turma"
                 >
-                  <RefreshCw size={15} />
-                </button>
-              </div>
-            </div>
+                  <option value="all">Todas as turmas ({enrollments.length})</option>
+                  <option value="unassigned">Sem turma vinculada ({enrollments.filter(e => !e.turma_id).length})</option>
+                  {turmas.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({enrollments.filter(e => e.turma_id === t.id).length})
+                    </option>
+                  ))}
+                </select>
 
-            {/* Tabela de Participantes */}
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '1rem',
-              overflow: 'hidden',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-            }}>
-              {filteredEnrollments.length === 0 ? (
-                <div style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  <Users size={36} style={{ margin: '0 auto 0.65rem', opacity: 0.3 }} />
-                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>
-                    {searchQuery ? 'Nenhum aluno encontrado para os filtros atuais.' : 'Nenhuma inscrição recebida ainda.'}
-                  </p>
+                <div className="tc-toolbar-end">
+                  {hasActiveFilters && (
+                    <button type="button" className="tc-link" onClick={clearEnrollmentFilters}>
+                      <X size={12} />
+                      Limpar filtros
+                    </button>
+                  )}
+                  <button
+                    id="btn-refresh-enrollments"
+                    type="button"
+                    className="tc-icon-btn"
+                    onClick={loadData}
+                    title="Atualizar lista em tempo real"
+                    aria-label="Atualizar lista"
+                  >
+                    <RefreshCw size={15} />
+                  </button>
                 </div>
+              </div>
+
+              {filteredEnrollments.length === 0 ? (
+                enrollments.length === 0 ? (
+                  <div className="tc-empty tc-empty--flat">
+                    <div className="tc-empty-icon">
+                      <Users size={22} />
+                    </div>
+                    <h3>Nenhuma inscrição recebida ainda</h3>
+                    <p>Compartilhe o link público com os alunos — as inscrições aparecem aqui automaticamente.</p>
+                    <div className="tc-empty-actions">
+                      <button
+                        type="button"
+                        className="tc-btn tc-btn--soft"
+                        onClick={() => copyPublicLink(null, 'empty-enrollments')}
+                      >
+                        {copiedKey === 'empty-enrollments' ? <Check size={14} /> : <Copy size={14} />}
+                        {copiedKey === 'empty-enrollments' ? 'Link copiado' : 'Copiar link público'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="tc-empty tc-empty--flat">
+                    <div className="tc-empty-icon">
+                      <Filter size={22} />
+                    </div>
+                    <h3>Nenhum participante encontrado</h3>
+                    <p>Nenhum aluno corresponde aos filtros atuais.</p>
+                    <div className="tc-empty-actions">
+                      <button type="button" className="tc-btn" onClick={clearEnrollmentFilters}>
+                        <X size={14} />
+                        Limpar filtros
+                      </button>
+                    </div>
+                  </div>
+                )
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                <div className="tc-table-wrap">
+                  <table className="tc-table">
                     <thead>
-                      <tr style={{ backgroundColor: 'var(--surface-hover)', borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        <th style={{ padding: '0.85rem 1.15rem' }}>Participante Oficial</th>
-                        <th style={{ padding: '0.85rem 1.15rem' }}>CPF</th>
-                        <th style={{ padding: '0.85rem 1.15rem' }}>Nascimento</th>
-                        <th style={{ padding: '0.85rem 1.15rem' }}>Turma Vinculada</th>
-                        <th style={{ padding: '0.85rem 1.15rem' }}>Inscrição</th>
-                        <th style={{ padding: '0.85rem 1.15rem', textAlign: 'right' }}>Ações</th>
+                      <tr>
+                        <th>Participante</th>
+                        <th>CPF</th>
+                        <th>Nascimento</th>
+                        <th>Turma vinculada</th>
+                        <th>Inscrição</th>
+                        <th className="tc-col-end">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredEnrollments.map(student => {
-                        return (
-                          <tr key={student.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.15s' }}>
-                            <td style={{ padding: '0.85rem 1.15rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                                <div style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '50%',
-                                  backgroundColor: 'rgba(2, 132, 199, 0.1)',
-                                  color: '#0284c7',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '800',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}>
-                                  {student.nome?.charAt(0)?.toUpperCase() || 'P'}
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                                    {student.nome}
-                                  </div>
-                                  {student.empresa && (
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                      {student.empresa} {student.telefone ? `• ${student.telefone}` : ''}
-                                    </div>
-                                  )}
-                                </div>
+                      {filteredEnrollments.map(student => (
+                        <tr key={student.id}>
+                          <td>
+                            <div className="tc-person">
+                              <div className="tc-avatar">
+                                {student.nome?.charAt(0)?.toUpperCase() || 'P'}
                               </div>
-                            </td>
-                            <td style={{ padding: '0.85rem 1.15rem', fontFamily: 'monospace', fontWeight: '600', color: '#0284c7' }}>
-                              {student.cpf}
-                            </td>
-                            <td style={{ padding: '0.85rem 1.15rem', color: 'var(--text-secondary)' }}>
-                              {student.data_nascimento ? new Date(student.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
-                            </td>
-                            <td style={{ padding: '0.85rem 1.15rem' }}>
-                              <select
-                                value={student.turma_id || ''}
-                                onChange={(e) => handleStudentTurmaChange(student.id, e.target.value)}
-                                className="input"
-                                style={{ fontSize: '0.8125rem', padding: '0.35rem 0.65rem', width: 'auto', maxWidth: '220px' }}
-                              >
-                                <option value="">(Sem turma vinculada)</option>
-                                {turmas.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td style={{ padding: '0.85rem 1.15rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                              {student.created_at ? new Date(student.created_at).toLocaleDateString('pt-BR') : '-'}
-                            </td>
-                            <td style={{ padding: '0.85rem 1.15rem', textAlign: 'right' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteStudent(student.id, student.nome)}
-                                style={{ 
-                                  background: 'none', 
-                                  border: 'none', 
-                                  color: 'var(--text-secondary)', 
-                                  cursor: 'pointer', 
-                                  padding: '5px',
-                                  transition: 'color 0.15s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
-                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                                title="Excluir Inscrição"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                              <div>
+                                <div className="tc-person-name">{student.nome}</div>
+                                {student.empresa && (
+                                  <div className="tc-person-sub">
+                                    {student.empresa} {student.telefone ? `• ${student.telefone}` : ''}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="tc-cell-mono">{student.cpf}</td>
+                          <td className="tc-cell-muted">
+                            {student.data_nascimento ? new Date(student.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
+                          </td>
+                          <td>
+                            <select
+                              value={student.turma_id || ''}
+                              onChange={(e) => handleStudentTurmaChange(student.id, e.target.value)}
+                              className="tc-input"
+                              aria-label={`Turma vinculada de ${student.nome}`}
+                            >
+                              <option value="">(Sem turma vinculada)</option>
+                              {turmas.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="tc-cell-muted" style={{ fontSize: '0.78rem' }}>
+                            {student.created_at ? new Date(student.created_at).toLocaleDateString('pt-BR') : '-'}
+                          </td>
+                          <td className="tc-col-end">
+                            <button
+                              type="button"
+                              className="tc-icon-btn tc-icon-btn--sm tc-icon-btn--danger"
+                              onClick={() => handleDeleteStudent(student.id, student.nome)}
+                              title="Excluir inscrição"
+                              aria-label={`Excluir inscrição de ${student.nome}`}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* MODAL: CRIAR OU EDITAR TURMA                                              */}
