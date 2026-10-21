@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText,
-  Phone, User, Hash, Edit3, UserCheck, LifeBuoy,
-  ShieldCheck, Clock, CheckCircle2, AlertTriangle, AlertCircle
+  Phone, User, Hash, Edit3, UserCheck,
+  ShieldCheck, Clock, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import {
   getCompanyById, getGroups, getTrainingsByCompany,
@@ -87,11 +87,10 @@ const CompanyDetailsPage = () => {
 
   const programs = deliverables.filter(d => d.type === 'programa');
 
-  const effSupervisor = company.supervisor || group?.supervisor || company.supportResponsible || 'Não definido';
-  const effTecnico = company.tecnicoResponsavel || group?.tecnicoResponsavel || company.responsible || 'Não definido';
-  const effVisitas = company.visitasTecnicas || group?.visitasTecnicas || 'N/A';
+  const effSupervisor = group?.supervisor || company.supervisor || company.supportResponsible || 'Não definido';
+  const effTecnico = group?.tecnicoResponsavel || company.tecnicoResponsavel || company.responsible || 'Não definido';
+  const effVisitas = (group?.visitasTecnicas && group.visitasTecnicas !== 'N/A') ? group.visitasTecnicas : (company.visitasTecnicas || group?.visitasTecnicas || 'N/A');
 
-  const todayStr = new Date().toISOString().split('T')[0];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -133,19 +132,26 @@ const CompanyDetailsPage = () => {
   const pctRegular = Math.max(0, 100 - pctDelivered - pct30 - pct60);
 
   const handleUpdateGestao = async (field, value) => {
-    await updateCompany(companyId, { [field]: value });
-    setCompany(prev => ({ ...prev, [field]: value }));
+    const updates = { [field]: value };
+    if (field === 'gestaoCipa') {
+      updates.gestao_cipa = value;
+      updates.gestaoPgr = value;
+      updates.gestao_pgr = value;
+    }
+    if (field === 'gestaoEpi') {
+      updates.gestao_epi = value;
+      updates.gestaoSipat = value;
+      updates.gestao_sipat = value;
+    }
+    await updateCompany(companyId, updates);
+    setCompany(prev => ({
+      ...prev,
+      [field]: value,
+      ...(field === 'gestaoCipa' ? { gestaoPgr: value, gestaoCipa: value } : {}),
+      ...(field === 'gestaoEpi' ? { gestaoSipat: value, gestaoEpi: value } : {})
+    }));
   };
 
-  // Ordena programações: próximas/futuras primeiro (por data ascendente), seguidas pelas passadas (por data descendente)
-  const sortedSchedules = [...trainings].sort((a, b) => {
-    const aIsFuture = (a.date || '') >= todayStr;
-    const bIsFuture = (b.date || '') >= todayStr;
-    if (aIsFuture && !bIsFuture) return -1;
-    if (!aIsFuture && bIsFuture) return 1;
-    if (aIsFuture && bIsFuture) return (a.date || '').localeCompare(b.date || '');
-    return (b.date || '').localeCompare(a.date || '');
-  });
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -249,7 +255,7 @@ const CompanyDetailsPage = () => {
       {/* Tab Content */}
       {activeTab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Painel Visão Geral: Prazos, Barra Amarelo e Vermelho, Gestão PGR e SIPAT */}
+          {/* Painel Visão Geral: Prazos, Barra Amarelo e Vermelho, Gestão CIPA e EPI */}
           <div className="card" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
@@ -340,204 +346,152 @@ const CompanyDetailsPage = () => {
               </div>
             </div>
 
-            {/* Cards de Gestão PGR e Gestão SIPAT */}
+            {/* Cards de Gestão de CIPA e Gestão de EPI */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-              {/* Card Gestão PGR */}
-              <div style={{
-                padding: '1rem',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--surface)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Programa</span>
-                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>Gestão PGR</h3>
-                  </div>
-                  <span style={{
-                    fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.25rem 0.625rem', borderRadius: '1rem',
-                    backgroundColor: company.gestaoPgr === 'implementado' ? '#dcfce7' : company.gestaoPgr === 'nao_implementado' ? '#fee2e2' : '#fef3c7',
-                    color: company.gestaoPgr === 'implementado' ? '#15803d' : company.gestaoPgr === 'nao_implementado' ? '#b91c1c' : '#b45309',
-                    border: `1px solid ${company.gestaoPgr === 'implementado' ? '#86efac' : company.gestaoPgr === 'nao_implementado' ? '#fca5a5' : '#fde68a'}`
-                  }}>
-                    {company.gestaoPgr === 'implementado' ? 'Implementado' : company.gestaoPgr === 'nao_implementado' ? 'Não Implementado' : 'Pendente'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateGestao('gestaoPgr', 'pendente')}
-                    style={{
-                      flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
-                      border: company.gestaoPgr === 'pendente' ? '2px solid #b45309' : '1px solid var(--border)',
-                      backgroundColor: company.gestaoPgr === 'pendente' ? '#fef3c7' : 'var(--background)',
-                      color: company.gestaoPgr === 'pendente' ? '#b45309' : 'var(--text-secondary)',
-                      fontWeight: company.gestaoPgr === 'pendente' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    Pendente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateGestao('gestaoPgr', 'implementado')}
-                    style={{
-                      flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
-                      border: company.gestaoPgr === 'implementado' ? '2px solid #15803d' : '1px solid var(--border)',
-                      backgroundColor: company.gestaoPgr === 'implementado' ? '#dcfce7' : 'var(--background)',
-                      color: company.gestaoPgr === 'implementado' ? '#15803d' : 'var(--text-secondary)',
-                      fontWeight: company.gestaoPgr === 'implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    Implementado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateGestao('gestaoPgr', 'nao_implementado')}
-                    style={{
-                      flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
-                      border: company.gestaoPgr === 'nao_implementado' ? '2px solid #b91c1c' : '1px solid var(--border)',
-                      backgroundColor: company.gestaoPgr === 'nao_implementado' ? '#fee2e2' : 'var(--background)',
-                      color: company.gestaoPgr === 'nao_implementado' ? '#b91c1c' : 'var(--text-secondary)',
-                      fontWeight: company.gestaoPgr === 'nao_implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    Não Impl.
-                  </button>
-                </div>
-              </div>
-
-              {/* Card Gestão SIPAT */}
-              <div style={{
-                padding: '1rem',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--surface)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Evento / Campanha</span>
-                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>Gestão de SIPAT</h3>
-                  </div>
-                  <span style={{
-                    fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.25rem 0.625rem', borderRadius: '1rem',
-                    backgroundColor: company.gestaoSipat === 'implementado' ? '#dcfce7' : company.gestaoSipat === 'nao_implementado' ? '#fee2e2' : '#fef3c7',
-                    color: company.gestaoSipat === 'implementado' ? '#15803d' : company.gestaoSipat === 'nao_implementado' ? '#b91c1c' : '#b45309',
-                    border: `1px solid ${company.gestaoSipat === 'implementado' ? '#86efac' : company.gestaoSipat === 'nao_implementado' ? '#fca5a5' : '#fde68a'}`
-                  }}>
-                    {company.gestaoSipat === 'implementado' ? 'Implementado' : company.gestaoSipat === 'nao_implementado' ? 'Não Implementado' : 'Pendente'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateGestao('gestaoSipat', 'pendente')}
-                    style={{
-                      flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
-                      border: company.gestaoSipat === 'pendente' ? '2px solid #b45309' : '1px solid var(--border)',
-                      backgroundColor: company.gestaoSipat === 'pendente' ? '#fef3c7' : 'var(--background)',
-                      color: company.gestaoSipat === 'pendente' ? '#b45309' : 'var(--text-secondary)',
-                      fontWeight: company.gestaoSipat === 'pendente' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    Pendente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateGestao('gestaoSipat', 'implementado')}
-                    style={{
-                      flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
-                      border: company.gestaoSipat === 'implementado' ? '2px solid #15803d' : '1px solid var(--border)',
-                      backgroundColor: company.gestaoSipat === 'implementado' ? '#dcfce7' : 'var(--background)',
-                      color: company.gestaoSipat === 'implementado' ? '#15803d' : 'var(--text-secondary)',
-                      fontWeight: company.gestaoSipat === 'implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    Implementado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateGestao('gestaoSipat', 'nao_implementado')}
-                    style={{
-                      flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
-                      border: company.gestaoSipat === 'nao_implementado' ? '2px solid #b91c1c' : '1px solid var(--border)',
-                      backgroundColor: company.gestaoSipat === 'nao_implementado' ? '#fee2e2' : 'var(--background)',
-                      color: company.gestaoSipat === 'nao_implementado' ? '#b91c1c' : 'var(--text-secondary)',
-                      fontWeight: company.gestaoSipat === 'nao_implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    Não Impl.
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid-responsive-overview">
-          {/* Programações no Calendário */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h2 className="text-h2" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Calendar size={20} /> Programações no Calendário
-              </h2>
-              <button 
-                className="btn btn-secondary" 
-                style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
-                onClick={() => setActiveTab('calendar')}
-              >
-                Ver Calendário
-              </button>
-            </div>
-            {sortedSchedules.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Nenhuma programação registrada no calendário.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {sortedSchedules.map(item => {
-                  const statusStyle = item.status === 'concluido'
-                    ? { bg: 'var(--secondary-light)', color: 'var(--secondary-hover)', label: 'Concluído' }
-                    : item.status === 'agendado'
-                      ? { bg: 'var(--primary-light)', color: 'var(--primary)', label: 'Agendado' }
-                      : item.status === 'adiado'
-                        ? { bg: '#fef3c7', color: '#b45309', label: 'Adiado' }
-                        : item.status === 'nao_feito'
-                          ? { bg: '#fee2e2', color: '#dc2626', label: 'Não Feito' }
-                          : { bg: 'var(--primary-light)', color: 'var(--primary)', label: item.status || 'Agendado' };
-
-                  return (
-                    <div key={item.id} style={{
-                      padding: '1rem', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)', backgroundColor: 'var(--background)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              {/* Card Gestão de CIPA */}
+              {(() => {
+                const cipaStatus = company.gestaoCipa || company.gestaoPgr || 'pendente';
+                const epiStatus = company.gestaoEpi || company.gestaoSipat || 'pendente';
+                return (
+                  <>
+                    <div style={{
+                      padding: '1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--surface)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem'
                     }}>
-                      <div>
-                        <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)' }}>
-                          {item.title}
-                        </h4>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.125rem' }}>
-                          {item.date ? new Date(item.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}
-                          {item.time ? ` • ${item.time}` : ''}
-                          {item.instructor ? ` • Instrutor: ${item.instructor}` : ''}
-                        </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Comissão / NR-5</span>
+                          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>Gestão de CIPA</h3>
+                        </div>
+                        <span style={{
+                          fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.25rem 0.625rem', borderRadius: '1rem',
+                          backgroundColor: cipaStatus === 'implementado' ? '#dcfce7' : cipaStatus === 'nao_implementado' ? '#fee2e2' : '#fef3c7',
+                          color: cipaStatus === 'implementado' ? '#15803d' : cipaStatus === 'nao_implementado' ? '#b91c1c' : '#b45309',
+                          border: `1px solid ${cipaStatus === 'implementado' ? '#86efac' : cipaStatus === 'nao_implementado' ? '#fca5a5' : '#fde68a'}`
+                        }}>
+                          {cipaStatus === 'implementado' ? 'Implementado' : cipaStatus === 'nao_implementado' ? 'Não Implementado' : 'Pendente'}
+                        </span>
                       </div>
-                      <span style={{
-                        fontSize: '0.75rem', padding: '0.125rem 0.5rem',
-                        borderRadius: '1rem', backgroundColor: statusStyle.bg,
-                        color: statusStyle.color, fontWeight: '500', textTransform: 'capitalize', whiteSpace: 'nowrap'
-                      }}>
-                        {statusStyle.label}
-                      </span>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoCipa', 'pendente')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: cipaStatus === 'pendente' ? '2px solid #b45309' : '1px solid var(--border)',
+                            backgroundColor: cipaStatus === 'pendente' ? '#fef3c7' : 'var(--background)',
+                            color: cipaStatus === 'pendente' ? '#b45309' : 'var(--text-secondary)',
+                            fontWeight: cipaStatus === 'pendente' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Pendente
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoCipa', 'implementado')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: cipaStatus === 'implementado' ? '2px solid #15803d' : '1px solid var(--border)',
+                            backgroundColor: cipaStatus === 'implementado' ? '#dcfce7' : 'var(--background)',
+                            color: cipaStatus === 'implementado' ? '#15803d' : 'var(--text-secondary)',
+                            fontWeight: cipaStatus === 'implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Implementado
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoCipa', 'nao_implementado')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: cipaStatus === 'nao_implementado' ? '2px solid #b91c1c' : '1px solid var(--border)',
+                            backgroundColor: cipaStatus === 'nao_implementado' ? '#fee2e2' : 'var(--background)',
+                            color: cipaStatus === 'nao_implementado' ? '#b91c1c' : 'var(--text-secondary)',
+                            fontWeight: cipaStatus === 'nao_implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Não Impl.
+                        </button>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+
+                    {/* Card Gestão de EPI */}
+                    <div style={{
+                      padding: '1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--surface)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Equipamento / NR-6</span>
+                          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>Gestão de EPI</h3>
+                        </div>
+                        <span style={{
+                          fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.25rem 0.625rem', borderRadius: '1rem',
+                          backgroundColor: epiStatus === 'implementado' ? '#dcfce7' : epiStatus === 'nao_implementado' ? '#fee2e2' : '#fef3c7',
+                          color: epiStatus === 'implementado' ? '#15803d' : epiStatus === 'nao_implementado' ? '#b91c1c' : '#b45309',
+                          border: `1px solid ${epiStatus === 'implementado' ? '#86efac' : epiStatus === 'nao_implementado' ? '#fca5a5' : '#fde68a'}`
+                        }}>
+                          {epiStatus === 'implementado' ? 'Implementado' : epiStatus === 'nao_implementado' ? 'Não Implementado' : 'Pendente'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoEpi', 'pendente')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: epiStatus === 'pendente' ? '2px solid #b45309' : '1px solid var(--border)',
+                            backgroundColor: epiStatus === 'pendente' ? '#fef3c7' : 'var(--background)',
+                            color: epiStatus === 'pendente' ? '#b45309' : 'var(--text-secondary)',
+                            fontWeight: epiStatus === 'pendente' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Pendente
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoEpi', 'implementado')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: epiStatus === 'implementado' ? '2px solid #15803d' : '1px solid var(--border)',
+                            backgroundColor: epiStatus === 'implementado' ? '#dcfce7' : 'var(--background)',
+                            color: epiStatus === 'implementado' ? '#15803d' : 'var(--text-secondary)',
+                            fontWeight: epiStatus === 'implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Implementado
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoEpi', 'nao_implementado')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: epiStatus === 'nao_implementado' ? '2px solid #b91c1c' : '1px solid var(--border)',
+                            backgroundColor: epiStatus === 'nao_implementado' ? '#fee2e2' : 'var(--background)',
+                            color: epiStatus === 'nao_implementado' ? '#b91c1c' : 'var(--text-secondary)',
+                            fontWeight: epiStatus === 'nao_implementado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Não Impl.
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           </div>
 
           {/* Programas */}
@@ -611,7 +565,6 @@ const CompanyDetailsPage = () => {
             )}
           </div>
         </div>
-      </div>
       )}
 
       {activeTab === 'calendar' && (
@@ -634,6 +587,7 @@ const CompanyDetailsPage = () => {
       {showEditModal && (
         <EditCompanyModal 
           company={company}
+          group={group}
           onClose={() => setShowEditModal(false)} 
           onSave={handleEditCompany} 
         />
