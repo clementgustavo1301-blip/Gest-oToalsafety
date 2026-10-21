@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2, Plus, ChevronDown, ChevronRight, Search,
-  Trash2, Users, FileText, MapPin, Edit2
+  Trash2, Users, FileText, MapPin, Edit2, UserCheck, LifeBuoy,
+  ShieldCheck, Clock, CheckCircle2
 } from 'lucide-react';
 import { getGroups, getCompanies, addGroup, updateGroup, addCompany, deleteGroup, deleteCompany } from '../services/storageService';
 import AddGroupModal from '../components/AddGroupModal';
@@ -18,6 +19,7 @@ const CompaniesPage = () => {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
   const [editingGroup, setEditingGroup] = useState(null);
 
   const loadData = async () => {
@@ -127,6 +129,11 @@ const CompaniesPage = () => {
             group.name.toLowerCase().includes(searchTerm.toLowerCase())
           ));
           const isExpanded = expandedGroups.has(group.id);
+          const displaySupervisor = group.supervisor || companiesInGroup.find(c => c.supervisor)?.supervisor || companiesInGroup.find(c => c.supportResponsible)?.supportResponsible;
+          const displayTecnico = group.tecnicoResponsavel || companiesInGroup.find(c => c.tecnicoResponsavel)?.tecnicoResponsavel || companiesInGroup.find(c => c.responsible)?.responsible;
+          const displayVisitas = (group.visitasTecnicas && group.visitasTecnicas !== 'N/A')
+            ? group.visitasTecnicas
+            : (companiesInGroup.find(c => c.visitasTecnicas && c.visitasTecnicas !== 'N/A')?.visitasTecnicas || 'N/A');
 
           return (
             <div key={group.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -164,9 +171,26 @@ const CompaniesPage = () => {
                         </span>
                       ))}
                     </div>
-                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                      {companiesInGroup.length} empresa{companiesInGroup.length !== 1 ? 's' : ''}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.25rem' }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                        {companiesInGroup.length} empresa{companiesInGroup.length !== 1 ? 's' : ''}
+                      </span>
+                      {displaySupervisor && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Supervisor do Grupo">
+                          <ShieldCheck size={13} color="var(--primary)" /> Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{displaySupervisor}</strong>
+                        </span>
+                      )}
+                      {displayTecnico && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Técnico Responsável do Grupo">
+                          <UserCheck size={13} color="var(--primary)" /> Técnico Responsável: <strong style={{ color: 'var(--text-primary)' }}>{displayTecnico}</strong>
+                        </span>
+                      )}
+                      {displayVisitas && displayVisitas !== 'N/A' && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Periodicidade de Visitas Técnicas">
+                          <Clock size={13} color="var(--primary)" /> Visitas: <strong style={{ color: 'var(--text-primary)' }}>{displayVisitas} dias</strong>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -176,6 +200,7 @@ const CompaniesPage = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedGroupId(group.id);
+                      setSelectedGroup(group);
                       setShowCompanyModal(true);
                     }}
                   >
@@ -215,7 +240,13 @@ const CompaniesPage = () => {
                       Nenhuma empresa cadastrada neste grupo.
                     </div>
                   ) : (
-                    companiesInGroup.map((company, idx) => (
+                    companiesInGroup.map((company, idx) => {
+                      const effSupervisor = displaySupervisor || company.supervisor || company.supportResponsible;
+                      const effTecnico = displayTecnico || company.tecnicoResponsavel || company.responsible;
+                      const effVisitas = (displayVisitas && displayVisitas !== 'N/A') ? displayVisitas : (company.visitasTecnicas || 'N/A');
+                      const isConsultoriaFixa = company.category === 'Consultoria Fixa' || company.type === 'Consultoria Fixa';
+
+                      return (
                       <Link
                         key={company.id}
                         to={`/company/${company.id}`}
@@ -238,38 +269,42 @@ const CompaniesPage = () => {
                             <Building2 size={16} color="var(--secondary)" />
                           </div>
                           <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{company.name}</h4>
-                              {company.category && (
-                                <span style={{
-                                  fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                                  backgroundColor: company.category === 'Consultoria Fixa' ? '#ffedd5' : '#dcfce7',
-                                  color: company.category === 'Consultoria Fixa' ? '#c2410c' : '#15803d',
-                                  border: `1px solid ${company.category === 'Consultoria Fixa' ? '#fdba74' : '#86efac'}`
-                                }}>
-                                  {company.category === 'Consultoria Fixa' ? 'Consultoria Fixa' : 'TotalSafety'}
-                                </span>
-                              )}
-                              {company.region && (
-                                <span style={{
-                                  fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                                  backgroundColor: company.region === 'Natal' ? '#e0f2fe' : '#fce7f3',
-                                  color: company.region === 'Natal' ? '#0369a1' : '#be185d',
-                                  border: `1px solid ${company.region === 'Natal' ? '#7dd3fc' : '#fbcfe8'}`
-                                }}>
-                                  {company.region}
-                                </span>
-                              )}
+                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem', margin: 0 }}>{company.name}</h4>
+                              {/* Apenas se é Total Safety ou Consultoria Fixa */}
+                              <span style={{
+                                fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.125rem 0.5rem', borderRadius: '1rem',
+                                backgroundColor: isConsultoriaFixa ? '#ffedd5' : '#dcfce7',
+                                color: isConsultoriaFixa ? '#c2410c' : '#15803d',
+                                border: `1px solid ${isConsultoriaFixa ? '#fdba74' : '#86efac'}`
+                              }}>
+                                {isConsultoriaFixa ? 'Consultoria Fixa' : 'TotalSafety'}
+                              </span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginTop: '0.125rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem', marginTop: '0.35rem' }}>
                               <span style={{
                                 fontSize: '0.8125rem', color: 'var(--text-secondary)',
                                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace", letterSpacing: '0.5px'
                               }}>
                                 CNPJ: {company.cnpj}
                               </span>
+                              {effSupervisor && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Supervisor">
+                                  <ShieldCheck size={12} color="var(--primary)" /> Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{effSupervisor}</strong>
+                                </span>
+                              )}
+                              {effTecnico && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Técnico Responsável">
+                                  <UserCheck size={12} /> Técnico Responsável: {effTecnico}
+                                </span>
+                              )}
+                              {effVisitas && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--secondary-hover)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Periodicidade de Visitas Técnicas">
+                                  <Clock size={12} /> Visitas: {effVisitas === 'N/A' ? 'N/A' : `${effVisitas} dias`}
+                                </span>
+                              )}
                               {company.contact && (
-                                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Contato na Empresa Cliente">
                                   <Users size={12} /> {company.contact}
                                 </span>
                               )}
@@ -299,7 +334,8 @@ const CompaniesPage = () => {
                           <ChevronRight size={18} color="var(--text-secondary)" />
                         </div>
                       </Link>
-                    ))
+                    );
+                  })
                   )}
                 </div>
               )}
@@ -325,7 +361,16 @@ const CompaniesPage = () => {
           initialGroup={editingGroup}
         />
       )}
-      {showCompanyModal && <AddCompanyModal onClose={() => setShowCompanyModal(false)} onSave={handleAddCompany} />}
+      {showCompanyModal && (
+        <AddCompanyModal 
+          group={selectedGroup}
+          onClose={() => {
+            setShowCompanyModal(false);
+            setSelectedGroup(null);
+          }} 
+          onSave={handleAddCompany} 
+        />
+      )}
     </div>
   );
 };
