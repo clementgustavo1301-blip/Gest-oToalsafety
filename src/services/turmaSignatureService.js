@@ -1,10 +1,10 @@
 /**
  * Serviço de Gestão e Sincronização em Tempo Real das Assinaturas Manuais da Turma.
- * As assinaturas são desenhadas no celular ou na tela e aplicadas em lote para todos
- * os certificados da turma selecionada.
+ * Suporta múltiplos instrutores e geração de links de uso único que expiram após a assinatura.
  */
 
 const STORAGE_PREFIX = 'totalsafety_turma_signatures_';
+const TOKENS_STORAGE_KEY = 'totalsafety_signing_tokens';
 const CHANNEL_NAME = 'totalsafety_turma_signatures';
 
 let broadcastChannel = null;
@@ -35,24 +35,34 @@ export function getTurmaSignatures(turmaId) {
 /**
  * Salva ou atualiza uma assinatura manual de um papel específico na turma
  * @param {string} turmaId
- * @param {string} roleKey 'instructor' | 'tech_lead' | 'coordinator'
+ * @param {string} roleKey 'instructor' | 'instructor_0' | 'instructor_1' | 'tech_lead' | 'coordinator'
  * @param {string} signatureDataUrl Base64 PNG data URL
- * @param {object} meta { signerName, signedAt, roleTitle }
+ * @param {object} meta { signerName, signedAt, roleTitle, instructorId }
  */
 export function saveRoleSignature(turmaId, roleKey, signatureDataUrl, meta = {}) {
   if (!turmaId || !roleKey) return null;
   try {
     const existing = getTurmaSignatures(turmaId);
+    const signatureEntry = {
+      dataUrl: signatureDataUrl,
+      signerName: meta.signerName || '',
+      roleTitle: meta.roleTitle || '',
+      signedAt: meta.signedAt || new Date().toISOString(),
+      instructorId: meta.instructorId || null
+    };
+
     const updated = {
       ...existing,
-      [roleKey]: {
-        dataUrl: signatureDataUrl,
-        signerName: meta.signerName || '',
-        roleTitle: meta.roleTitle || '',
-        signedAt: meta.signedAt || new Date().toISOString()
-      },
+      [roleKey]: signatureEntry,
       updatedAt: new Date().toISOString()
     };
+
+    // Sincroniza alias entre 'instructor' e 'instructor_0' para compatibilidade total
+    if (roleKey === 'instructor') {
+      updated.instructor_0 = signatureEntry;
+    } else if (roleKey === 'instructor_0') {
+      updated.instructor = signatureEntry;
+    }
 
     localStorage.setItem(`${STORAGE_PREFIX}${turmaId}`, JSON.stringify(updated));
 
@@ -97,6 +107,9 @@ export function clearTurmaSignature(turmaId, roleKey = null) {
     if (roleKey) {
       const current = getTurmaSignatures(turmaId);
       delete current[roleKey];
+      if (roleKey === 'instructor') delete current.instructor_0;
+      if (roleKey === 'instructor_0') delete current.instructor;
+
       localStorage.setItem(`${STORAGE_PREFIX}${turmaId}`, JSON.stringify(current));
       if (broadcastChannel) {
         broadcastChannel.postMessage({ type: 'SIGNATURE_UPDATED', turmaId: String(turmaId), roleKey, signatures: current });
@@ -113,13 +126,241 @@ export function clearTurmaSignature(turmaId, roleKey = null) {
 }
 
 /**
- * Subscreve a atualizações de assinaturas em tempo real
+ * ---------------- TOKENS DE LINKS EXCLUSIVOS / DE USO ÚNICO ----------------
+ */
+
+export function getAllSigningTokens() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const raw = localStorage.getItem(TOKENS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.warn('[TurmaSignatureService] Erro ao ler tokens de assinatura:', e);
+    return [];
+  }
+}
+
+function saveAllSigningTokens(tokens) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
+  } catch (e) {
+    console.warn('[TurmaSignatureService] Erro ao salvar tokens:', e);
+  }
+}
+
+/**
+ * Retorna todos os tokens vinculados a uma turma
+ */
+export function getTurmaTokens(turmaId) {
+  if (!turmaId) return [];
+  const all = getAllSigningTokens();
+  return all.filter(t => String(t.turmaId) === String(turmaId));
+}
+
+/**
+ * Cria ou recupera o token exclusivo de assinatura para um papel/instrutor da turma
+ */
+export function createOrGetSigningToken(turmaId, roleKey, meta = {}) {
+  if (!turmaId || !roleKey) return null;
+  const all = getAllSigningTokens();
+  const sigs = getTurmaSignatures(turmaId);
+  const isAlreadySigned = !!(sigs[roleKey]?.dataUrl || (roleKey === 'instructor_0' && sigs.instructor?.dataUrl));
+
+  // Procura token existente ativo para este papel
+  const existingIdx = all.findIndex(t => 
+    String(t.turmaId) === String(turmaId) && 
+    (t.roleKey === roleKey || (roleKey === 'instructor_0' && t.roleKey === 'instructor')) &&
+    (!meta.instructorId || t.instructorId === meta.instructorId)
+  );
+
+  if (existingIdx >= 0) {
+    const existing = all[existingIdx];
+    // Sincroniza estado caso já tenha sido assinado externamente
+    if (isAlreadySigned && existing.status !== 'signed') {
+      const activeSig = sigs[roleKey] || sigs.instructor;
+      existing.status = 'signed';
+      existing.signedAt = activeSig.signedAt || new Date().toISOString();
+      existing.signatureDataUrl = activeSig.dataUrl;
+      saveAllSigningTokens(all);
+    }
+    // Atualiza metadados se necessário
+    if (meta.signerName && meta.signerName !== existing.signerName) {
+      existing.signerName = meta.signerName;
+      existing.roleTitle = meta.roleTitle || existing.roleTitle;
+      saveAllSigningTokens(all);
+    }
+    return existing;
+  }
+
+  // Gera novo token único
+  const randomPart = Math.random().toString(36).substring(2, 9);
+  const timePart = Date.now().toString(36);
+  const token = `sig_${randomPart}_${timePart}`;
+
+  const activeSig = sigs[roleKey] || (roleKey === 'instructor_0' ? sigs.instructor : null);
+
+  const newToken = {
+    token,
+    turmaId: String(turmaId),
+    roleKey,
+    instructorId: meta.instructorId || null,
+    signerName: meta.signerName || '',
+    roleTitle: meta.roleTitle || 'Instrutor(a)',
+    turmaName: meta.turmaName || '',
+    courseName: meta.courseName || '',
+    status: isAlreadySigned ? 'signed' : 'pending',
+    createdAt: new Date().toISOString(),
+    signedAt: isAlreadySigned ? (activeSig?.signedAt || new Date().toISOString()) : null,
+    signatureDataUrl: isAlreadySigned ? activeSig?.dataUrl : null
+  };
+
+  all.unshift(newToken);
+  saveAllSigningTokens(all);
+  return newToken;
+}
+
+/**
+ * Força a geração de um novo link descartável (revogando token pendente anterior)
+ */
+export function generateNewSigningToken(turmaId, roleKey, meta = {}) {
+  if (!turmaId || !roleKey) return null;
+  const all = getAllSigningTokens();
+
+  // Marca anteriores deste papel como revogados se ainda estavam pendentes
+  all.forEach(t => {
+    if (String(t.turmaId) === String(turmaId) && t.roleKey === roleKey && t.status === 'pending') {
+      t.status = 'revoked';
+    }
+  });
+
+  const randomPart = Math.random().toString(36).substring(2, 9);
+  const timePart = Date.now().toString(36);
+  const token = `sig_${randomPart}_${timePart}`;
+
+  const newToken = {
+    token,
+    turmaId: String(turmaId),
+    roleKey,
+    instructorId: meta.instructorId || null,
+    signerName: meta.signerName || '',
+    roleTitle: meta.roleTitle || 'Instrutor(a)',
+    turmaName: meta.turmaName || '',
+    courseName: meta.courseName || '',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    signedAt: null,
+    signatureDataUrl: null
+  };
+
+  all.unshift(newToken);
+  saveAllSigningTokens(all);
+
+  if (broadcastChannel) {
+    broadcastChannel.postMessage({
+      type: 'TOKEN_CREATED',
+      turmaId: String(turmaId),
+      token: newToken
+    });
+  }
+
+  return newToken;
+}
+
+/**
+ * Busca os dados de um token de assinatura específico
+ */
+export function getSigningToken(tokenString) {
+  if (!tokenString) return null;
+  const all = getAllSigningTokens();
+  const found = all.find(t => t.token === tokenString);
+  if (!found) return null;
+
+  // Cross-check com assinaturas salvas da turma
+  const sigs = getTurmaSignatures(found.turmaId);
+  const currentSig = sigs[found.roleKey] || (found.roleKey === 'instructor_0' ? sigs.instructor : null);
+
+  if (currentSig?.dataUrl && found.status !== 'signed') {
+    found.status = 'signed';
+    found.signedAt = currentSig.signedAt || new Date().toISOString();
+    found.signatureDataUrl = currentSig.dataUrl;
+    saveAllSigningTokens(all);
+  }
+
+  return found;
+}
+
+/**
+ * Conclui e finaliza o token após o usuário assinar.
+ * Uma vez concluído, o link NÃO aceita novas assinaturas.
+ */
+export function completeSigningToken(tokenString, signatureDataUrl) {
+  if (!tokenString || !signatureDataUrl) {
+    return { success: false, error: 'Dados insuficientes para concluir a assinatura.' };
+  }
+
+  const all = getAllSigningTokens();
+  const tokenObj = all.find(t => t.token === tokenString);
+
+  if (!tokenObj) {
+    return { success: false, error: 'Link de assinatura inválido ou não encontrado.' };
+  }
+
+  if (tokenObj.status === 'signed') {
+    return { 
+      success: false, 
+      alreadyCompleted: true, 
+      error: 'Este link de assinatura já foi utilizado e finalizado com sucesso.',
+      token: tokenObj 
+    };
+  }
+
+  if (tokenObj.status === 'revoked') {
+    return { 
+      success: false, 
+      error: 'Este link de assinatura foi cancelado ou substituído por um novo link.',
+      token: tokenObj 
+    };
+  }
+
+  const signedAt = new Date().toISOString();
+  tokenObj.status = 'signed';
+  tokenObj.signedAt = signedAt;
+  tokenObj.signatureDataUrl = signatureDataUrl;
+
+  saveAllSigningTokens(all);
+
+  // Aplica a assinatura na turma
+  saveRoleSignature(tokenObj.turmaId, tokenObj.roleKey, signatureDataUrl, {
+    signerName: tokenObj.signerName,
+    roleTitle: tokenObj.roleTitle,
+    signedAt,
+    instructorId: tokenObj.instructorId
+  });
+
+  if (broadcastChannel) {
+    broadcastChannel.postMessage({
+      type: 'TOKEN_COMPLETED',
+      token: tokenObj
+    });
+  }
+
+  return { success: true, token: tokenObj };
+}
+
+/**
+ * Subscreve a atualizações de assinaturas e tokens em tempo real
  */
 export function subscribeToTurmaSignatures(callback) {
   if (typeof window === 'undefined') return () => {};
 
   const handleBroadcast = (event) => {
-    if (event.data && (event.data.type === 'SIGNATURE_UPDATED' || event.data.type === 'SIGNATURE_CLEARED')) {
+    if (event.data && (
+      event.data.type === 'SIGNATURE_UPDATED' || 
+      event.data.type === 'SIGNATURE_CLEARED' ||
+      event.data.type === 'TOKEN_COMPLETED' ||
+      event.data.type === 'TOKEN_CREATED'
+    )) {
       callback(event.data);
     }
   };
@@ -133,6 +374,8 @@ export function subscribeToTurmaSignatures(callback) {
       } catch {
         // Ignora
       }
+    } else if (event.key === TOKENS_STORAGE_KEY) {
+      callback({ type: 'TOKENS_UPDATED' });
     }
   };
 

@@ -18,7 +18,8 @@ import {
 import SignaturePadModal from '../components/SignaturePadModal';
 import './TrainingCertificatesPage.css';
 import { 
-  getTurmaSignatures, saveRoleSignature, clearTurmaSignature, subscribeToTurmaSignatures 
+  getTurmaSignatures, saveRoleSignature, clearTurmaSignature, subscribeToTurmaSignatures,
+  createOrGetSigningToken, generateNewSigningToken, getTurmaTokens 
 } from '../services/turmaSignatureService';
 
 import { OFFICIAL_TRAINING_MODELS, OFFICIAL_INSTRUCTORS, getInstructorSignatureUrl } from '../data/officialTrainingModels';
@@ -56,14 +57,26 @@ const TrainingCertificatesPage = () => {
   const [editingTurma, setEditingTurma] = useState(null);
   const [turmaFormData, setTurmaFormData] = useState({
     name: '',
+    selectedPresetKey: '',
     course_name: '',
     duration: '8 horas',
+    validade: '24 meses',
     start_date: new Date().toISOString().split('T')[0],
     location: 'Mossoró - RN',
     company: 'TotalSafety',
-    instructor_name: 'Eider Gomes do Nascimento',
-    instructor_role: 'Instrutor e Responsável Técnico',
-    instructor_registration: 'MTE0009995/RN',
+    instructors: [],
+    instructor_name: '',
+    instructor_role: '',
+    instructor_registration: '',
+    tech_lead: {
+      name: 'Eider Gomes do Nascimento',
+      role: 'Responsável Técnico / Engenheiro de Segurança',
+      registration: 'CREA 210874512-0 / MTE 0009995/RN'
+    },
+    tech_lead_name: 'Eider Gomes do Nascimento',
+    tech_lead_role: 'Responsável Técnico / Engenheiro de Segurança',
+    tech_lead_registration: 'CREA 210874512-0 / MTE 0009995/RN',
+    cert_model: 'modelo1',
     content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
     status: 'Aberta'
   });
@@ -85,6 +98,8 @@ const TrainingCertificatesPage = () => {
   const [signModalRoleTitle, setSignModalRoleTitle] = useState('');
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrModalTurma, setQrModalTurma] = useState(null);
+  const [qrModalSelectedSignerKey, setQrModalSelectedSignerKey] = useState('instructor');
+  const [tokensRefreshKey, setTokensRefreshKey] = useState(0);
 
   // ----------------------------------------------------
   // Estados do Gerador de Certificados (PPTX)
@@ -206,9 +221,15 @@ const TrainingCertificatesPage = () => {
     let name = '';
     let title = '';
 
-    if (roleKey === 'instructor') {
-      name = formData.instrutorNome || activeTurma?.instructor_name || 'Adeylton da Silva Araújo';
-      title = 'Instrutor(a)';
+    if (roleKey.startsWith('instructor_')) {
+      const idx = parseInt(roleKey.replace('instructor_', ''), 10);
+      const inst = (formData.instructors && formData.instructors[idx]) || activeTurma?.instructors?.[idx];
+      name = inst?.name || `Instrutor #${idx + 1}`;
+      title = inst?.role || 'Instrutor(a)';
+    } else if (roleKey === 'instructor') {
+      const inst = (formData.instructors && formData.instructors[0]) || activeTurma?.instructors?.[0];
+      name = inst?.name || formData.instrutorNome || activeTurma?.instructor_name || 'Adeylton da Silva Araújo';
+      title = inst?.role || 'Instrutor(a)';
     } else if (roleKey === 'tech_lead') {
       name = certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes de Oliveira Junior';
       title = 'Responsável Técnico';
@@ -250,31 +271,139 @@ const TrainingCertificatesPage = () => {
     setTimeout(() => setFeedback(null), 3500);
   };
 
-  const handleOpenQrModal = (turma = null) => {
+  const handleOpenQrModal = (turma = null, initialSignerKey = 'instructor') => {
     const t = turma || turmas.find(item => String(item.id) === String(selectedTurmaIdInGenerator)) || {
       id: selectedTurmaIdInGenerator || 'draft_turma',
-      name: formData.curso || 'Turma Ativa'
+      name: formData.curso || 'Turma Ativa',
+      course_name: formData.curso || 'Curso de Treinamento',
+      company: formData.empresa || 'TotalSafety',
+      instructors: formData.instructors || [
+        {
+          id: 'inst-1',
+          name: formData.instrutorNome || 'Eider Gomes do Nascimento',
+          role: formData.instrutorCargo || 'Instrutor e Responsável Técnico',
+          registration: formData.instrutorRegistro || 'MTE0009995/RN'
+        }
+      ]
     };
     setQrModalTurma(t);
+    setQrModalSelectedSignerKey(initialSignerKey);
     setShowQrModal(true);
   };
 
   // ----------------------------------------------------
-  // Ações de Turmas
   // ----------------------------------------------------
+  // Ações de Turmas & Manipulação de Múltiplos Instrutores / Responsável Técnico
+  // ----------------------------------------------------
+  const handleCoursePresetChangeInTurma = (presetName) => {
+    if (presetName === 'custom') {
+      setTurmaFormData(prev => ({
+        ...prev,
+        selectedPresetKey: 'custom'
+      }));
+      return;
+    }
+    const preset = COURSE_PRESETS.find(p => p.name === presetName);
+    if (preset) {
+      setTurmaFormData(prev => ({
+        ...prev,
+        selectedPresetKey: preset.name,
+        course_name: preset.title || preset.name,
+        duration: preset.duration || prev.duration,
+        validade: preset.validade || prev.validade || '24 meses',
+        content: preset.content || prev.content,
+        cert_model: preset.modelType || prev.cert_model || 'modelo1'
+      }));
+    }
+  };
+
+  const handleUpdateTechLeadInTurma = (updates) => {
+    setTurmaFormData(prev => {
+      const current = prev.tech_lead || {};
+      const updated = { ...current, ...updates };
+      return {
+        ...prev,
+        tech_lead: updated,
+        tech_lead_name: updated.name || '',
+        tech_lead_role: updated.role || '',
+        tech_lead_registration: updated.registration || ''
+      };
+    });
+  };
+
+  const handleAddInstructorToTurma = () => {
+    setTurmaFormData(prev => ({
+      ...prev,
+      instructors: [
+        ...(prev.instructors || []),
+        {
+          id: `inst-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          name: '',
+          role: 'Instrutor(a)',
+          registration: ''
+        }
+      ]
+    }));
+  };
+
+  const handleRemoveInstructorFromTurma = (index) => {
+    setTurmaFormData(prev => {
+      const list = [...(prev.instructors || [])];
+      list.splice(index, 1);
+      const primary = list[0] || {};
+      return {
+        ...prev,
+        instructors: list,
+        instructor_name: primary.name || '',
+        instructor_role: primary.role || '',
+        instructor_registration: primary.registration || ''
+      };
+    });
+  };
+
+  const handleUpdateInstructorInTurma = (index, updates) => {
+    setTurmaFormData(prev => {
+      const list = [...(prev.instructors || [])];
+      list[index] = { ...list[index], ...updates };
+      const primary = list[0] || {};
+      return {
+        ...prev,
+        instructors: list,
+        instructor_name: primary.name || '',
+        instructor_role: primary.role || '',
+        instructor_registration: primary.registration || ''
+      };
+    });
+  };
+
   const handleOpenNewTurma = () => {
     setEditingTurma(null);
+    const defaultModel = COURSE_PRESETS[0] || {};
+    const defaultLead = profiles.find(p => p.role?.toLowerCase().includes('responsável') || p.role?.toLowerCase().includes('admin')) || profiles[0] || {};
+
     setTurmaFormData({
       name: '',
-      course_name: '',
-      duration: '8 horas',
+      selectedPresetKey: defaultModel.name || '',
+      course_name: defaultModel.title || defaultModel.name || 'NR-35 – TRABALHO EM ALTURA – NÍVEL BÁSICO',
+      duration: defaultModel.duration || '8 horas',
+      validade: defaultModel.validade || '24 meses',
       start_date: new Date().toISOString().split('T')[0],
       location: 'Mossoró - RN',
       company: 'TotalSafety',
-      instructor_name: profiles[0]?.name || 'Eider Gomes do Nascimento',
-      instructor_role: profiles[0]?.role || 'Instrutor e Responsável Técnico',
-      instructor_registration: profiles[0]?.registration || 'MTE0009995/RN',
-      content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
+      instructors: [], // Opcional: usuário pode adicionar ou deixar para depois
+      instructor_name: '',
+      instructor_role: '',
+      instructor_registration: '',
+      tech_lead: {
+        name: defaultLead.name || 'Eider Gomes do Nascimento',
+        role: defaultLead.role || 'Responsável Técnico / Engenheiro de Segurança',
+        registration: defaultLead.registration || 'CREA 210874512-0 / MTE 0009995/RN'
+      },
+      tech_lead_name: defaultLead.name || 'Eider Gomes do Nascimento',
+      tech_lead_role: defaultLead.role || 'Responsável Técnico / Engenheiro de Segurança',
+      tech_lead_registration: defaultLead.registration || 'CREA 210874512-0 / MTE 0009995/RN',
+      cert_model: defaultModel.modelType || 'modelo1',
+      content: defaultModel.content || '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
       status: 'Aberta'
     });
     setShowTurmaModal(true);
@@ -282,16 +411,41 @@ const TrainingCertificatesPage = () => {
 
   const handleEditTurma = (turma) => {
     setEditingTurma(turma);
+    const loadedInstructors = (Array.isArray(turma.instructors) && turma.instructors.length > 0)
+      ? turma.instructors
+      : (turma.instructor_name ? [
+          {
+            id: 'inst-1',
+            name: turma.instructor_name,
+            role: turma.instructor_role || 'Instrutor',
+            registration: turma.instructor_registration || ''
+          }
+        ] : []);
+
+    const loadedTechLead = turma.tech_lead || {
+      name: turma.tech_lead_name || 'Eider Gomes do Nascimento',
+      role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
+      registration: turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
+    };
+
     setTurmaFormData({
       name: turma.name || '',
+      selectedPresetKey: COURSE_PRESETS.find(p => (p.title === turma.course_name || p.name === turma.course_name))?.name || 'custom',
       course_name: turma.course_name || '',
       duration: turma.duration || '8 horas',
+      validade: turma.validade || '24 meses',
       start_date: turma.start_date || new Date().toISOString().split('T')[0],
       location: turma.location || 'Mossoró - RN',
       company: turma.company || '',
-      instructor_name: turma.instructor_name || profiles[0]?.name || 'Eider Gomes do Nascimento',
-      instructor_role: turma.instructor_role || 'Instrutor e Responsável Técnico',
-      instructor_registration: turma.instructor_registration || 'MTE0009995/RN',
+      instructors: loadedInstructors,
+      instructor_name: loadedInstructors[0]?.name || turma.instructor_name || '',
+      instructor_role: loadedInstructors[0]?.role || turma.instructor_role || '',
+      instructor_registration: loadedInstructors[0]?.registration || turma.instructor_registration || '',
+      tech_lead: loadedTechLead,
+      tech_lead_name: loadedTechLead.name,
+      tech_lead_role: loadedTechLead.role,
+      tech_lead_registration: loadedTechLead.registration,
+      cert_model: turma.cert_model || 'modelo1',
       content: turma.content || '',
       status: turma.status || 'Aberta'
     });
@@ -306,9 +460,29 @@ const TrainingCertificatesPage = () => {
     }
 
     try {
+      const validInstructors = (turmaFormData.instructors || [])
+        .map(i => ({
+          ...i,
+          name: (i.name || '').trim(),
+          role: (i.role || '').trim(),
+          registration: (i.registration || '').trim()
+        }))
+        .filter(i => i.name.length > 0);
+
+      const primary = validInstructors[0] || {};
+
       await saveTrainingClass({
         id: editingTurma ? editingTurma.id : null,
-        ...turmaFormData
+        ...turmaFormData,
+        instructors: validInstructors,
+        instructor_name: primary.name || '',
+        instructor_role: primary.role || '',
+        instructor_registration: primary.registration || '',
+        tech_lead: turmaFormData.tech_lead || {
+          name: turmaFormData.tech_lead_name || 'Eider Gomes do Nascimento',
+          role: turmaFormData.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
+          registration: turmaFormData.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
+        }
       });
       setShowTurmaModal(false);
       loadData();
@@ -344,27 +518,52 @@ const TrainingCertificatesPage = () => {
   const handleLoadTurmaIntoGenerator = (turma) => {
     const studentsInTurma = enrollments.filter(e => String(e.turma_id) === String(turma.id));
 
-    if (studentsInTurma.length === 0) {
-      if (!window.confirm(`A turma "${turma.name}" não possui participantes inscritos ainda. Deseja carregar as configurações do curso no gerador mesmo assim?`)) {
-        return;
-      }
-    }
-
     setSelectedTurmaIdInGenerator(turma.id);
 
-    // Atualiza o formulário do certificado com os dados da turma
+    const turmaInstructors = (Array.isArray(turma.instructors) && turma.instructors.length > 0)
+      ? turma.instructors
+      : (turma.instructor_name ? [
+          {
+            id: 'inst-1',
+            name: turma.instructor_name,
+            role: turma.instructor_role || 'Instrutor Oficial',
+            registration: turma.instructor_registration || ''
+          }
+        ] : []);
+
+    const instructorNames = turmaInstructors.map(i => i.name).filter(Boolean).join(' / ');
+    const instructorRoles = turmaInstructors.map(i => i.role).filter(Boolean).join(' / ');
+    const instructorRegs = turmaInstructors.map(i => i.registration).filter(Boolean).join(' / ');
+
+    const techLead = turma.tech_lead || {
+      name: turma.tech_lead_name || 'Eider Gomes do Nascimento',
+      role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
+      registration: turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
+    };
+
+    // Atualiza o formulário do certificado com todos os dados da turma
     setFormData(prev => ({
       ...prev,
       curso: turma.course_name || turma.name,
       duracao: turma.duration || prev.duracao,
+      validade: turma.validade || prev.validade || '24 meses',
       data: turma.start_date || prev.data,
       local: turma.location || prev.local,
       empresa: turma.company || prev.empresa,
-      instrutorNome: turma.instructor_name || prev.instrutorNome,
-      instrutorCargo: turma.instructor_role || prev.instrutorCargo,
-      instrutorRegistro: turma.instructor_registration || prev.instrutorRegistro,
+      instructors: turmaInstructors,
+      instrutorNome: instructorNames || prev.instrutorNome,
+      instrutorCargo: instructorRoles || prev.instrutorCargo,
+      instrutorRegistro: instructorRegs || prev.instrutorRegistro,
+      tech_lead: techLead,
+      techLeadNome: techLead.name,
+      techLeadCargo: techLead.role,
+      techLeadRegistro: techLead.registration,
       conteudo: turma.content || prev.conteudo
     }));
+
+    if (turma.cert_model) {
+      setCertModel(turma.cert_model);
+    }
 
     // Carrega a lista de colaboradores se houver inscritos
     if (studentsInTurma.length > 0) {
@@ -374,12 +573,12 @@ const TrainingCertificatesPage = () => {
       })));
       setFeedback({ 
         type: 'success', 
-        text: `Turma "${turma.name}" vinculada com ${studentsInTurma.length} participante(s) carregados!` 
+        text: `Turma "${turma.name}" carregada no gerador com ${studentsInTurma.length} participante(s)!` 
       });
     } else {
       setFeedback({ 
         type: 'info', 
-        text: `Configurações da turma "${turma.name}" carregadas no formulário do certificado!` 
+        text: `Dados da turma "${turma.name}" carregados no formulário do certificado!` 
       });
     }
 
@@ -644,8 +843,22 @@ const TrainingCertificatesPage = () => {
     p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
   );
   const isAphCourse = formData.curso?.toLowerCase().includes('aph');
+
+  // Papéis de assinatura dinâmicos com suporte a múltiplos instrutores
+  const instructorRoles = (formData.instructors && formData.instructors.length > 0)
+    ? formData.instructors.map((inst, idx) => ({
+        key: idx === 0 ? 'instructor' : `instructor_${idx}`,
+        label: formData.instructors.length > 1 ? `Instrutor(a) #${idx + 1}` : 'Instrutor(a)',
+        name: inst.name || 'Instrutor não definido',
+        roleTitle: inst.role || 'Instrutor',
+        registration: inst.registration || ''
+      }))
+    : [
+        { key: 'instructor', label: 'Instrutor(a)', name: formData.instrutorNome || 'Instrutor não definido' }
+      ];
+
   const signatureRoles = [
-    { key: 'instructor', label: 'Instrutor(a)', name: formData.instrutorNome || 'Instrutor não definido' },
+    ...instructorRoles,
     {
       key: 'tech_lead',
       label: 'Responsável Técnico',
@@ -1314,7 +1527,7 @@ const TrainingCertificatesPage = () => {
                   backgroundColor: '#ffffff',
                   backgroundImage: certModel === 'modelo1'
                     ? `url(${previewTab === 'frente' ? '/certificate-templates/m1_frente_bg.jpg' : '/certificate-templates/m1_verso_bg.jpg'})`
-                    : `url(${previewTab === 'frente' ? '/certificate-templates/m2_frente_bg.png?v=pristine_v4' : '/certificate-templates/m2_verso_bg.png?v=pristine_v4'})`,
+                    : `url(${previewTab === 'frente' ? '/certificate-templates/m2_frente_bg.png?v=ecosafety_v2' : '/certificate-templates/m2_verso_bg.png?v=ecosafety_v2'})`,
                   backgroundSize: '100% 100%',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
@@ -1323,7 +1536,7 @@ const TrainingCertificatesPage = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  padding: certModel === 'modelo1' ? '3.5% 9.5% 3.5% 9.5%' : '3% 7% 3% 7%',
+                  padding: certModel === 'modelo1' ? '3.5% 9.5% 3.5% 9.5%' : '3% 7% 3.5% 7%',
                   boxSizing: 'border-box',
                   fontFamily: certModel === 'modelo1' ? "'Roboto', 'Lato', sans-serif" : "'Lato', 'Montserrat', sans-serif"
                 }}>
@@ -1361,7 +1574,7 @@ const TrainingCertificatesPage = () => {
                         {/* Rodapé: 3 Assinaturas com Traços e Tipografia em Roxo Oficial EcoSafety #64268a */}
                         <div style={{
                           display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr',
+                          gridTemplateColumns: `1fr 1fr repeat(${Math.max(1, formData.instructors?.length || 1)}, 1fr)`,
                           gap: '0.45rem',
                           alignItems: 'end',
                           textAlign: 'center',
@@ -1389,15 +1602,23 @@ const TrainingCertificatesPage = () => {
                             </div>
                           </div>
 
-                          {/* Coluna 3: Instrutor (Vinculado ao Dono) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.instructor?.dataUrl || getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
-                            <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>INSTRUTOR:</div>
-                              <div style={{ fontSize: '0.51rem', color: '#64268a', fontWeight: '700' }}>{formData.instrutorNome || 'Pedro Henrique Lima Padilha'}</div>
-                              <div style={{ fontSize: '0.48rem', color: '#64268a' }}>{formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP'}</div>
-                            </div>
-                          </div>
+                          {/* Colunas dos Instrutores (Suporte a múltiplos instrutores) */}
+                          {(formData.instructors && formData.instructors.length > 0 ? formData.instructors : [{ name: formData.instrutorNome, registration: formData.instrutorRegistro }]).map((inst, idx) => {
+                            const sigKey = idx === 0 ? 'instructor' : `instructor_${idx}`;
+                            const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
+                            return (
+                              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <img src={sigImg} alt="Assinatura" style={{ height: '24px', objectFit: 'contain', marginBottom: '2px' }} />
+                                <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
+                                  <div style={{ fontSize: '0.54rem', fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
+                                    {formData.instructors?.length > 1 ? `INSTRUTOR #${idx + 1}:` : 'INSTRUTOR:'}
+                                  </div>
+                                  <div style={{ fontSize: '0.51rem', color: '#64268a', fontWeight: '700' }}>{inst.name || 'Instrutor'}</div>
+                                  <div style={{ fontSize: '0.48rem', color: '#64268a' }}>{inst.registration ? `Registro: ${inst.registration}` : (formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP')}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : (
@@ -1446,63 +1667,63 @@ const TrainingCertificatesPage = () => {
                     previewTab === 'frente' ? (
                       /* MODELO 2 - FRENTE */
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
-                        {/* Topo do Certificado */}
-                        <div style={{ textAlign: 'center' }}>
+                        {/* Topo do Certificado - Ajustado com respiro para a logo EcoSafety superior esquerda */}
+                        <div style={{ textAlign: 'center', paddingTop: '8.5%' }}>
                           <div style={{ 
                             fontFamily: "'Montserrat', sans-serif",
-                            fontSize: '1.05rem', 
+                            fontSize: '1.02rem', 
                             fontWeight: '800', 
-                            color: '#595959', 
-                            letterSpacing: '1.5px', 
+                            color: '#555555', 
+                            letterSpacing: '1.6px', 
                             textTransform: 'uppercase' 
                           }}>
                             CERTIFICADO DE CAPACITAÇÃO
                           </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: '400', color: '#000000', marginTop: '1px' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: '400', color: '#000000', marginTop: '0.3rem' }}>
                             A ECOSAFETY certifica que:
                           </div>
 
                           {/* Destaque do Nome em Azul Real Oficial #3340e6 com Lato Black 900 */}
                           <div style={{ 
                             fontFamily: "'Lato', sans-serif",
-                            fontSize: '1.18rem', 
+                            fontSize: '1.2rem', 
                             fontWeight: '900', 
                             color: '#3340e6', 
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            margin: '0.28rem 0'
+                            letterSpacing: '0.6px',
+                            margin: '0.4rem 0'
                           }}>
                             {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
                           </div>
 
-                          <div style={{ fontSize: '0.65rem', color: '#000000', lineHeight: '1.4' }}>
+                          <div style={{ fontSize: '0.66rem', color: '#000000', lineHeight: '1.45', maxWidth: '94%', margin: '0 auto' }}>
                             Portador do CPF: <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
                             <strong style={{ color: '#000000' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na ECOSAFETY TREINAMENTOS, o treinamento de:
                           </div>
 
                           <div style={{ 
-                            fontSize: '0.88rem', 
+                            fontSize: '0.92rem', 
                             fontWeight: '800', 
                             color: '#3340e6', 
-                            margin: '0.22rem 0' 
+                            margin: '0.35rem 0' 
                           }}>
                             {formData.curso}
                           </div>
 
                           {formData.descricao && (
                             <div style={{ 
-                              fontSize: '0.6rem', 
+                              fontSize: '0.61rem', 
                               color: '#000000', 
                               textAlign: 'justify', 
-                              lineHeight: '1.34', 
-                              maxWidth: '94%', 
-                              margin: '0.15rem auto' 
+                              lineHeight: '1.38', 
+                              maxWidth: '92%', 
+                              margin: '0.2rem auto' 
                             }}>
                               {formData.descricao}
                             </div>
                           )}
 
-                          <div style={{ fontSize: '0.63rem', color: '#000000', marginTop: '0.3rem' }}>
+                          <div style={{ fontSize: '0.64rem', color: '#000000', marginTop: '0.45rem' }}>
                             {formData.local || 'Mossoró, RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
                           </div>
                         </div>
@@ -1571,15 +1792,23 @@ const TrainingCertificatesPage = () => {
                             </div>
                           </div>
 
-                          {/* Instrutor (Vinculado ao Dono) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.instructor?.dataUrl || getInstructorSignatureUrl(formData.instrutorNome)} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
-                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>INSTRUTOR</div>
-                              <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '700' }}>{formData.instrutorNome || 'Eider Gomes do Nascimento'}</div>
-                              <div style={{ fontSize: '0.43rem', color: '#595959' }}>{formData.instrutorRegistro || 'MTE0009995/RN'}</div>
-                            </div>
-                          </div>
+                          {/* Colunas dos Instrutores (Suporte a múltiplos instrutores) */}
+                          {(formData.instructors && formData.instructors.length > 0 ? formData.instructors : [{ name: formData.instrutorNome, registration: formData.instrutorRegistro }]).map((inst, idx) => {
+                            const sigKey = idx === 0 ? 'instructor' : `instructor_${idx}`;
+                            const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
+                            return (
+                              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <img src={sigImg} alt="Assinatura" style={{ height: '20px', objectFit: 'contain', marginBottom: '1px' }} />
+                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                                  <div style={{ fontSize: '0.48rem', fontWeight: '800', color: '#000000' }}>
+                                    {formData.instructors?.length > 1 ? `INSTRUTOR #${idx + 1}` : 'INSTRUTOR'}
+                                  </div>
+                                  <div style={{ fontSize: '0.45rem', color: '#000000', fontWeight: '700' }}>{inst.name || 'Eider Gomes do Nascimento'}</div>
+                                  <div style={{ fontSize: '0.43rem', color: '#595959' }}>{inst.registration || formData.instrutorRegistro || 'MTE0009995/RN'}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : (
@@ -1919,12 +2148,20 @@ const TrainingCertificatesPage = () => {
                         )}
 
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          {turma.instructor_name && (
+                          {turma.instructors && turma.instructors.length > 0 ? (
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
+                              <User size={14} style={{ color: '#0284c7', marginTop: '2px', flexShrink: 0 }} />
+                              <div>
+                                <strong>{turma.instructors.length > 1 ? `Instrutores (${turma.instructors.length}):` : 'Instrutor:'}</strong>{' '}
+                                {turma.instructors.map(i => i.name).join(' • ')}
+                              </div>
+                            </div>
+                          ) : turma.instructor_name ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                               <User size={14} style={{ color: '#0284c7' }} />
                               <span><strong>Instrutor:</strong> {turma.instructor_name}</span>
                             </div>
-                          )}
+                          ) : null}
                           {turma.company && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                               <Building size={14} style={{ color: 'var(--text-secondary)' }} />
@@ -1970,10 +2207,10 @@ const TrainingCertificatesPage = () => {
                               color: '#7c3aed',
                               fontWeight: '700'
                             }}
-                            title="Abrir QR Code para assinar esta turma pelo celular"
+                            title="Gerar e gerenciar links exclusivos de assinatura desta turma"
                           >
                             <Smartphone size={14} />
-                            Assinar no Celular
+                            Links de Assinatura
                           </button>
 
                           <button
@@ -2210,7 +2447,7 @@ const TrainingCertificatesPage = () => {
       {/* ========================================================================= */}
       {showTurmaModal && (
         <div className="modal-backdrop" onClick={() => setShowTurmaModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', borderRadius: '1.25rem', padding: '1.75rem' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '660px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '1.25rem', padding: '1.75rem' }}>
             <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
               <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.15rem', fontWeight: '800' }}>
                 <Award size={20} style={{ color: '#0284c7' }} />
@@ -2231,19 +2468,45 @@ const TrainingCertificatesPage = () => {
                   placeholder="Ex: Turma 01 - NR-35 Trabalho em Altura / Março 2026"
                   value={turmaFormData.name}
                   onChange={e => setTurmaFormData(prev => ({ ...prev, name: e.target.value }))}
-                  style={{ width: '100%', marginTop: '0.35rem', fontWeight: '600' }}
+                  style={{ width: '100%', marginTop: '0.35rem', fontWeight: '700', fontSize: '0.92rem' }}
                 />
               </div>
 
+              {/* Seletor Oficial de Curso / Catálogo TotalSafety */}
+              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.75rem', padding: '0.85rem' }}>
+                <label className="modal-label" style={{ fontWeight: '800', fontSize: '0.8125rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem' }}>
+                  <BookOpen size={16} />
+                  Puxar Configurações do Catálogo de Cursos Oficiais
+                </label>
+                <select
+                  className="input"
+                  value={turmaFormData.selectedPresetKey || 'custom'}
+                  onChange={(e) => handleCoursePresetChangeInTurma(e.target.value)}
+                  style={{ width: '100%', fontSize: '0.82rem', fontWeight: '600', backgroundColor: '#ffffff' }}
+                >
+                  <option value="custom">-- Selecionar Curso do Catálogo Oficial --</option>
+                  {COURSE_PRESETS.map(preset => (
+                    <option key={preset.name} value={preset.name}>
+                      {preset.name} ({preset.duration}) — {preset.modelType === 'modelo1' ? 'EcoCurvas' : 'Ondas & Colmeia'}
+                    </option>
+                  ))}
+                  <option value="custom">Outro Curso / Digitar Nome Personalizado</option>
+                </select>
+                <p style={{ fontSize: '0.72rem', color: '#166534', margin: '0.4rem 0 0 0' }}>
+                  💡 Ao escolher um curso, a carga horária, validade, modelo e o conteúdo programático oficial são preenchidos automaticamente.
+                </p>
+              </div>
+
               <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Nome Oficial do Curso *</label>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Nome Oficial do Curso no Certificado *</label>
                 <input
                   type="text"
+                  required
                   className="input"
-                  placeholder="Ex: NR-35 - Segurança no Trabalho em Altura"
+                  placeholder="Ex: NR-35 – TRABALHO EM ALTURA – NÍVEL BÁSICO"
                   value={turmaFormData.course_name}
                   onChange={e => setTurmaFormData(prev => ({ ...prev, course_name: e.target.value }))}
-                  style={{ width: '100%', marginTop: '0.35rem' }}
+                  style={{ width: '100%', marginTop: '0.35rem', fontWeight: '600' }}
                 />
               </div>
 
@@ -2260,6 +2523,20 @@ const TrainingCertificatesPage = () => {
                   />
                 </div>
                 <div>
+                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Validade do Treinamento</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Ex: 24 meses, 12 meses"
+                    value={turmaFormData.validade || '24 meses'}
+                    onChange={e => setTurmaFormData(prev => ({ ...prev, validade: e.target.value }))}
+                    style={{ width: '100%', marginTop: '0.35rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
                   <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Data de Conclusão / Realização</label>
                   <input
                     type="date"
@@ -2269,9 +2546,6 @@ const TrainingCertificatesPage = () => {
                     style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
                   <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Local / Cidade</label>
                   <input
@@ -2283,85 +2557,266 @@ const TrainingCertificatesPage = () => {
                     style={{ width: '100%', marginTop: '0.35rem' }}
                   />
                 </div>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Empresa Solicitante</label>
+              </div>
+
+              <div>
+                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Empresa Solicitante</label>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem' }}>
+                  {companies && companies.length > 0 && (
+                    <select
+                      className="input"
+                      value={companies.some(c => c.name === turmaFormData.company) ? turmaFormData.company : (turmaFormData.company ? 'custom' : '')}
+                      onChange={(e) => {
+                        if (e.target.value && e.target.value !== 'custom') {
+                          setTurmaFormData(prev => ({ ...prev, company: e.target.value }));
+                        }
+                      }}
+                      style={{ maxWidth: '210px', fontSize: '0.78rem' }}
+                    >
+                      <option value="">Selecione cadastrada...</option>
+                      {companies.map(c => (
+                        <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                      ))}
+                      <option value="custom">Outra / Digitar manual</option>
+                    </select>
+                  )}
                   <input
                     type="text"
                     className="input"
                     placeholder="Ex: TotalSafety / Nome do Cliente"
                     value={turmaFormData.company}
                     onChange={e => setTurmaFormData(prev => ({ ...prev, company: e.target.value }))}
-                    style={{ width: '100%', marginTop: '0.35rem' }}
+                    style={{ flex: 1 }}
                   />
                 </div>
               </div>
 
-              {/* Instrutor entre os Usuários */}
-              <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <User size={14} style={{ color: '#0284c7' }} />
-                  Instrutor Responsável Técnico *
+              {/* ========================================================================= */}
+              {/* SEÇÃO DE INSTRUTORES DA TURMA (TOTALMENTE OPCIONAL)                       */}
+              {/* ========================================================================= */}
+              <div style={{
+                marginTop: '0.4rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.85rem',
+                padding: '0.85rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <div>
+                    <label className="modal-label" style={{ fontWeight: '800', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0, color: '#0284c7' }}>
+                      <User size={15} />
+                      Instrutores do Treinamento ({turmaFormData.instructors?.length || 0})
+                    </label>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      Opcional: pode ser definido agora, no gerador ou via link de assinatura
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddInstructorToTurma}
+                    style={{
+                      background: 'rgba(2, 132, 199, 0.08)',
+                      border: '1px solid rgba(2, 132, 199, 0.3)',
+                      color: '#0284c7',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                  >
+                    <Plus size={13} />
+                    Adicionar Instrutor
+                  </button>
+                </div>
+
+                {(!turmaFormData.instructors || turmaFormData.instructors.length === 0) ? (
+                  <div style={{ textAlign: 'center', padding: '0.85rem', color: '#94a3b8', fontSize: '0.78rem', fontStyle: 'italic' }}>
+                    Nenhum instrutor adicionado previamente. Você pode clicar no botão acima para adicionar um ou mais instrutores agora, ou definir depois.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.4rem' }}>
+                    {turmaFormData.instructors.map((inst, index) => (
+                      <div
+                        key={inst.id || index}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '0.75rem',
+                          padding: '0.75rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.45rem',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: '800', color: index === 0 ? '#0284c7' : '#7c3aed', textTransform: 'uppercase' }}>
+                            {index === 0 ? 'Instrutor Principal' : `Instrutor Adicional #${index + 1}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInstructorFromTurma(index)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#ef4444',
+                              fontSize: '0.7rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.2rem'
+                            }}
+                          >
+                            <Trash2 size={13} /> Remover
+                          </button>
+                        </div>
+
+                        {/* Seletor rápido por lista oficial/usuários */}
+                        <select
+                          className="input"
+                          value={profiles.some(p => p.name.trim() === inst.name?.trim()) ? inst.name : (inst.name ? 'custom' : '')}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val && val !== 'custom') {
+                              const sel = profiles.find(p => p.name === val);
+                              handleUpdateInstructorInTurma(index, {
+                                name: sel ? sel.name : val,
+                                role: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : (inst.role || 'Instrutor')),
+                                registration: sel?.registration || inst.registration || ''
+                              });
+                            }
+                          }}
+                          style={{ width: '100%', fontSize: '0.78rem', padding: '0.45rem 0.65rem' }}
+                        >
+                          <option value="">Selecione dos usuários/instrutores cadastrados...</option>
+                          {profiles.map(p => (
+                            <option key={p.id || p.name} value={p.name}>
+                              {p.name} {p.role ? `— ${p.role}` : ''}
+                            </option>
+                          ))}
+                          <option value="custom">Outro / Digitar manualmente</option>
+                        </select>
+
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Nome completo do Instrutor (Opcional)"
+                          value={inst.name || ''}
+                          onChange={e => handleUpdateInstructorInTurma(index, { name: e.target.value })}
+                          style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0.65rem' }}
+                        />
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                          <div>
+                            <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '2px' }}>Cargo / Qualificação</label>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Ex: Téc. Segurança do Trabalho"
+                              value={inst.role || ''}
+                              onChange={e => handleUpdateInstructorInTurma(index, { role: e.target.value })}
+                              style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '2px' }}>Registro MTE / SRTE / CREA</label>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Ex: MTE0009995/RN"
+                              value={inst.registration || ''}
+                              onChange={e => handleUpdateInstructorInTurma(index, { registration: e.target.value })}
+                              style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ========================================================================= */}
+              {/* SEÇÃO DO RESPONSÁVEL TÉCNICO (CONFIGURÁVEL)                               */}
+              {/* ========================================================================= */}
+              <div style={{
+                backgroundColor: '#faf5ff',
+                border: '1px solid #e9d5ff',
+                borderRadius: '0.85rem',
+                padding: '0.85rem'
+              }}>
+                <label className="modal-label" style={{ fontWeight: '800', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: '0 0 0.4rem 0', color: '#7c3aed' }}>
+                  <ShieldCheck size={16} />
+                  Responsável Técnico do Treinamento
                 </label>
-                
-                <select
-                  className="input"
-                  value={profiles.some(p => p.name.trim() === turmaFormData.instructor_name?.trim()) ? turmaFormData.instructor_name : (turmaFormData.instructor_name ? 'custom' : '')}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === 'custom') {
-                      // Custom
-                    } else if (val) {
-                      const sel = profiles.find(p => p.name === val);
-                      setTurmaFormData(prev => ({
-                        ...prev,
-                        instructor_name: sel ? sel.name : val,
-                        instructor_role: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : prev.instructor_role),
-                        instructor_registration: sel?.registration || prev.instructor_registration
-                      }));
-                    }
-                  }}
-                  style={{ marginTop: '0.35rem', marginBottom: '0.5rem', width: '100%' }}
-                >
-                  <option value="">Selecione um instrutor dos usuários do sistema...</option>
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.name}>
-                      {p.name} {p.role ? `— ${p.role}` : ''}
-                    </option>
-                  ))}
-                  <option value="custom">Outro / Digitar manualmente</option>
-                </select>
+                <span style={{ fontSize: '0.7rem', color: '#6b21a8', display: 'block', marginBottom: '0.6rem' }}>
+                  Profissional habilitado responsável pela emissão técnica dos certificados desta turma.
+                </span>
 
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  placeholder="Nome do Instrutor"
-                  value={turmaFormData.instructor_name}
-                  onChange={e => setTurmaFormData(prev => ({ ...prev, instructor_name: e.target.value }))}
-                  style={{ width: '100%' }}
-                />
-              </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                  <select
+                    className="input"
+                    value={profiles.some(p => p.name.trim() === turmaFormData.tech_lead?.name?.trim()) ? turmaFormData.tech_lead?.name : (turmaFormData.tech_lead?.name ? 'custom' : '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val && val !== 'custom') {
+                        const sel = profiles.find(p => p.name === val);
+                        handleUpdateTechLeadInTurma({
+                          name: sel ? sel.name : val,
+                          role: sel?.role || 'Responsável Técnico / Engenheiro de Segurança',
+                          registration: sel?.registration || 'CREA 210874512-0 / MTE 0009995/RN'
+                        });
+                      }
+                    }}
+                    style={{ width: '100%', fontSize: '0.78rem', padding: '0.45rem 0.65rem', backgroundColor: '#ffffff' }}
+                  >
+                    <option value="">Selecione dos profissionais cadastrados...</option>
+                    {profiles.map(p => (
+                      <option key={p.id || p.name} value={p.name}>
+                        {p.name} {p.role ? `— ${p.role}` : ''}
+                      </option>
+                    ))}
+                    <option value="custom">Outro Responsável / Digitar Manualmente</option>
+                  </select>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Cargo do Instrutor</label>
                   <input
                     type="text"
                     className="input"
-                    value={turmaFormData.instructor_role}
-                    onChange={e => setTurmaFormData(prev => ({ ...prev, instructor_role: e.target.value }))}
-                    style={{ width: '100%', marginTop: '0.35rem' }}
+                    placeholder="Nome completo do Responsável Técnico"
+                    value={turmaFormData.tech_lead?.name || ''}
+                    onChange={e => handleUpdateTechLeadInTurma({ name: e.target.value })}
+                    style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0.65rem', backgroundColor: '#ffffff' }}
                   />
-                </div>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Registro SRTE</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={turmaFormData.instructor_registration}
-                    onChange={e => setTurmaFormData(prev => ({ ...prev, instructor_registration: e.target.value }))}
-                    style={{ width: '100%', marginTop: '0.35rem' }}
-                  />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#6b21a8', display: 'block', marginBottom: '2px' }}>Cargo / Qualificação</label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Ex: Engenheiro de Segurança do Trabalho"
+                        value={turmaFormData.tech_lead?.role || ''}
+                        onChange={e => handleUpdateTechLeadInTurma({ role: e.target.value })}
+                        style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem', backgroundColor: '#ffffff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#6b21a8', display: 'block', marginBottom: '2px' }}>Registro CREA / CFT / MTE</label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Ex: CREA 210874512-0"
+                        value={turmaFormData.tech_lead?.registration || ''}
+                        onChange={e => handleUpdateTechLeadInTurma({ registration: e.target.value })}
+                        style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem', backgroundColor: '#ffffff' }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -2383,7 +2838,7 @@ const TrainingCertificatesPage = () => {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTurmaModal(false)}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7', fontWeight: '700' }}>
+                <button id="btn-submit-turma" type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7', fontWeight: '700' }}>
                   {editingTurma ? 'Salvar Alterações' : 'Criar Turma'}
                 </button>
               </div>
@@ -2512,133 +2967,326 @@ const TrainingCertificatesPage = () => {
       {/* ========================================================================= */}
       {/* MODAL: ASSINAR PELO CELULAR (QR CODE & LINK DE COMPARTILHAMENTO)          */}
       {/* ========================================================================= */}
-      {showQrModal && qrModalTurma && (
-        <div className="modal-backdrop" onClick={() => setShowQrModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '490px', borderRadius: '1.25rem', padding: '1.75rem', textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '0.55rem',
-                  backgroundColor: 'rgba(124, 58, 237, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Smartphone size={18} style={{ color: '#7c3aed' }} />
+      {/* ========================================================================= */}
+      {/* MODAL: LINKS EXCLUSIVOS DE ASSINATURA DA TURMA (EXPIRAÇÃO AUTOMÁTICA)      */}
+      {/* ========================================================================= */}
+      {showQrModal && qrModalTurma && (() => {
+        const modalInstructors = (Array.isArray(qrModalTurma.instructors) && qrModalTurma.instructors.length > 0)
+          ? qrModalTurma.instructors
+          : [
+              {
+                id: 'inst-1',
+                name: qrModalTurma.instructor_name || 'Eider Gomes do Nascimento',
+                role: qrModalTurma.instructor_role || 'Instrutor e Responsável Técnico',
+                registration: qrModalTurma.instructor_registration || 'MTE0009995/RN'
+              }
+            ];
+
+        const signersList = [
+          ...modalInstructors.map((inst, idx) => ({
+            key: idx === 0 ? 'instructor' : `instructor_${idx}`,
+            label: modalInstructors.length > 1 ? `Instrutor #${idx + 1}` : 'Instrutor(a)',
+            name: inst.name || 'Instrutor',
+            role: inst.role || 'Instrutor(a)',
+            instructorId: inst.id
+          })),
+          {
+            key: 'tech_lead',
+            label: 'Responsável Técnico',
+            name: certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes de Oliveira Junior',
+            role: 'Responsável Técnico',
+            instructorId: null
+          }
+        ];
+
+        const activeSigner = signersList.find(s => s.key === qrModalSelectedSignerKey) || signersList[0];
+        const activeToken = createOrGetSigningToken(qrModalTurma.id, activeSigner.key, {
+          signerName: activeSigner.name,
+          roleTitle: activeSigner.role,
+          instructorId: activeSigner.instructorId,
+          turmaName: qrModalTurma.name,
+          courseName: qrModalTurma.course_name
+        });
+
+        const activeSignerUrl = `${window.location.origin}/assinar-turma/${qrModalTurma.id}?token=${activeToken?.token || ''}`;
+
+        return (
+          <div className="modal-backdrop" onClick={() => setShowQrModal(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', borderRadius: '1.25rem', padding: '1.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '0.65rem',
+                    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Smartphone size={20} style={{ color: '#7c3aed' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                      Links de Assinatura da Turma
+                    </h3>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      Turma: <strong>{qrModalTurma.name}</strong> • {qrModalTurma.course_name || 'Curso'}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                    Assinar Turma pelo Celular
-                  </h3>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    Turma: <strong>{qrModalTurma.name}</strong>
-                  </span>
+                <button className="modal-close" onClick={() => setShowQrModal(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{
+                backgroundColor: '#eff6ff',
+                borderRadius: '0.75rem',
+                padding: '0.75rem 1rem',
+                border: '1px solid #dbeafe',
+                fontSize: '0.78rem',
+                color: '#1e40af',
+                lineHeight: '1.45',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'flex-start'
+              }}>
+                <Sparkles size={16} style={{ flexShrink: 0, marginTop: '2px', color: '#2563eb' }} />
+                <span>
+                  <strong>Links de uso único com expiração automática:</strong> Envie o link exclusivo abaixo para o instrutor assinar com o dedo no celular. Assim que a assinatura é confirmada, o link é finalizado e não aceita novas modificações.
+                </span>
+              </div>
+
+              {/* Lista de Signatários da Turma */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                {signersList.map((signer) => {
+                  const token = createOrGetSigningToken(qrModalTurma.id, signer.key, {
+                    signerName: signer.name,
+                    roleTitle: signer.role,
+                    instructorId: signer.instructorId,
+                    turmaName: qrModalTurma.name,
+                    courseName: qrModalTurma.course_name
+                  });
+                  const isSigned = token?.status === 'signed';
+                  const isSelected = signer.key === activeSigner.key;
+                  const signerUrl = `${window.location.origin}/assinar-turma/${qrModalTurma.id}?token=${token?.token || ''}`;
+
+                  return (
+                    <div
+                      key={signer.key}
+                      style={{
+                        border: isSelected ? '2px solid #7c3aed' : '1px solid #e2e8f0',
+                        borderRadius: '0.85rem',
+                        padding: '0.85rem 1rem',
+                        backgroundColor: isSelected ? 'rgba(124, 58, 237, 0.03)' : '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#7c3aed', textTransform: 'uppercase' }}>
+                              {signer.label}
+                            </span>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: '700',
+                              padding: '2px 8px',
+                              borderRadius: '1rem',
+                              backgroundColor: isSigned ? '#ecfdf5' : '#fffbeb',
+                              color: isSigned ? '#059669' : '#d97706',
+                              border: isSigned ? '1px solid #a7f3d0' : '1px solid #fde68a'
+                            }}>
+                              {isSigned ? '✅ Assinado (Link Finalizado)' : '⏳ Aguardando Assinatura'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>
+                            {signer.name}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                            {signer.role}
+                          </div>
+                        </div>
+
+                        {/* Botões de Ação para este Signatário */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => {
+                              navigator.clipboard.writeText(signerUrl);
+                              setCopiedKey(`sig-link-${signer.key}`);
+                              setTimeout(() => setCopiedKey(null), 2500);
+                            }}
+                            style={{ fontSize: '0.74rem', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                            title="Copiar link exclusivo de assinatura"
+                          >
+                            {copiedKey === `sig-link-${signer.key}` ? <Check size={13} style={{ color: '#10b981' }} /> : <Copy size={13} />}
+                            {copiedKey === `sig-link-${signer.key}` ? 'Copiado!' : 'Copiar Link'}
+                          </button>
+
+                          <a
+                            href={`https://wa.me/?text=${encodeURIComponent(
+                              `Olá, ${signer.name}! Segue seu link exclusivo e seguro para assinar digitalmente os certificados da turma "${qrModalTurma.name}":\n\n${signerUrl}`
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn"
+                            style={{
+                              fontSize: '0.74rem',
+                              padding: '0.35rem 0.65rem',
+                              backgroundColor: '#25D366',
+                              color: '#ffffff',
+                              fontWeight: '700',
+                              textDecoration: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              borderRadius: '0.5rem'
+                            }}
+                            title="Enviar via WhatsApp"
+                          >
+                            <Share2 size={13} />
+                            WhatsApp
+                          </a>
+
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => setQrModalSelectedSignerKey(signer.key)}
+                            style={{
+                              fontSize: '0.74rem',
+                              padding: '0.35rem 0.65rem',
+                              backgroundColor: isSelected ? '#7c3aed' : 'rgba(124, 58, 237, 0.08)',
+                              color: isSelected ? '#ffffff' : '#7c3aed',
+                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                              fontWeight: '700',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem'
+                            }}
+                            title="Visualizar QR Code deste signatário"
+                          >
+                            <QrCode size={13} />
+                            Ver QR Code
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Deseja gerar um novo link de uso único para ${signer.name}? O link pendente anterior será cancelado.`)) {
+                                generateNewSigningToken(qrModalTurma.id, signer.key, {
+                                  signerName: signer.name,
+                                  roleTitle: signer.role,
+                                  instructorId: signer.instructorId,
+                                  turmaName: qrModalTurma.name,
+                                  courseName: qrModalTurma.course_name
+                                });
+                                setTokensRefreshKey(k => k + 1);
+                                setFeedback({ type: 'success', text: `Novo link gerado com sucesso para ${signer.name}!` });
+                                setTimeout(() => setFeedback(null), 3500);
+                              }
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#64748b',
+                              fontSize: '0.72rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.2rem',
+                              padding: '0.35rem 0.45rem'
+                            }}
+                            title="Gerar novo link descartável caso queira invalidar o anterior"
+                          >
+                            <RefreshCw size={12} /> Novo
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Seção do QR Code Ativo */}
+              <div style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '1rem',
+                padding: '1.25rem',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.3rem' }}>
+                  QR Code para: <span style={{ color: '#7c3aed' }}>{activeSigner.name}</span> ({activeSigner.role})
+                </div>
+                <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 0.85rem 0' }}>
+                  Aponte a câmera do celular para assinar com o dedo diretamente no celular.
+                </p>
+
+                <div style={{
+                  display: 'inline-block',
+                  padding: '0.65rem',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '0.85rem',
+                  border: '1px solid #cbd5e1',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  marginBottom: '0.85rem'
+                }}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(activeSignerUrl)}`}
+                    alt={`QR Code para ${activeSigner.name}`}
+                    style={{ width: '180px', height: '180px', display: 'block', borderRadius: '0.4rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.4rem', maxWidth: '440px', margin: '0 auto' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    className="input"
+                    value={activeSignerUrl}
+                    style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem', fontFamily: 'monospace' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      navigator.clipboard.writeText(activeSignerUrl);
+                      setCopiedKey('active-qr-link');
+                      setTimeout(() => setCopiedKey(null), 2500);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                  >
+                    {copiedKey === 'active-qr-link' ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
+                    {copiedKey === 'active-qr-link' ? 'Copiado!' : 'Copiar'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => window.open(activeSignerUrl, '_blank')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      backgroundColor: '#7c3aed',
+                      fontWeight: '700',
+                      fontSize: '0.75rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <ExternalLink size={14} /> Abrir
+                  </button>
                 </div>
               </div>
-              <button className="modal-close" onClick={() => setShowQrModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0', lineHeight: '1.45' }}>
-              Aponte a câmera do celular para o QR Code abaixo para abrir o portal de assinatura com o dedo. Ao salvar, a assinatura é aplicada automaticamente em lote para todos os alunos.
-            </p>
-
-            {/* Imagem do QR Code Dinâmico */}
-            <div style={{
-              display: 'inline-block',
-              padding: '0.75rem',
-              backgroundColor: '#ffffff',
-              borderRadius: '1rem',
-              border: '2px solid #e2e8f0',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
-              marginBottom: '1rem'
-            }}>
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-                  `${window.location.origin}/assinar-turma/${qrModalTurma.id}`
-                )}`}
-                alt="QR Code para Assinatura no Celular"
-                style={{ width: '200px', height: '200px', display: 'block', borderRadius: '0.5rem' }}
-              />
-            </div>
-
-            {/* Campo com Link Direto */}
-            <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
-              <input
-                type="text"
-                readOnly
-                className="input"
-                value={`${window.location.origin}/assinar-turma/${qrModalTurma.id}`}
-                style={{ fontSize: '0.78rem', padding: '0.55rem 0.75rem', fontFamily: 'monospace' }}
-              />
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/assinar-turma/${qrModalTurma.id}`);
-                  setCopiedKey('qr-modal-link');
-                  setTimeout(() => setCopiedKey(null), 2500);
-                }}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-              >
-                {copiedKey === 'qr-modal-link' ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
-                {copiedKey === 'qr-modal-link' ? 'Copiado!' : 'Copiar'}
-              </button>
-            </div>
-
-            {/* Ações de Compartilhamento */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(
-                  `Olá! Segue o link para assinar digitalmente pelo celular os certificados da turma "${qrModalTurma.name}": ${window.location.origin}/assinar-turma/${qrModalTurma.id}`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  backgroundColor: '#25D366',
-                  color: '#ffffff',
-                  fontWeight: '700',
-                  fontSize: '0.8rem',
-                  padding: '0.65rem',
-                  borderRadius: '0.65rem',
-                  textDecoration: 'none'
-                }}
-              >
-                <Share2 size={15} />
-                WhatsApp
-              </a>
-
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => window.open(`/assinar-turma/${qrModalTurma.id}`, '_blank')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  backgroundColor: '#7c3aed',
-                  fontWeight: '700',
-                  fontSize: '0.8rem',
-                  padding: '0.65rem',
-                  borderRadius: '0.65rem'
-                }}
-              >
-                <ExternalLink size={15} />
-                Abrir Portal
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

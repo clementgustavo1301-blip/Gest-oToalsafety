@@ -321,9 +321,42 @@ export async function generateTrainingPPTX({
     return null;
   };
 
-  // 1. Assinatura do Instrutor (Manual ou Oficial)
+  // 1. Assinatura do(s) Instrutor(es) (Manual ou Oficial, com suporte a múltiplos instrutores)
   const instrutorFallback = instrutorNome ? getInstructorSignatureUrl(instrutorNome) : null;
-  const instrutorBuffer = await getSignatureBuffer(turmaSignatures?.instructor, instrutorFallback);
+  let activeInstructorSig = turmaSignatures?.instructor || turmaSignatures?.instructor_0;
+
+  // Se houver mais de um instrutor com assinatura desenhada, mescla as imagens lado a lado
+  if (turmaSignatures?.instructor_1?.dataUrl && typeof window !== 'undefined' && typeof document !== 'undefined') {
+    try {
+      const primaryUrl = activeInstructorSig?.dataUrl || instrutorFallback;
+      const secondaryUrl = turmaSignatures.instructor_1.dataUrl;
+
+      if (primaryUrl && secondaryUrl) {
+        const img1 = new Image();
+        const img2 = new Image();
+        await Promise.all([
+          new Promise(r => { img1.onload = r; img1.onerror = r; img1.src = primaryUrl; }),
+          new Promise(r => { img2.onload = r; img2.onerror = r; img2.src = secondaryUrl; })
+        ]);
+
+        const mergedCanvas = document.createElement('canvas');
+        mergedCanvas.width = 640;
+        mergedCanvas.height = 160;
+        const mCtx = mergedCanvas.getContext('2d');
+        mCtx.drawImage(img1, 10, 10, 290, 140);
+        mCtx.drawImage(img2, 330, 10, 290, 140);
+
+        activeInstructorSig = {
+          dataUrl: mergedCanvas.toDataURL('image/png'),
+          signerName: `${activeInstructorSig?.signerName || ''} & ${turmaSignatures.instructor_1.signerName || ''}`
+        };
+      }
+    } catch (e) {
+      console.warn('Falha ao compor assinaturas de múltiplos instrutores:', e);
+    }
+  }
+
+  const instrutorBuffer = await getSignatureBuffer(activeInstructorSig, instrutorFallback);
   if (instrutorBuffer) {
     if (certModel === 'modelo1') {
       newZip.file('ppt/media/image4.png', instrutorBuffer);

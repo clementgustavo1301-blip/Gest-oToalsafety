@@ -38,26 +38,83 @@ export async function getTrainingClasses() {
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setLocal(LOCAL_CLASSES_KEY, data);
-      return data;
+      const normalizedData = data.map(c => {
+        if (!Array.isArray(c.instructors) || c.instructors.length === 0) {
+          c.instructors = [
+            {
+              id: 'inst-1',
+              name: c.instructor_name || '',
+              role: c.instructor_role || '',
+              registration: c.instructor_registration || ''
+            }
+          ];
+        }
+        return c;
+      });
+      setLocal(LOCAL_CLASSES_KEY, normalizedData);
+      return normalizedData;
     }
   } catch (err) {
     console.warn('[TrainingClasses] Supabase indisponível, usando cache:', err.message);
   }
 
-  return getLocal(LOCAL_CLASSES_KEY);
+  const local = getLocal(LOCAL_CLASSES_KEY);
+  return local.map(c => {
+    if (!Array.isArray(c.instructors) || c.instructors.length === 0) {
+      c.instructors = [
+        {
+          id: 'inst-1',
+          name: c.instructor_name || '',
+          role: c.instructor_role || '',
+          registration: c.instructor_registration || ''
+        }
+      ];
+    }
+    return c;
+  });
 }
 
 export async function saveTrainingClass(turma) {
   const isNew = !turma.id || String(turma.id).startsWith('local-');
+
+  const instructors = Array.isArray(turma.instructors) && turma.instructors.length > 0
+    ? turma.instructors.map((inst, idx) => ({
+        id: inst.id || `inst-${idx + 1}-${Date.now()}`,
+        name: (inst.name || '').trim(),
+        role: (inst.role || '').trim(),
+        registration: (inst.registration || '').trim()
+      }))
+    : [
+        {
+          id: 'inst-1',
+          name: (turma.instructor_name || turma.instrutorNome || '').trim(),
+          role: (turma.instructor_role || turma.instrutorCargo || '').trim(),
+          registration: (turma.instructor_registration || turma.instrutorRegistro || '').trim()
+        }
+      ];
+
+  const techLead = turma.tech_lead || {
+    name: (turma.tech_lead_name || 'Eider Gomes do Nascimento').trim(),
+    role: (turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança').trim(),
+    registration: (turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN').trim()
+  };
+  const primaryInstructor = (instructors && instructors.length > 0) ? instructors[0] : {};
+
   const payload = {
     name: turma.name,
     course_name: turma.course_name || turma.curso || '',
     description: turma.description || turma.descricao || '',
-    instructor_name: turma.instructor_name || turma.instrutorNome || '',
-    instructor_role: turma.instructor_role || turma.instrutorCargo || '',
-    instructor_registration: turma.instructor_registration || turma.instrutorRegistro || '',
+    instructors: instructors,
+    instructor_name: primaryInstructor.name || '',
+    instructor_role: primaryInstructor.role || '',
+    instructor_registration: primaryInstructor.registration || '',
+    tech_lead: techLead,
+    tech_lead_name: techLead.name || '',
+    tech_lead_role: techLead.role || '',
+    tech_lead_registration: techLead.registration || '',
     duration: turma.duration || turma.duracao || '',
+    validade: turma.validade || '24 meses',
+    cert_model: turma.cert_model || 'modelo1',
     start_date: turma.start_date || turma.data || null,
     location: turma.location || turma.local || '',
     company: turma.company || turma.empresa || '',
@@ -97,6 +154,8 @@ export async function saveTrainingClass(turma) {
       ...payload,
       created_at: turma.created_at || new Date().toISOString()
     };
+  } else if (!savedItem.instructors || savedItem.instructors.length === 0) {
+    savedItem.instructors = instructors;
   }
 
   const existingIdx = localList.findIndex(c => c.id === savedItem.id);
