@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { 
   Award, FileText, Plus, Trash2, Download, Loader, 
-  Upload, CheckCircle2, AlertCircle, Users, Sparkles, 
+  CheckCircle2, AlertCircle, Users, Sparkles,
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
   Edit, Key, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
   CheckCircle, Clock, Briefcase, MapPin, Building,
   Smartphone, QrCode, PenTool, Share2
 } from 'lucide-react';
-import { generateTrainingPPTX, balanceSyllabusColumns, getCertificateFrontGeometry } from '../utils/trainingPptxGenerator';
+import { balanceSyllabusColumns, getCertificateFrontGeometry } from '../utils/trainingPptxGenerator';
 import { formatCpf } from '../services/cpfService';
 import { getProfiles, getCompanies, getGroups } from '../services/storageService';
 import { 
@@ -31,6 +34,30 @@ const COURSE_PRESETS = OFFICIAL_TRAINING_MODELS;
 
 // Lista de instrutores e responsáveis técnicos oficiais extraídos diretamente dos certificados
 const FALLBACK_PROFILES = OFFICIAL_INSTRUCTORS;
+
+const DEFAULT_TECH_LEAD = {
+  name: 'Eider Gomes do Nascimento',
+  role: 'Responsável Técnico / Engenheiro de Segurança',
+  registration: 'CREA 210874512-0 / MTE 0009995/RN'
+};
+const DEFAULT_COORDINATOR = {
+  name: 'Cezar Augusto Galvão De P. Camêlo',
+  role: 'Coordenação Técnica / Engenheiro Eletricista',
+  registration: 'CREA-RN 211051104-4'
+};
+const DEFAULT_APH_COORDINATOR = {
+  name: 'Leiliana Nunes de Lima Fernandes',
+  role: 'Coordenação Técnica / Instrutora de Saúde e APH',
+  registration: 'Coren RN 333018'
+};
+
+const getDefaultCoordinator = (courseName = '') =>
+  /(?:aph|hospitalar|primeiros socorros)/i.test(courseName)
+    ? { ...DEFAULT_APH_COORDINATOR }
+    : { ...DEFAULT_COORDINATOR };
+
+const getTurmaCoordinator = (turma = {}) =>
+  turma.coordinator || turma.tech_lead?.coordinator || getDefaultCoordinator(turma.course_name || turma.curso || '');
 
 /**
  * Determina dinamicamente as proporções, tamanhos de fonte, entrelinhas e espaçamentos
@@ -165,43 +192,36 @@ export const getModelo2FrenteStyles = ({ curso = '', descricao = '', studentName
 export const getModelo2VersoStyles = (conteudo = '') => {
   const { maxLinesInCol } = balanceSyllabusColumns(conteudo, 38);
 
-  if (maxLinesInCol > 20) {
+  if (maxLinesInCol > 38) {
     return {
-      fontSize: '0.44rem',
-      lineHeight: '1.20',
-      gap: '0.85rem',
-      headerTitleSize: '0.68rem',
-      headerDurationSize: '0.58rem',
-      headerPadding: '0.2rem',
-      headerMargin: '0.25rem',
-      footerSize: '0.50rem',
-      footerPadding: '0.25rem'
+      fontSize: '0.35rem', lineHeight: '1.10', gap: '0.68rem',
+      headerTitleSize: '0.58rem', headerDurationSize: '0.50rem',
+      headerPadding: '0.12rem', headerMargin: '0.16rem',
+      footerSize: '0.42rem', footerPadding: '0.16rem'
     };
   }
-  if (maxLinesInCol > 15) {
+  if (maxLinesInCol > 30) {
     return {
-      fontSize: '0.49rem',
-      lineHeight: '1.24',
-      gap: '0.95rem',
-      headerTitleSize: '0.72rem',
-      headerDurationSize: '0.62rem',
-      headerPadding: '0.25rem',
-      headerMargin: '0.3rem',
-      footerSize: '0.52rem',
-      footerPadding: '0.28rem'
+      fontSize: '0.40rem', lineHeight: '1.14', gap: '0.74rem',
+      headerTitleSize: '0.62rem', headerDurationSize: '0.53rem',
+      headerPadding: '0.15rem', headerMargin: '0.2rem',
+      footerSize: '0.45rem', footerPadding: '0.18rem'
     };
   }
-  if (maxLinesInCol > 10) {
+  if (maxLinesInCol > 23) {
     return {
-      fontSize: '0.55rem',
-      lineHeight: '1.30',
-      gap: '1.0rem',
-      headerTitleSize: '0.74rem',
-      headerDurationSize: '0.64rem',
-      headerPadding: '0.3rem',
-      headerMargin: '0.35rem',
-      footerSize: '0.54rem',
-      footerPadding: '0.32rem'
+      fontSize: '0.46rem', lineHeight: '1.18', gap: '0.82rem',
+      headerTitleSize: '0.66rem', headerDurationSize: '0.56rem',
+      headerPadding: '0.18rem', headerMargin: '0.24rem',
+      footerSize: '0.48rem', footerPadding: '0.21rem'
+    };
+  }
+  if (maxLinesInCol > 16) {
+    return {
+      fontSize: '0.52rem', lineHeight: '1.23', gap: '0.9rem',
+      headerTitleSize: '0.70rem', headerDurationSize: '0.59rem',
+      headerPadding: '0.21rem', headerMargin: '0.28rem',
+      footerSize: '0.50rem', footerPadding: '0.24rem'
     };
   }
   return {
@@ -269,26 +289,26 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
  * Adaptação para o Verso do Modelo 1
  */
 export const getModelo1VersoStyles = (conteudo = '') => {
-  const { totalLines } = balanceSyllabusColumns(conteudo, 42);
+  const { totalWeight, maxLinesInCol } = balanceSyllabusColumns(conteudo, 42);
 
-  if (totalLines > 22) {
+  if (maxLinesInCol > 36) {
     return {
-      useTwoCols: false,
-      fontSize: '0.46rem',
-      lineHeight: '1.22',
-      gap: '0.9rem',
-      headerSize: '0.70rem',
-      footerSize: '0.50rem'
+      useTwoCols: true, fontSize: '0.36rem', lineHeight: '1.10', gap: '0.7rem',
+      headerSize: '0.60rem', footerSize: '0.43rem'
     };
   }
-  if (totalLines > 10) {
+  if (totalWeight > 24) {
     return {
-      useTwoCols: false,
-      fontSize: '0.54rem',
-      lineHeight: '1.28',
-      gap: '1.0rem',
-      headerSize: '0.72rem',
-      footerSize: '0.52rem'
+      useTwoCols: true,
+      fontSize: maxLinesInCol > 27 ? '0.42rem' : '0.49rem',
+      lineHeight: maxLinesInCol > 27 ? '1.14' : '1.20',
+      gap: '0.8rem', headerSize: '0.66rem', footerSize: '0.47rem'
+    };
+  }
+  if (totalWeight > 12) {
+    return {
+      useTwoCols: false, fontSize: '0.54rem', lineHeight: '1.26', gap: '0',
+      headerSize: '0.70rem', footerSize: '0.50rem'
     };
   }
   return {
@@ -348,6 +368,7 @@ const TrainingCertificatesPage = () => {
     tech_lead_name: 'Eider Gomes do Nascimento',
     tech_lead_role: 'Responsável Técnico / Engenheiro de Segurança',
     tech_lead_registration: 'CREA 210874512-0 / MTE 0009995/RN',
+    coordinator: { ...DEFAULT_COORDINATOR },
     cert_model: 'modelo1',
     content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
     status: 'Aberta'
@@ -374,7 +395,7 @@ const TrainingCertificatesPage = () => {
   const [tokensRefreshKey, setTokensRefreshKey] = useState(0);
 
   // ----------------------------------------------------
-  // Estados do Gerador de Certificados (PPTX)
+  // Estados do Gerador de Certificados em PDF
   // ----------------------------------------------------
   const defaultOfficialModel = OFFICIAL_TRAINING_MODELS[0];
   const [formData, setFormData] = useState({
@@ -388,6 +409,8 @@ const TrainingCertificatesPage = () => {
     instrutorNome: defaultOfficialModel?.defaultInstructor?.name || 'Eider Gomes do Nascimento',
     instrutorCargo: defaultOfficialModel?.defaultInstructor?.role || 'Instrutor e Responsável Técnico',
     instrutorRegistro: defaultOfficialModel?.defaultInstructor?.registration || 'MTE0009995/RN',
+    tech_lead: { ...DEFAULT_TECH_LEAD },
+    coordinator: getDefaultCoordinator(defaultOfficialModel?.title || defaultOfficialModel?.name || ''),
     conteudo: defaultOfficialModel ? defaultOfficialModel.content : '1. Conceitos, definições e requisitos da NR-35...'
   });
 
@@ -395,9 +418,7 @@ const TrainingCertificatesPage = () => {
     { nome: '', cpf: '', matricula: '' }
   ]);
 
-  const [customTemplateFile, setCustomTemplateFile] = useState(null);
-  const [customTemplateBuffer, setCustomTemplateBuffer] = useState(null);
-  const fileInputRef = useRef(null);
+  const certificatePreviewRef = useRef(null);
 
   const [generating, setGenerating] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -503,11 +524,13 @@ const TrainingCertificatesPage = () => {
       name = inst?.name || formData.instrutorNome || activeTurma?.instructor_name || 'Adeylton da Silva Araújo';
       title = inst?.role || 'Instrutor(a)';
     } else if (roleKey === 'tech_lead') {
-      name = certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes de Oliveira Junior';
-      title = 'Responsável Técnico';
+      const techLead = formData.tech_lead || activeTurma?.tech_lead || DEFAULT_TECH_LEAD;
+      name = techLead.name || DEFAULT_TECH_LEAD.name;
+      title = techLead.role || 'Responsável Técnico';
     } else if (roleKey === 'coordinator') {
-      name = formData.curso?.toLowerCase().includes('aph') ? 'Leiliana Nunes de Lima Fernandes' : 'Cezar Augusto Galvão De P. Camêlo';
-      title = 'Coordenador(a) Técnico(a)';
+      const coordinator = formData.coordinator || getTurmaCoordinator(activeTurma);
+      name = coordinator.name || getDefaultCoordinator(formData.curso).name;
+      title = coordinator.role || 'Coordenador(a) Técnico(a)';
     }
 
     setSignModalRole(roleKey);
@@ -556,7 +579,9 @@ const TrainingCertificatesPage = () => {
           role: formData.instrutorCargo || 'Instrutor e Responsável Técnico',
           registration: formData.instrutorRegistro || 'MTE0009995/RN'
         }
-      ]
+      ],
+      tech_lead: formData.tech_lead || DEFAULT_TECH_LEAD,
+      coordinator: formData.coordinator || getDefaultCoordinator(formData.curso)
     };
     setQrModalTurma(t);
     setQrModalSelectedSignerKey(initialSignerKey);
@@ -584,7 +609,10 @@ const TrainingCertificatesPage = () => {
         duration: preset.duration || prev.duration,
         validade: preset.validade || prev.validade || '24 meses',
         content: preset.content || prev.content,
-        cert_model: preset.modelType || prev.cert_model || 'modelo1'
+        cert_model: preset.modelType || prev.cert_model || 'modelo1',
+        coordinator: [DEFAULT_COORDINATOR.name, DEFAULT_APH_COORDINATOR.name].includes(prev.coordinator?.name)
+          ? getDefaultCoordinator(preset.title || preset.name)
+          : prev.coordinator
       }));
     }
   };
@@ -601,6 +629,13 @@ const TrainingCertificatesPage = () => {
         tech_lead_registration: updated.registration || ''
       };
     });
+  };
+
+  const handleUpdateCoordinatorInTurma = (updates) => {
+    setTurmaFormData(prev => ({
+      ...prev,
+      coordinator: { ...(prev.coordinator || {}), ...updates }
+    }));
   };
 
   const handleAddInstructorToTurma = () => {
@@ -675,6 +710,7 @@ const TrainingCertificatesPage = () => {
       tech_lead_name: defaultLead.name || 'Eider Gomes do Nascimento',
       tech_lead_role: defaultLead.role || 'Responsável Técnico / Engenheiro de Segurança',
       tech_lead_registration: defaultLead.registration || 'CREA 210874512-0 / MTE 0009995/RN',
+      coordinator: getDefaultCoordinator(defaultModel.title || defaultModel.name),
       cert_model: defaultModel.modelType || 'modelo1',
       content: defaultModel.content || '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
       status: 'Aberta'
@@ -703,6 +739,7 @@ const TrainingCertificatesPage = () => {
       role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
       registration: turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
     };
+    const loadedCoordinator = getTurmaCoordinator(turma);
 
     const nextFormData = {
       name: turma.name || '',
@@ -721,6 +758,7 @@ const TrainingCertificatesPage = () => {
       tech_lead_name: loadedTechLead.name,
       tech_lead_role: loadedTechLead.role,
       tech_lead_registration: loadedTechLead.registration,
+      coordinator: loadedCoordinator,
       cert_model: turma.cert_model || 'modelo1',
       content: turma.content || '',
       status: turma.status || 'Aberta'
@@ -771,11 +809,15 @@ const TrainingCertificatesPage = () => {
         instructor_name: primary.name || '',
         instructor_role: primary.role || '',
         instructor_registration: primary.registration || '',
-        tech_lead: turmaFormData.tech_lead || {
+        tech_lead: {
+          ...(turmaFormData.tech_lead || {
           name: turmaFormData.tech_lead_name || 'Eider Gomes do Nascimento',
           role: turmaFormData.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
           registration: turmaFormData.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
-        }
+          }),
+          coordinator: turmaFormData.coordinator || getDefaultCoordinator(turmaFormData.course_name)
+        },
+        coordinator: turmaFormData.coordinator || getDefaultCoordinator(turmaFormData.course_name)
       });
       setShowTurmaModal(false);
       loadData();
@@ -872,6 +914,7 @@ const TrainingCertificatesPage = () => {
       role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
       registration: turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
     };
+    const coordinator = getTurmaCoordinator(turma);
 
     // Atualiza o formulário do certificado com todos os dados da turma
     setFormData(prev => ({
@@ -887,6 +930,7 @@ const TrainingCertificatesPage = () => {
       instrutorCargo: instructorRoles || prev.instrutorCargo,
       instrutorRegistro: instructorRegs || prev.instrutorRegistro,
       tech_lead: techLead,
+      coordinator,
       techLeadNome: techLead.name,
       techLeadCargo: techLead.role,
       techLeadRegistro: techLead.registration,
@@ -1031,33 +1075,6 @@ const TrainingCertificatesPage = () => {
     }
   };
 
-  const handleTemplateUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.pptx')) {
-      alert('Por favor, selecione um arquivo PowerPoint (.pptx).');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setCustomTemplateBuffer(event.target.result);
-      setCustomTemplateFile(file);
-      setFeedback({ type: 'success', text: `Modelo carregado: ${file.name}` });
-      setTimeout(() => setFeedback(null), 4000);
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const removeCustomTemplate = () => {
-    setCustomTemplateFile(null);
-    setCustomTemplateBuffer(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setFeedback({ type: 'info', text: 'Usando modelo padrão do sistema.' });
-    setTimeout(() => setFeedback(null), 3000);
-  };
-
   const handleProcessBatch = () => {
     if (!batchText.trim()) return;
 
@@ -1110,47 +1127,79 @@ const TrainingCertificatesPage = () => {
       return;
     }
 
+    const originalColaboradores = colaboradores.map(item => ({ ...item }));
+    const originalPreviewTab = previewTab;
     setGenerating(true);
     try {
-      const blob = await generateTrainingPPTX({
-        templateBuffer: customTemplateBuffer,
-        certModel: certModel,
-        curso: formData.curso,
-        descricao: formData.descricao,
-        data: formData.data,
-        duracao: formData.duracao,
-        validade: formData.validade,
-        local: formData.local,
-        empresa: formData.empresa,
-        instrutorNome: formData.instrutorNome,
-        instrutorCargo: formData.instrutorCargo,
-        instrutorRegistro: formData.instrutorRegistro,
-        conteudo: formData.conteudo,
-        colaboradores: validColaboradores,
-        turmaSignatures: currentTurmaSignatures
-      });
+      if (document.fonts?.ready) await document.fonts.ready;
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+      pdf.setProperties({
+        title: `Certificados - ${formData.curso}`,
+        subject: 'Certificados de treinamento',
+        creator: 'EcoSafety'
+      });
+      const pdfPageWidth = pdf.internal.pageSize.getWidth();
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
+
+      let pageIndex = 0;
+      for (const participant of validColaboradores) {
+        for (const side of ['frente', 'verso']) {
+          flushSync(() => {
+            setColaboradores([{ ...participant }]);
+            setPreviewTab(side);
+          });
+
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const previewNode = certificatePreviewRef.current;
+          if (!previewNode) throw new Error('Pré-visualização do certificado indisponível.');
+
+          const images = [...previewNode.querySelectorAll('img')];
+          await Promise.all(images.map(image => {
+            if (image.complete) return image.decode?.().catch(() => undefined);
+            return new Promise(resolve => {
+              image.addEventListener('load', resolve, { once: true });
+              image.addEventListener('error', resolve, { once: true });
+            });
+          }));
+
+          const canvas = await html2canvas(previewNode, {
+            scale: 3,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            imageTimeout: 15000
+          });
+
+          if (pageIndex > 0) pdf.addPage('a4', 'landscape');
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfPageWidth, pdfPageHeight, undefined, 'FAST');
+          pageIndex += 1;
+        }
+      }
+
       const safeCourse = formData.curso.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
-      a.download = `Certificados_${safeCourse}_${validColaboradores.length}alunos.pptx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      pdf.save(`Certificados_${safeCourse}_${validColaboradores.length}alunos.pdf`);
 
       setFeedback({ 
         type: 'success', 
-        text: `Arquivo PPTX com ${validColaboradores.length} certificado(s) gerado e baixado com sucesso!` 
+        text: `PDF com ${validColaboradores.length} certificado(s) gerado exatamente como na prévia.`
       });
       setTimeout(() => setFeedback(null), 5000);
     } catch (err) {
       console.error('Erro ao gerar certificados:', err);
-      setFeedback({ type: 'error', text: `Não foi possível gerar o PowerPoint: ${err.message}` });
+      setFeedback({ type: 'error', text: `Não foi possível gerar o PDF: ${err.message}` });
       setTimeout(() => setFeedback(null), 5000);
     } finally {
-      setGenerating(false);
+      flushSync(() => {
+        setColaboradores(originalColaboradores);
+        setPreviewTab(originalPreviewTab);
+        setGenerating(false);
+      });
     }
   };
 
@@ -1197,7 +1246,8 @@ const TrainingCertificatesPage = () => {
     p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
     p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
   );
-  const isAphCourse = formData.curso?.toLowerCase().includes('aph');
+  const activeTechLead = formData.tech_lead || DEFAULT_TECH_LEAD;
+  const activeCoordinator = formData.coordinator || getDefaultCoordinator(formData.curso);
 
   // Papéis de assinatura dinâmicos com suporte a múltiplos instrutores
   const instructorRoles = (formData.instructors && formData.instructors.length > 0)
@@ -1217,13 +1267,17 @@ const TrainingCertificatesPage = () => {
     {
       key: 'tech_lead',
       label: 'Responsável Técnico',
-      name: certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes de Oliveira Junior'
+      name: activeTechLead.name || DEFAULT_TECH_LEAD.name,
+      roleTitle: activeTechLead.role || 'Responsável Técnico',
+      registration: activeTechLead.registration || ''
     },
     ...(certModel === 'modelo2'
       ? [{
           key: 'coordinator',
           label: 'Coordenação Técnica',
-          name: isAphCourse ? 'Leiliana Nunes de Lima Fernandes' : 'Cezar Augusto Galvão De P. Camêlo'
+          name: activeCoordinator.name || getDefaultCoordinator(formData.curso).name,
+          roleTitle: activeCoordinator.role || 'Coordenação Técnica',
+          registration: activeCoordinator.registration || ''
         }]
       : [])
   ];
@@ -1275,7 +1329,7 @@ const TrainingCertificatesPage = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* ABA 1: GERADOR DE CERTIFICADOS PPTX                                       */}
+      {/* ABA 1: GERADOR DE CERTIFICADOS PDF                                        */}
       {/* ========================================================================= */}
       {activeTab === 'generator' && (
         <div className="tc-gen">
@@ -1703,7 +1757,7 @@ const TrainingCertificatesPage = () => {
               <summary>
                 <div>
                   <div className="tc-adv-title">Opções avançadas</div>
-                  <small>Texto do certificado, conteúdo do verso, validade, empresa e modelo .pptx próprio</small>
+                  <small>Texto do certificado, conteúdo do verso, validade e empresa</small>
                 </div>
                 <ChevronDown size={18} className="tc-adv-chevron" />
               </summary>
@@ -1767,38 +1821,6 @@ const TrainingCertificatesPage = () => {
                     </datalist>
                   </div>
                 </div>
-
-                <div className="tc-field">
-                  <span className="tc-label">Modelo .pptx próprio</span>
-                  <div className="tc-file-row">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept=".pptx"
-                      onChange={handleTemplateUpload}
-                      style={{ display: 'none' }}
-                    />
-                    <button
-                      id="btn-upload-template"
-                      type="button"
-                      className="tc-btn"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload size={14} />
-                      {customTemplateFile ? 'Trocar arquivo' : 'Carregar .pptx'}
-                    </button>
-                    {customTemplateFile && (
-                      <button type="button" className="tc-link tc-link--danger" style={{ marginTop: 0 }} onClick={removeCustomTemplate}>
-                        Restaurar padrão
-                      </button>
-                    )}
-                    <span className="tc-hint">
-                      {customTemplateFile
-                        ? `${customTemplateFile.name} (${(customTemplateFile.size / 1024).toFixed(1)} KB)`
-                        : 'Usando o modelo oficial do curso selecionado.'}
-                    </span>
-                  </div>
-                </div>
               </div>
             </details>
           </div>
@@ -1852,8 +1874,9 @@ const TrainingCertificatesPage = () => {
                 </div>
               </div>
 
-                {/* Prévia na mesma proporção e com a mesma área útil dos slides oficiais */}
+                {/* Prévia na mesma proporção e com a mesma área útil do PDF */}
                 <div
+                  ref={certificatePreviewRef}
                   className={`tc-certificate-preview tc-certificate-preview--${certModel}`}
                   style={{
                   backgroundImage: certModel === 'modelo1'
@@ -1906,11 +1929,11 @@ const TrainingCertificatesPage = () => {
                         }}>
                           {/* Coluna 1: Responsável Técnico */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_eider_gomes.png"} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
+                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
                             <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
                               <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: m1FrenteStyles.sigNameSize, fontWeight: '700', color: '#64268a' }}>Eider Gomes do Nascimento</div>
-                              <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>Registro: MTE0009995/RN</div>
+                              <div style={{ fontSize: m1FrenteStyles.sigNameSize, fontWeight: '700', color: '#64268a' }}>{activeTechLead.name}</div>
+                              <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>{activeTechLead.registration ? `Registro: ${activeTechLead.registration}` : 'Registro não informado'}</div>
                             </div>
                           </div>
 
@@ -1986,7 +2009,7 @@ const TrainingCertificatesPage = () => {
                                 whiteSpace: 'pre-line',
                                 wordBreak: 'break-word'
                               }}>
-                                {formData.conteudo}
+                                {balanced.normalizedText}
                               </div>
                             );
                           })()}
@@ -2088,45 +2111,22 @@ const TrainingCertificatesPage = () => {
                         }}>
                           {/* Raimundo - Responsável Técnico Geral */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || "/certificate-templates/signatures/sig_raimundo_fernandes.png"} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
+                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
                             <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
                               <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>Raimundo Fernandes de Oliveira Junior</div>
-                              <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Registro CREA – 211204597-0</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>{activeTechLead.name}</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>{activeTechLead.registration || 'Registro não informado'}</div>
                             </div>
                           </div>
 
                           {/* Cezar Augusto ou Leiliana Nunes (se APH) */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            {currentTurmaSignatures?.coordinator?.dataUrl ? (
-                              <>
-                                <img src={currentTurmaSignatures.coordinator.dataUrl} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
-                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>{currentTurmaSignatures.coordinator.signerName || 'Coordenação Técnica'}</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Registro Oficial</div>
-                                </div>
-                              </>
-                            ) : formData.curso?.toLowerCase().includes('aph') || formData.curso?.toLowerCase().includes('hospitalar') || formData.instrutorNome?.toLowerCase().includes('leiliana') ? (
-                              <>
-                                <img src="/certificate-templates/signatures/sig_leiliana_nunes.png" alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
-                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>COORDENADORA TÉCNICA / INSTRUTORA</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>Leiliana Nunes de Lima Fernandes</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Registro Coren RN 333018</div>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <img src="/certificate-templates/signatures/sig_cezar_augusto.png" alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
-                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO / INSTRUTOR</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>Engenheiro Eletricista</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>Cezar Augusto Galvão De P. Camêlo</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>CREA-RN 211051104-4</div>
-                                </div>
-                              </>
-                            )}
+                            <img src={currentTurmaSignatures?.coordinator?.dataUrl || getInstructorSignatureUrl(activeCoordinator.name)} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
+                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                              <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>{(activeCoordinator.role || 'COORDENAÇÃO TÉCNICA').toUpperCase()}</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>{activeCoordinator.name}</div>
+                              <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>{activeCoordinator.registration || 'Registro não informado'}</div>
+                            </div>
                           </div>
 
                           {/* Aluno (PENDENTE - sem imagem de assinatura falsa) */}
@@ -2223,7 +2223,7 @@ const TrainingCertificatesPage = () => {
                   </div>
                   <div className="tc-stat">
                     <strong>{validCount * 2}</strong>
-                    <span>slides (frente + verso)</span>
+                    <span>páginas no PDF (frente + verso)</span>
                   </div>
                   <div className="tc-stat">
                     <strong>{signedCount}/{signatureRoles.length}</strong>
@@ -2232,7 +2232,7 @@ const TrainingCertificatesPage = () => {
                 </div>
 
                 <button
-                  id="btn-generate-pptx"
+                  id="btn-generate-pdf"
                   type="button"
                   className={`tc-btn tc-btn--primary tc-generate-btn ${generating ? 'is-loading' : ''}`}
                   onClick={handleGenerate}
@@ -2241,12 +2241,12 @@ const TrainingCertificatesPage = () => {
                   {generating ? (
                     <>
                       <Loader size={19} className="animate-spin" />
-                      Gerando certificados...
+                      Gerando PDF...
                     </>
                   ) : (
                     <>
                       <Download size={19} />
-                      Baixar certificados
+                      Baixar certificados em PDF
                     </>
                   )}
                 </button>
@@ -2470,7 +2470,7 @@ const TrainingCertificatesPage = () => {
                             title="Carregar alunos desta turma no gerador de certificados"
                           >
                             <Award size={14} />
-                            Emitir certificados (.pptx)
+                            Emitir certificados (PDF)
                           </button>
                         </div>
                       </div>
@@ -2801,7 +2801,7 @@ const TrainingCertificatesPage = () => {
 
                 <details className="tc-modal-details">
                   <summary>
-                    <span>Instrutores e responsável técnico</span>
+                    <span>Instrutores e responsáveis técnicos</span>
                     <small>{turmaFormData.instructors?.length || 0} instrutor{turmaFormData.instructors?.length === 1 ? '' : 'es'}</small>
                     <ChevronDown size={16} />
                   </summary>
@@ -2874,6 +2874,35 @@ const TrainingCertificatesPage = () => {
                       <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome do responsável técnico" placeholder="Nome completo" value={turmaFormData.tech_lead?.name || ''} onChange={event => handleUpdateTechLeadInTurma({ name: event.target.value })} />
                       <input type="text" className="tc-input" aria-label="Cargo do responsável técnico" placeholder="Cargo ou qualificação" value={turmaFormData.tech_lead?.role || ''} onChange={event => handleUpdateTechLeadInTurma({ role: event.target.value })} />
                       <input type="text" className="tc-input" aria-label="Registro do responsável técnico" placeholder="Registro CREA, CFT ou MTE" value={turmaFormData.tech_lead?.registration || ''} onChange={event => handleUpdateTechLeadInTurma({ registration: event.target.value })} />
+                    </div>
+
+                    <div className="tc-subsection-head tc-subsection-head--divided">
+                      <h4>Coordenação técnica</h4>
+                    </div>
+                    <div className="tc-modal-grid">
+                      <select
+                        className="tc-input tc-modal-span-2"
+                        aria-label="Selecionar coordenação técnica"
+                        value={profiles.some(profile => profile.name.trim() === turmaFormData.coordinator?.name?.trim()) ? turmaFormData.coordinator?.name : (turmaFormData.coordinator?.name ? 'custom' : '')}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value && value !== 'custom') {
+                            const selected = profiles.find(profile => profile.name === value);
+                            handleUpdateCoordinatorInTurma({
+                              name: selected?.name || value,
+                              role: selected?.role || 'Coordenação Técnica',
+                              registration: selected?.registration || ''
+                            });
+                          }
+                        }}
+                      >
+                        <option value="">Selecionar profissional</option>
+                        {profiles.map(profile => <option key={profile.id || profile.name} value={profile.name}>{profile.name}{profile.role ? ` — ${profile.role}` : ''}</option>)}
+                        <option value="custom">Outro profissional</option>
+                      </select>
+                      <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome da coordenação técnica" placeholder="Nome completo" value={turmaFormData.coordinator?.name || ''} onChange={event => handleUpdateCoordinatorInTurma({ name: event.target.value })} />
+                      <input type="text" className="tc-input" aria-label="Cargo da coordenação técnica" placeholder="Cargo ou qualificação" value={turmaFormData.coordinator?.role || ''} onChange={event => handleUpdateCoordinatorInTurma({ role: event.target.value })} />
+                      <input type="text" className="tc-input" aria-label="Registro da coordenação técnica" placeholder="Registro CREA, Coren, CFT ou MTE" value={turmaFormData.coordinator?.registration || ''} onChange={event => handleUpdateCoordinatorInTurma({ registration: event.target.value })} />
                     </div>
                   </div>
                 </details>
@@ -3036,6 +3065,7 @@ const TrainingCertificatesPage = () => {
       {/* MODAL: LINKS EXCLUSIVOS DE ASSINATURA DA TURMA (EXPIRAÇÃO AUTOMÁTICA)      */}
       {/* ========================================================================= */}
       {showQrModal && qrModalTurma && (() => {
+        const modalCertModel = qrModalTurma.cert_model || certModel;
         const modalInstructors = (Array.isArray(qrModalTurma.instructors) && qrModalTurma.instructors.length > 0)
           ? qrModalTurma.instructors
           : [
@@ -3058,10 +3088,17 @@ const TrainingCertificatesPage = () => {
           {
             key: 'tech_lead',
             label: 'Responsável Técnico',
-            name: certModel === 'modelo1' ? 'Eider Gomes do Nascimento' : 'Raimundo Fernandes de Oliveira Junior',
-            role: 'Responsável Técnico',
+            name: (qrModalTurma.tech_lead || DEFAULT_TECH_LEAD).name,
+            role: (qrModalTurma.tech_lead || DEFAULT_TECH_LEAD).role || 'Responsável Técnico',
             instructorId: null
-          }
+          },
+          ...(modalCertModel === 'modelo2' ? [{
+            key: 'coordinator',
+            label: 'Coordenação Técnica',
+            name: getTurmaCoordinator(qrModalTurma).name,
+            role: getTurmaCoordinator(qrModalTurma).role || 'Coordenação Técnica',
+            instructorId: null
+          }] : [])
         ];
 
         const activeSigner = signersList.find(s => s.key === qrModalSelectedSignerKey) || signersList[0];

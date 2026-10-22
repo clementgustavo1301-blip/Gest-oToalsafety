@@ -26,6 +26,20 @@ const setLocal = (key, data) => {
   }
 };
 
+const normalizeTrainingClass = (trainingClass) => {
+  const c = { ...trainingClass };
+  if (!Array.isArray(c.instructors) || c.instructors.length === 0) {
+    c.instructors = c.instructor_name ? [{
+      id: 'inst-1',
+      name: c.instructor_name || '',
+      role: c.instructor_role || '',
+      registration: c.instructor_registration || ''
+    }] : [];
+  }
+  c.coordinator = c.coordinator || c.tech_lead?.coordinator || null;
+  return c;
+};
+
 /**
  * ---------------- TURMAS (CLASSES) ----------------
  */
@@ -38,19 +52,7 @@ export async function getTrainingClasses() {
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      const normalizedData = data.map(c => {
-        if (!Array.isArray(c.instructors) || c.instructors.length === 0) {
-          c.instructors = [
-            {
-              id: 'inst-1',
-              name: c.instructor_name || '',
-              role: c.instructor_role || '',
-              registration: c.instructor_registration || ''
-            }
-          ];
-        }
-        return c;
-      });
+      const normalizedData = data.map(normalizeTrainingClass);
       setLocal(LOCAL_CLASSES_KEY, normalizedData);
       return normalizedData;
     }
@@ -59,19 +61,7 @@ export async function getTrainingClasses() {
   }
 
   const local = getLocal(LOCAL_CLASSES_KEY);
-  return local.map(c => {
-    if (!Array.isArray(c.instructors) || c.instructors.length === 0) {
-      c.instructors = [
-        {
-          id: 'inst-1',
-          name: c.instructor_name || '',
-          role: c.instructor_role || '',
-          registration: c.instructor_registration || ''
-        }
-      ];
-    }
-    return c;
-  });
+  return local.map(normalizeTrainingClass);
 }
 
 export async function saveTrainingClass(turma) {
@@ -93,10 +83,14 @@ export async function saveTrainingClass(turma) {
         }
       ];
 
-  const techLead = turma.tech_lead || {
+  const coordinator = turma.coordinator || turma.tech_lead?.coordinator || null;
+  const techLead = {
+    ...(turma.tech_lead || {
     name: (turma.tech_lead_name || 'Eider Gomes do Nascimento').trim(),
     role: (turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança').trim(),
     registration: (turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN').trim()
+    }),
+    coordinator
   };
   const primaryInstructor = (instructors && instructors.length > 0) ? instructors[0] : {};
 
@@ -166,7 +160,7 @@ export async function saveTrainingClass(turma) {
   }
   setLocal(LOCAL_CLASSES_KEY, localList);
 
-  return savedItem;
+  return normalizeTrainingClass(savedItem);
 }
 
 export async function deleteTrainingClass(id) {

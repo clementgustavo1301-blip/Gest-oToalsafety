@@ -11,11 +11,39 @@ import { getInstructorSignatureUrl } from '../data/officialTrainingModels.js';
  * Divide o conteúdo programático em 2 colunas equilibradas pelo peso visual das linhas,
  * evitando que uma coluna fique muito maior que a outra ou corte no slide.
  */
+export function normalizeSyllabusContent(rawText = '') {
+  const sourceLines = String(rawText)
+    .split(/\r?\n/)
+    .map(line => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const normalized = [];
+
+  for (let index = 0; index < sourceLines.length; index += 1) {
+    let line = sourceLines[index];
+
+    if (/^(?:\d{1,3}[.)]|[a-z][.)}]?)$/i.test(line) && sourceLines[index + 1]) {
+      line = `${line} ${sourceLines[index + 1]}`;
+      index += 1;
+    }
+
+    const previous = normalized[normalized.length - 1];
+    const startsNewTopic = /^(?:\d{1,3}[.)]|[a-z][.)}])(?:\s|$)/i.test(line);
+    if (previous && !startsNewTopic && !/[.;:!?]$/.test(previous)) {
+      normalized[normalized.length - 1] = `${previous} ${line}`;
+    } else {
+      normalized.push(line);
+    }
+  }
+
+  return normalized.join('\n');
+}
+
 export function balanceSyllabusColumns(rawText, maxCharsPerLine = 38) {
-  if (!rawText) return { col1: '', col2: '', totalLines: 0, maxLinesInCol: 0, totalWeight: 0 };
-  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const normalizedText = normalizeSyllabusContent(rawText);
+  if (!normalizedText) return { col1: '', col2: '', totalLines: 0, maxLinesInCol: 0, totalWeight: 0, normalizedText: '' };
+  const lines = normalizedText.split('\n');
   if (lines.length <= 1) {
-    return { col1: lines.join('\n'), col2: '', totalLines: lines.length, maxLinesInCol: lines.length, totalWeight: lines.length };
+    return { col1: normalizedText, col2: '', totalLines: lines.length, maxLinesInCol: lines.length, totalWeight: lines.length, normalizedText };
   }
 
   const weights = lines.map(l => Math.max(1, Math.ceil(l.length / maxCharsPerLine)));
@@ -50,8 +78,70 @@ export function balanceSyllabusColumns(rawText, maxCharsPerLine = 38) {
     col2Count: col2Lines.length,
     totalLines: lines.length,
     totalWeight,
-    maxLinesInCol
+    maxLinesInCol,
+    normalizedText
   };
+}
+
+function setShapeGeometry(shapeXml, { id, name, x, y, cx, cy }) {
+  let updated = shapeXml;
+  if (id !== undefined) updated = updated.replace(/(<p:cNvPr\b[^>]*\bid=")\d+("[^>]*>)/, `$1${id}$2`);
+  if (name) updated = updated.replace(/(<p:cNvPr\b[^>]*\bname=")[^"]+("[^>]*>)/, `$1${name}$2`);
+  if (x !== undefined) updated = updated.replace(/(<a:off\b[^>]*\bx=")\d+("\s+y=")\d+("\s*\/>)/, `$1${x}$2${y}$3`);
+  if (cx !== undefined) updated = updated.replace(/(<a:ext\b[^>]*\bcx=")\d+("\s+cy=")\d+("\s*\/>)/, `$1${cx}$2${cy}$3`);
+  return updated;
+}
+
+function applyBackTextSize(xml, shapeNames, fontSize) {
+  const targets = new Set(shapeNames);
+  return xml.replace(/<p:sp>[\s\S]*?<\/p:sp>/g, shapeXml => {
+    const shapeName = shapeXml.match(/<p:cNvPr\b[^>]*\bname="([^"]+)"/)?.[1];
+    if (!targets.has(shapeName)) return shapeXml;
+    return shapeXml.replace(/\bsz="\d+"/g, `sz="${fontSize}"`);
+  });
+}
+
+function applyOfficialBackLayout(xml, certModel, balanced) {
+  if (certModel === 'modelo1' && balanced.totalWeight > 24) {
+    const originalShape = (xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [])
+      .find(shapeXml => /<p:cNvPr\b[^>]*\bname="TextBox 3"/.test(shapeXml));
+    if (!originalShape || !originalShape.includes('{{CONTEUDO}}')) return xml;
+
+    const leftX = 1097280;
+    const topY = 1450000;
+    const gap = 300000;
+    const fullWidth = 8494776;
+    const columnWidth = Math.floor((fullWidth - gap) / 2);
+    const height = 4700000;
+    const maxShapeId = Math.max(0, ...[...xml.matchAll(/<p:cNvPr\b[^>]*\bid="(\d+)"/g)].map(match => Number(match[1])));
+    const fontSize = balanced.maxLinesInCol > 38 ? 600 : balanced.maxLinesInCol > 30 ? 680 : balanced.maxLinesInCol > 23 ? 760 : 840;
+
+    let leftShape = setShapeGeometry(originalShape, {
+      name: 'Conteudo Coluna 1', x: leftX, y: topY, cx: columnWidth, cy: height
+    }).replace('{{CONTEUDO}}', '{{CONTEUDO_COL1}}');
+    let rightShape = setShapeGeometry(originalShape, {
+      id: maxShapeId + 1,
+      name: 'Conteudo Coluna 2',
+      x: leftX + columnWidth + gap,
+      y: topY,
+      cx: columnWidth,
+      cy: height
+    }).replace('{{CONTEUDO}}', '{{CONTEUDO_COL2}}');
+    leftShape = leftShape.replace(/\bsz="\d+"/g, `sz="${fontSize}"`);
+    rightShape = rightShape.replace(/\bsz="\d+"/g, `sz="${fontSize}"`);
+    return xml.replace(originalShape, leftShape + rightShape);
+  }
+
+  if (certModel === 'modelo2') {
+    const fontSize = balanced.maxLinesInCol > 42 ? 560
+      : balanced.maxLinesInCol > 34 ? 620
+        : balanced.maxLinesInCol > 27 ? 680
+          : balanced.maxLinesInCol > 20 ? 760
+            : 880;
+    return applyBackTextSize(xml, ['Conteudo Coluna 1', 'Conteudo Coluna 2'], fontSize);
+  }
+
+  return xml;
 }
 
 /**
@@ -124,6 +214,12 @@ export async function generateTrainingPPTX({
   instrutorNome,
   instrutorCargo,
   instrutorRegistro,
+  techLeadNome,
+  techLeadCargo,
+  techLeadRegistro,
+  coordinatorNome,
+  coordinatorCargo,
+  coordinatorRegistro,
   conteudo,
   colaboradores,
   turmaSignatures
@@ -201,6 +297,8 @@ export async function generateTrainingPPTX({
   };
 
   const formattedDate = formatDate(data);
+  const balancedSyllabus = balanceSyllabusColumns(conteudo, certModel === 'modelo1' ? 42 : 38);
+  const normalizedSyllabus = balancedSyllabus.normalizedText || normalizeSyllabusContent(conteudo);
 
   const escapeXml = (str) => {
     if (str === null || str === undefined) return '';
@@ -264,6 +362,10 @@ export async function generateTrainingPPTX({
     for (let i = 0; i < templateSlides.length; i++) {
       const template = templateSlides[i];
       let xml = template.xml;
+
+      if (i === 1 && conteudo) {
+        xml = applyOfficialBackLayout(xml, certModel, balancedSyllabus);
+      }
 
       // 1. Participante / Aluno
       xml = replaceText(xml, [
@@ -347,19 +449,45 @@ export async function generateTrainingPPTX({
         ], instrutorRegistro);
       }
 
+      // 9.1 Responsável técnico e coordenação definidos na turma
+      if (techLeadNome) {
+        xml = replaceText(xml, [
+          '{{RESPONSAVEL_TECNICO}}', '{{NOME_RESPONSAVEL_TECNICO}}',
+          'Eider Gomes do Nascimento', 'Raimundo Fernandes de Oliveira Junior'
+        ], techLeadNome);
+      }
+      if (techLeadCargo) {
+        xml = replaceText(xml, ['{{CARGO_RESPONSAVEL_TECNICO}}'], techLeadCargo);
+      }
+      if (techLeadRegistro) {
+        xml = replaceText(xml, [
+          '{{REGISTRO_RESPONSAVEL_TECNICO}}',
+          'Registro: MTE0009995/RN', 'Registro CREA – 211204597-0'
+        ], techLeadRegistro);
+      }
+      if (coordinatorNome) {
+        xml = replaceText(xml, [
+          '{{COORDENADOR_TECNICO}}', '{{NOME_COORDENADOR_TECNICO}}',
+          'Cezar Augusto Galvão De P. Camêlo', 'Leiliana Nunes de Lima Fernandes'
+        ], coordinatorNome);
+      }
+      if (coordinatorCargo) {
+        xml = replaceText(xml, [
+          '{{CARGO_COORDENADOR_TECNICO}}', 'Engenheiro Eletricista'
+        ], coordinatorCargo);
+      }
+      if (coordinatorRegistro) {
+        xml = replaceText(xml, [
+          '{{REGISTRO_COORDENADOR_TECNICO}}', 'CREA-RN 211051104-4', 'Registro Coren RN 333018'
+        ], coordinatorRegistro);
+      }
+
       // 10. Conteúdo Programático (suporte a coluna única e 2 colunas balanceadas para Modelo 2)
       if (conteudo) {
-        xml = replaceText(xml, ['{{CONTEUDO}}', '[CONTEUDO]'], conteudo);
+        xml = replaceText(xml, ['{{CONTEUDO}}', '[CONTEUDO]'], normalizedSyllabus);
 
-        // Divisão balanceada por peso visual para o Modelo 2 (2 colunas)
-        const balanced = balanceSyllabusColumns(conteudo, 38);
-        xml = replaceText(xml, ['{{CONTEUDO_COL1}}', '[CONTEUDO_COL1]'], balanced.col1 || conteudo);
-        xml = replaceText(xml, ['{{CONTEUDO_COL2}}', '[CONTEUDO_COL2]'], balanced.col2 || '');
-
-        if (balanced.maxLinesInCol > 14) {
-          const newSz = balanced.maxLinesInCol > 20 ? '700' : '800';
-          xml = xml.replace(/(<a:rPr[^>]*\bsz=")(?:950|900)(")/g, `$1${newSz}$2`);
-        }
+        xml = replaceText(xml, ['{{CONTEUDO_COL1}}', '[CONTEUDO_COL1]'], balancedSyllabus.col1 || normalizedSyllabus);
+        xml = replaceText(xml, ['{{CONTEUDO_COL2}}', '[CONTEUDO_COL2]'], balancedSyllabus.col2 || '');
       }
 
       // 11. Validade do Certificado
@@ -510,9 +638,11 @@ export async function generateTrainingPPTX({
   }
 
   // 2. Assinatura do Responsável Técnico (Eider Gomes / Raimundo Fernandes)
-  const techLeadFallback = certModel === 'modelo1' 
-    ? '/certificate-templates/signatures/sig_eider_gomes.png' 
-    : '/certificate-templates/signatures/sig_raimundo_fernandes.png';
+  const techLeadFallback = techLeadNome
+    ? getInstructorSignatureUrl(techLeadNome)
+    : (certModel === 'modelo1'
+      ? '/certificate-templates/signatures/sig_eider_gomes.png'
+      : '/certificate-templates/signatures/sig_raimundo_fernandes.png');
   const techLeadBuffer = await getSignatureBuffer(turmaSignatures?.tech_lead, techLeadFallback);
   if (techLeadBuffer) {
     if (certModel === 'modelo1') {
@@ -523,8 +653,9 @@ export async function generateTrainingPPTX({
   }
 
   // 3. Assinatura da Coordenação / 2º Responsável (Modelo 2)
-  if (certModel === 'modelo2' && turmaSignatures?.coordinator?.dataUrl) {
-    const coordBuffer = await getSignatureBuffer(turmaSignatures.coordinator, null);
+  if (certModel === 'modelo2') {
+    const coordinatorFallback = coordinatorNome ? getInstructorSignatureUrl(coordinatorNome) : '/certificate-templates/signatures/sig_cezar_augusto.png';
+    const coordBuffer = await getSignatureBuffer(turmaSignatures?.coordinator, coordinatorFallback);
     if (coordBuffer) {
       newZip.file('ppt/media/image3.png', coordBuffer);
     }
