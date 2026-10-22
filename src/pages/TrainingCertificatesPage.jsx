@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
-import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { 
   Award, FileText, Plus, Trash2, Download, Loader, 
@@ -12,6 +11,7 @@ import {
   Smartphone, QrCode, PenTool, Share2
 } from 'lucide-react';
 import { balanceSyllabusColumns, getCertificateFrontGeometry } from '../utils/trainingPptxGenerator';
+import { renderCertificateDomPage } from '../utils/domCertificatePdf';
 import { formatCpf } from '../services/cpfService';
 import { getProfiles, getCompanies, getGroups } from '../services/storageService';
 import { 
@@ -1165,16 +1165,15 @@ const TrainingCertificatesPage = () => {
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4',
-        compress: true
+        compress: true,
+        putOnlyUsedFonts: true,
+        precision: 12
       });
       pdf.setProperties({
         title: `Certificados - ${formData.curso}`,
         subject: 'Certificados de treinamento',
         creator: 'EcoSafety'
       });
-      const pdfPageWidth = pdf.internal.pageSize.getWidth();
-      const pdfPageHeight = pdf.internal.pageSize.getHeight();
-
       let pageIndex = 0;
       for (const participant of validColaboradores) {
         for (const side of ['frente', 'verso']) {
@@ -1196,20 +1195,8 @@ const TrainingCertificatesPage = () => {
             });
           }));
 
-          const previewWidth = previewNode.clientWidth || 550;
-          // Escala dinâmica de alta definição para impressão nítida a 300 DPI (mínimo 2400px de largura)
-          const printScale = Math.max(3.8, Math.min(5.5, 2400 / previewWidth));
-
-          const canvas = await html2canvas(previewNode, {
-            scale: printScale,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            imageTimeout: 15000
-          });
-
           if (pageIndex > 0) pdf.addPage('a4', 'landscape');
-          pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, pdfPageWidth, pdfPageHeight, undefined, 'SLOW');
+          await renderCertificateDomPage(pdf, previewNode);
           pageIndex += 1;
         }
       }
@@ -1219,7 +1206,7 @@ const TrainingCertificatesPage = () => {
 
       setFeedback({ 
         type: 'success', 
-        text: `PDF com ${validColaboradores.length} certificado(s) gerado exatamente como na prévia.`
+        text: `PDF vetorial com ${validColaboradores.length} certificado(s) gerado em alta qualidade.`
       });
       setTimeout(() => setFeedback(null), 5000);
     } catch (err) {
