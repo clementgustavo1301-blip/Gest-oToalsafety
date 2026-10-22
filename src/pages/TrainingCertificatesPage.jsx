@@ -5,7 +5,7 @@ import {
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
   Edit, Key, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
-  Eye, CheckCircle, Clock, BookOpen, Briefcase, MapPin, Building,
+  Eye, CheckCircle, Clock, Briefcase, MapPin, Building,
   Smartphone, QrCode, PenTool, Share2
 } from 'lucide-react';
 import { generateTrainingPPTX, balanceSyllabusColumns } from '../utils/trainingPptxGenerator';
@@ -325,6 +325,9 @@ const TrainingCertificatesPage = () => {
   // Modais de Gestão
   const [showTurmaModal, setShowTurmaModal] = useState(false);
   const [editingTurma, setEditingTurma] = useState(null);
+  const [turmaSaving, setTurmaSaving] = useState(false);
+  const [turmaFormErrors, setTurmaFormErrors] = useState({});
+  const turmaInitialFormRef = useRef('');
   const [turmaFormData, setTurmaFormData] = useState({
     name: '',
     selectedPresetKey: '',
@@ -648,10 +651,11 @@ const TrainingCertificatesPage = () => {
 
   const handleOpenNewTurma = () => {
     setEditingTurma(null);
+    setTurmaFormErrors({});
     const defaultModel = COURSE_PRESETS[0] || {};
     const defaultLead = profiles.find(p => p.role?.toLowerCase().includes('responsável') || p.role?.toLowerCase().includes('admin')) || profiles[0] || {};
 
-    setTurmaFormData({
+    const nextFormData = {
       name: '',
       selectedPresetKey: defaultModel.name || '',
       course_name: defaultModel.title || defaultModel.name || 'NR-35 – TRABALHO EM ALTURA – NÍVEL BÁSICO',
@@ -675,12 +679,15 @@ const TrainingCertificatesPage = () => {
       cert_model: defaultModel.modelType || 'modelo1',
       content: defaultModel.content || '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
       status: 'Aberta'
-    });
+    };
+    turmaInitialFormRef.current = JSON.stringify(nextFormData);
+    setTurmaFormData(nextFormData);
     setShowTurmaModal(true);
   };
 
   const handleEditTurma = (turma) => {
     setEditingTurma(turma);
+    setTurmaFormErrors({});
     const loadedInstructors = (Array.isArray(turma.instructors) && turma.instructors.length > 0)
       ? turma.instructors
       : (turma.instructor_name ? [
@@ -698,7 +705,7 @@ const TrainingCertificatesPage = () => {
       registration: turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
     };
 
-    setTurmaFormData({
+    const nextFormData = {
       name: turma.name || '',
       selectedPresetKey: COURSE_PRESETS.find(p => (p.title === turma.course_name || p.name === turma.course_name))?.name || 'custom',
       course_name: turma.course_name || '',
@@ -718,17 +725,34 @@ const TrainingCertificatesPage = () => {
       cert_model: turma.cert_model || 'modelo1',
       content: turma.content || '',
       status: turma.status || 'Aberta'
-    });
+    };
+    turmaInitialFormRef.current = JSON.stringify(nextFormData);
+    setTurmaFormData(nextFormData);
     setShowTurmaModal(true);
+  };
+
+  const requestCloseTurmaModal = () => {
+    if (turmaSaving) return;
+    const hasChanges = turmaInitialFormRef.current && turmaInitialFormRef.current !== JSON.stringify(turmaFormData);
+    if (hasChanges && !window.confirm('Descartar as alterações desta turma?')) return;
+    setShowTurmaModal(false);
+    setTurmaFormErrors({});
   };
 
   const handleSaveTurma = async (e) => {
     e.preventDefault();
-    if (!turmaFormData.name.trim()) {
-      alert('Por favor, informe a identificação da Turma.');
+    const nextErrors = {};
+    if (!turmaFormData.name.trim()) nextErrors.name = 'Informe o nome da turma.';
+    if (!turmaFormData.course_name.trim()) nextErrors.course_name = 'Informe o nome oficial do curso.';
+    if (Object.keys(nextErrors).length > 0) {
+      setTurmaFormErrors(nextErrors);
+      const firstInvalidId = nextErrors.name ? 'tc-turma-name' : 'tc-turma-course-name';
+      requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
       return;
     }
 
+    setTurmaSaving(true);
+    setTurmaFormErrors({});
     try {
       const validInstructors = (turmaFormData.instructors || [])
         .map(i => ({
@@ -763,9 +787,29 @@ const TrainingCertificatesPage = () => {
       setTimeout(() => setFeedback(null), 4000);
     } catch (err) {
       console.error(err);
-      alert('Erro ao salvar turma.');
+      setTurmaFormErrors({ submit: 'Não foi possível salvar a turma. Revise os dados e tente novamente.' });
+    } finally {
+      setTurmaSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!showTurmaModal) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape' || turmaSaving) return;
+      const hasChanges = turmaInitialFormRef.current && turmaInitialFormRef.current !== JSON.stringify(turmaFormData);
+      if (hasChanges && !window.confirm('Descartar as alterações desta turma?')) return;
+      setShowTurmaModal(false);
+      setTurmaFormErrors({});
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showTurmaModal, turmaFormData, turmaSaving]);
 
   const handleDeleteTurma = async (id, name) => {
     if (!window.confirm(`Deseja realmente excluir a turma "${name}"? Os inscritos ficarão como sem turma.`)) {
@@ -776,12 +820,31 @@ const TrainingCertificatesPage = () => {
   };
 
   // Copia o link público da turma ou link geral
-  const copyPublicLink = (turmaId = null, key = 'general') => {
+  const copyPublicLink = async (turmaId = null, key = 'general') => {
     const origin = window.location.origin;
     const url = turmaId ? `${origin}/inscricao?turma=${turmaId}` : `${origin}/inscricao`;
-    navigator.clipboard.writeText(url);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2500);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const temporaryInput = document.createElement('textarea');
+        temporaryInput.value = url;
+        temporaryInput.setAttribute('readonly', '');
+        temporaryInput.style.position = 'fixed';
+        temporaryInput.style.opacity = '0';
+        document.body.appendChild(temporaryInput);
+        temporaryInput.select();
+        const copied = document.execCommand('copy');
+        temporaryInput.remove();
+        if (!copied) throw new Error('Clipboard indisponível');
+      }
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2500);
+    } catch (error) {
+      console.error(error);
+      setFeedback({ type: 'error', text: 'Não foi possível copiar o link. Tente novamente.' });
+      setTimeout(() => setFeedback(null), 4000);
+    }
   };
 
   // Carrega alunos de uma turma direto no gerador de certificados
@@ -1171,35 +1234,26 @@ const TrainingCertificatesPage = () => {
       {/* CABEÇALHO COMPACTO + ABAS                                                 */}
       {/* ========================================================================= */}
       <header className="tc-header">
-        <div className="tc-header-title">
-          <div className="tc-header-icon">
-            <Award size={22} />
-          </div>
-          <div>
-            <h1>Certificados de Treinamento</h1>
-            <p>Preencha os dados, confira a prévia e baixe os certificados em PowerPoint.</p>
-          </div>
-        </div>
+        <h1>Certificados</h1>
 
         <nav className="tc-tabs" aria-label="Seções do módulo de treinamento">
           <button
             id="tab-generator"
             type="button"
-            className={`tc-tab ${activeTab === 'generator' ? 'is-active' : ''}`}
+            className={`tc-tab tc-tab--primary ${activeTab === 'generator' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('generator')}
           >
             <Award size={15} />
-            Gerar Certificados
+            Gerar certificados
           </button>
           <button
             id="tab-turmas"
             type="button"
-            className={`tc-tab ${activeTab === 'turmas' ? 'is-active' : ''}`}
+            className={`tc-tab tc-tab--secondary ${activeTab === 'turmas' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('turmas')}
           >
             <Users size={15} />
-            Turmas &amp; Inscrições
-            <span className="tc-tab-count">{enrollments.length}</span>
+            Turmas e inscrições
           </button>
         </nav>
       </header>
@@ -2239,19 +2293,16 @@ const TrainingCertificatesPage = () => {
 
         return (
         <div className="tc-turmas">
-          {/* Faixa compacta: Link Público Geral de Inscrição */}
+          {/* Link público geral de inscrição */}
           <section className="tc-portal" aria-labelledby="tc-portal-title">
-            <div>
-              <div className="tc-portal-tags">
-                <span className="tc-portal-tag">Portal público de participação</span>
-                <span className="tc-portal-verified">
-                  <ShieldCheck size={14} />
-                  Validação oficial Receita (CPF)
-                </span>
-              </div>
-              <h3 id="tc-portal-title">
-                Envie o link para os alunos preencherem a lista de presença com CPF e data de nascimento.
-              </h3>
+            <div className="tc-portal-heading">
+              <h2 id="tc-portal-title">Link público de inscrição</h2>
+              <span className="tc-portal-verified" title="Os dados informados no formulário são validados pela API da Receita Federal">
+                <ShieldCheck size={13} />
+                CPF validado
+              </span>
+            </div>
+            <div className="tc-portal-row">
               <div className="tc-url-field">
                 <code title={`${window.location.origin}/inscricao`}>{window.location.origin}/inscricao</code>
                 <button
@@ -2259,28 +2310,26 @@ const TrainingCertificatesPage = () => {
                   type="button"
                   className={copiedKey === 'banner-general' ? 'is-copied' : ''}
                   onClick={() => copyPublicLink(null, 'banner-general')}
+                  aria-live="polite"
                 >
                   {copiedKey === 'banner-general' ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedKey === 'banner-general' ? 'Copiado!' : 'Copiar link'}
+                  {copiedKey === 'banner-general' ? 'Copiado' : 'Copiar'}
                 </button>
               </div>
-            </div>
-
-            <div className="tc-portal-actions">
               <a
                 id="btn-test-public-form"
                 href="/inscricao"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="tc-btn tc-btn--lg"
+                className="tc-link tc-portal-test"
               >
-                <Eye size={15} />
+                <ExternalLink size={13} />
                 Testar formulário
               </a>
               <button
                 id="btn-api-cpf-token"
                 type="button"
-                className="tc-icon-btn"
+                className="tc-icon-btn tc-icon-btn--sm"
                 onClick={() => setShowTokenModal(true)}
                 title="Configurar token da API CPF (Receita)"
                 aria-label="Configurar token da API CPF (Receita)"
@@ -2295,20 +2344,21 @@ const TrainingCertificatesPage = () => {
             <div className="tc-section-head">
               <div>
                 <h2 id="tc-turmas-title">
-                  Turmas de treinamento
+                  Turmas
                   <span className="tc-count">{turmas.length}</span>
                 </h2>
-                <p>Cada turma possui link próprio, instrutor do sistema e emissão direta de certificados.</p>
               </div>
-              <button
-                id="btn-new-turma"
-                type="button"
-                className="tc-btn tc-btn--primary tc-btn--lg"
-                onClick={handleOpenNewTurma}
-              >
-                <Plus size={16} />
-                Nova turma
-              </button>
+              {turmas.length > 0 && (
+                <button
+                  id="btn-new-turma"
+                  type="button"
+                  className="tc-btn tc-btn--primary"
+                  onClick={handleOpenNewTurma}
+                >
+                  <Plus size={15} />
+                  Nova turma
+                </button>
+              )}
             </div>
 
             {loadingData ? (
@@ -2317,20 +2367,16 @@ const TrainingCertificatesPage = () => {
                 <p style={{ margin: 0 }}>Carregando turmas...</p>
               </div>
             ) : turmas.length === 0 ? (
-              <div className="tc-empty">
-                <div className="tc-empty-icon">
-                  <Award size={24} />
-                </div>
-                <h3>Nenhuma turma criada ainda</h3>
-                <p>Crie sua primeira turma selecionando um instrutor do sistema para gerar links de presença e certificados em lote.</p>
+              <div className="tc-empty tc-empty--turmas">
+                <h3>Nenhuma turma cadastrada</h3>
                 <button
                   id="btn-create-first-turma"
                   type="button"
-                  className="tc-btn tc-btn--primary tc-btn--lg"
+                  className="tc-btn tc-btn--primary"
                   onClick={handleOpenNewTurma}
                 >
                   <Plus size={16} />
-                  Criar primeira turma
+                  Criar turma
                 </button>
               </div>
             ) : (
@@ -2455,85 +2501,73 @@ const TrainingCertificatesPage = () => {
             <div className="tc-section-head">
               <div>
                 <h2 id="tc-enrollments-title">
-                  Participantes &amp; lista de presença
+                  Participantes
                   <span className="tc-count">
                     {hasActiveFilters ? `${filteredEnrollments.length} de ${enrollments.length}` : enrollments.length}
                   </span>
                 </h2>
-                <p>Dados em tempo real obtidos com CPF e data de nascimento via Receita Federal.</p>
               </div>
             </div>
 
             <div className="tc-card tc-table-card">
               {/* Barra de filtros integrada à tabela */}
-              <div className="tc-toolbar">
-                <div className="tc-search">
-                  <Search size={15} />
-                  <input
-                    id="tc-enrollment-search"
-                    type="text"
-                    placeholder="Buscar por nome ou CPF..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+              {enrollments.length > 0 && (
+                <div className="tc-toolbar">
+                  <div className="tc-search">
+                    <Search size={15} />
+                    <input
+                      id="tc-enrollment-search"
+                      type="text"
+                      placeholder="Buscar por nome ou CPF..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="tc-input"
+                      aria-label="Buscar participante por nome ou CPF"
+                    />
+                  </div>
+
+                  <select
+                    id="tc-enrollment-filter"
+                    value={selectedTurmaFilter}
+                    onChange={(e) => setSelectedTurmaFilter(e.target.value)}
                     className="tc-input"
-                    aria-label="Buscar participante por nome ou CPF"
-                  />
-                </div>
-
-                <select
-                  id="tc-enrollment-filter"
-                  value={selectedTurmaFilter}
-                  onChange={(e) => setSelectedTurmaFilter(e.target.value)}
-                  className="tc-input"
-                  aria-label="Filtrar por turma"
-                >
-                  <option value="all">Todas as turmas ({enrollments.length})</option>
-                  <option value="unassigned">Sem turma vinculada ({enrollments.filter(e => !e.turma_id).length})</option>
-                  {turmas.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({enrollments.filter(e => e.turma_id === t.id).length})
-                    </option>
-                  ))}
-                </select>
-
-                <div className="tc-toolbar-end">
-                  {hasActiveFilters && (
-                    <button type="button" className="tc-link" onClick={clearEnrollmentFilters}>
-                      <X size={12} />
-                      Limpar filtros
-                    </button>
-                  )}
-                  <button
-                    id="btn-refresh-enrollments"
-                    type="button"
-                    className="tc-icon-btn"
-                    onClick={loadData}
-                    title="Atualizar lista em tempo real"
-                    aria-label="Atualizar lista"
+                    aria-label="Filtrar por turma"
                   >
-                    <RefreshCw size={15} />
-                  </button>
+                    <option value="all">Todas as turmas ({enrollments.length})</option>
+                    <option value="unassigned">Sem turma vinculada ({enrollments.filter(e => !e.turma_id).length})</option>
+                    {turmas.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({enrollments.filter(e => e.turma_id === t.id).length})
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="tc-toolbar-end">
+                    {hasActiveFilters && (
+                      <button type="button" className="tc-link" onClick={clearEnrollmentFilters}>
+                        <X size={12} />
+                        Limpar filtros
+                      </button>
+                    )}
+                    <button
+                      id="btn-refresh-enrollments"
+                      type="button"
+                      className="tc-icon-btn"
+                      onClick={loadData}
+                      title="Atualizar lista em tempo real"
+                      aria-label="Atualizar lista"
+                    >
+                      <RefreshCw size={15} />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {filteredEnrollments.length === 0 ? (
                 enrollments.length === 0 ? (
                   <div className="tc-empty tc-empty--flat">
-                    <div className="tc-empty-icon">
-                      <Users size={22} />
-                    </div>
-                    <h3>Nenhuma inscrição recebida ainda</h3>
-                    <p>Compartilhe o link público com os alunos — as inscrições aparecem aqui automaticamente.</p>
-                    <div className="tc-empty-actions">
-                      <button
-                        type="button"
-                        className="tc-btn tc-btn--soft"
-                        onClick={() => copyPublicLink(null, 'empty-enrollments')}
-                      >
-                        {copiedKey === 'empty-enrollments' ? <Check size={14} /> : <Copy size={14} />}
-                        {copiedKey === 'empty-enrollments' ? 'Link copiado' : 'Copiar link público'}
-                      </button>
-                    </div>
+                    <h3>Nenhum participante inscrito</h3>
+                    <p>As inscrições aparecerão aqui automaticamente.</p>
                   </div>
                 ) : (
                   <div className="tc-empty tc-empty--flat">
@@ -2628,402 +2662,266 @@ const TrainingCertificatesPage = () => {
       {/* MODAL: CRIAR OU EDITAR TURMA                                              */}
       {/* ========================================================================= */}
       {showTurmaModal && (
-        <div className="modal-backdrop" onClick={() => setShowTurmaModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '660px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '1.25rem', padding: '1.75rem' }}>
-            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.15rem', fontWeight: '800' }}>
-                <Award size={20} style={{ color: '#0284c7' }} />
-                {editingTurma ? 'Editar Turma de Treinamento' : 'Criar Nova Turma de Treinamento'}
-              </h2>
-              <button className="modal-close" onClick={() => setShowTurmaModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveTurma} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
-              <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Identificação da Turma *</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  placeholder="Ex: Turma 01 - NR-35 Trabalho em Altura / Março 2026"
-                  value={turmaFormData.name}
-                  onChange={e => setTurmaFormData(prev => ({ ...prev, name: e.target.value }))}
-                  style={{ width: '100%', marginTop: '0.35rem', fontWeight: '700', fontSize: '0.92rem' }}
-                />
-              </div>
-
-              {/* Seletor Oficial de Curso / Catálogo TotalSafety */}
-              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.75rem', padding: '0.85rem' }}>
-                <label className="modal-label" style={{ fontWeight: '800', fontSize: '0.8125rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem' }}>
-                  <BookOpen size={16} />
-                  Puxar Configurações do Catálogo de Cursos Oficiais
-                </label>
-                <select
-                  className="input"
-                  value={turmaFormData.selectedPresetKey || 'custom'}
-                  onChange={(e) => handleCoursePresetChangeInTurma(e.target.value)}
-                  style={{ width: '100%', fontSize: '0.82rem', fontWeight: '600', backgroundColor: '#ffffff' }}
-                >
-                  <option value="custom">-- Selecionar Curso do Catálogo Oficial --</option>
-                  {COURSE_PRESETS.map(preset => (
-                    <option key={preset.name} value={preset.name}>
-                      {preset.name} ({preset.duration}) — {preset.modelType === 'modelo1' ? 'EcoCurvas' : 'Ondas & Colmeia'}
-                    </option>
-                  ))}
-                  <option value="custom">Outro Curso / Digitar Nome Personalizado</option>
-                </select>
-                <p style={{ fontSize: '0.72rem', color: '#166534', margin: '0.4rem 0 0 0' }}>
-                  💡 Ao escolher um curso, a carga horária, validade, modelo e o conteúdo programático oficial são preenchidos automaticamente.
-                </p>
-              </div>
-
-              <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Nome Oficial do Curso no Certificado *</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  placeholder="Ex: NR-35 – TRABALHO EM ALTURA – NÍVEL BÁSICO"
-                  value={turmaFormData.course_name}
-                  onChange={e => setTurmaFormData(prev => ({ ...prev, course_name: e.target.value }))}
-                  style={{ width: '100%', marginTop: '0.35rem', fontWeight: '600' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) requestCloseTurmaModal();
+          }}
+        >
+          <div className="tc-turma-modal" role="dialog" aria-modal="true" aria-labelledby="tc-turma-modal-title">
+            <form className="tc-turma-modal-form" onSubmit={handleSaveTurma} noValidate>
+              <header className="tc-turma-modal-header">
                 <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Carga Horária</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Ex: 8 horas, 16 horas"
-                    value={turmaFormData.duration}
-                    onChange={e => setTurmaFormData(prev => ({ ...prev, duration: e.target.value }))}
-                    style={{ width: '100%', marginTop: '0.35rem' }}
-                  />
+                  <h2 id="tc-turma-modal-title">{editingTurma ? 'Editar turma' : 'Nova turma'}</h2>
+                  <p>Preencha os dados usados na inscrição e nos certificados.</p>
                 </div>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Validade do Treinamento</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Ex: 24 meses, 12 meses"
-                    value={turmaFormData.validade || '24 meses'}
-                    onChange={e => setTurmaFormData(prev => ({ ...prev, validade: e.target.value }))}
-                    style={{ width: '100%', marginTop: '0.35rem' }}
-                  />
-                </div>
-              </div>
+                <button type="button" className="modal-close" onClick={requestCloseTurmaModal} aria-label="Fechar modal">
+                  <X size={18} />
+                </button>
+              </header>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Data de Conclusão / Realização</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={turmaFormData.start_date}
-                    onChange={e => setTurmaFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                    style={{ width: '100%', marginTop: '0.35rem' }}
-                  />
-                </div>
-                <div>
-                  <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Local / Cidade</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Ex: Mossoró - RN"
-                    value={turmaFormData.location}
-                    onChange={e => setTurmaFormData(prev => ({ ...prev, location: e.target.value }))}
-                    style={{ width: '100%', marginTop: '0.35rem' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Empresa Solicitante</label>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem' }}>
-                  {companies && companies.length > 0 && (
-                    <select
-                      className="input"
-                      value={companies.some(c => c.name === turmaFormData.company) ? turmaFormData.company : (turmaFormData.company ? 'custom' : '')}
-                      onChange={(e) => {
-                        if (e.target.value && e.target.value !== 'custom') {
-                          setTurmaFormData(prev => ({ ...prev, company: e.target.value }));
-                        }
-                      }}
-                      style={{ maxWidth: '210px', fontSize: '0.78rem' }}
-                    >
-                      <option value="">Selecione cadastrada...</option>
-                      {companies.map(c => (
-                        <option key={c.id || c.name} value={c.name}>{c.name}</option>
-                      ))}
-                      <option value="custom">Outra / Digitar manual</option>
-                    </select>
-                  )}
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Ex: TotalSafety / Nome do Cliente"
-                    value={turmaFormData.company}
-                    onChange={e => setTurmaFormData(prev => ({ ...prev, company: e.target.value }))}
-                    style={{ flex: 1 }}
-                  />
-                </div>
-              </div>
-
-              {/* ========================================================================= */}
-              {/* SEÇÃO DE INSTRUTORES DA TURMA (TOTALMENTE OPCIONAL)                       */}
-              {/* ========================================================================= */}
-              <div style={{
-                marginTop: '0.4rem',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.85rem',
-                padding: '0.85rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <div>
-                    <label className="modal-label" style={{ fontWeight: '800', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0, color: '#0284c7' }}>
-                      <User size={15} />
-                      Instrutores do Treinamento ({turmaFormData.instructors?.length || 0})
-                    </label>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                      Opcional: pode ser definido agora, no gerador ou via link de assinatura
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddInstructorToTurma}
-                    style={{
-                      background: 'rgba(2, 132, 199, 0.08)',
-                      border: '1px solid rgba(2, 132, 199, 0.3)',
-                      color: '#0284c7',
-                      fontSize: '0.75rem',
-                      fontWeight: '700',
-                      padding: '0.35rem 0.75rem',
-                      borderRadius: '0.5rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.3rem'
-                    }}
-                  >
-                    <Plus size={13} />
-                    Adicionar Instrutor
-                  </button>
-                </div>
-
-                {(!turmaFormData.instructors || turmaFormData.instructors.length === 0) ? (
-                  <div style={{ textAlign: 'center', padding: '0.85rem', color: '#94a3b8', fontSize: '0.78rem', fontStyle: 'italic' }}>
-                    Nenhum instrutor adicionado previamente. Você pode clicar no botão acima para adicionar um ou mais instrutores agora, ou definir depois.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.4rem' }}>
-                    {turmaFormData.instructors.map((inst, index) => (
-                      <div
-                        key={inst.id || index}
-                        style={{
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.75rem',
-                          padding: '0.75rem',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.45rem',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: '800', color: index === 0 ? '#0284c7' : '#7c3aed', textTransform: 'uppercase' }}>
-                            {index === 0 ? 'Instrutor Principal' : `Instrutor Adicional #${index + 1}`}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveInstructorFromTurma(index)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              fontSize: '0.7rem',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.2rem'
-                            }}
-                          >
-                            <Trash2 size={13} /> Remover
-                          </button>
-                        </div>
-
-                        {/* Seletor rápido por lista oficial/usuários */}
-                        <select
-                          className="input"
-                          value={profiles.some(p => p.name.trim() === inst.name?.trim()) ? inst.name : (inst.name ? 'custom' : '')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val && val !== 'custom') {
-                              const sel = profiles.find(p => p.name === val);
-                              handleUpdateInstructorInTurma(index, {
-                                name: sel ? sel.name : val,
-                                role: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : (inst.role || 'Instrutor')),
-                                registration: sel?.registration || inst.registration || ''
-                              });
-                            }
-                          }}
-                          style={{ width: '100%', fontSize: '0.78rem', padding: '0.45rem 0.65rem' }}
-                        >
-                          <option value="">Selecione dos usuários/instrutores cadastrados...</option>
-                          {profiles.map(p => (
-                            <option key={p.id || p.name} value={p.name}>
-                              {p.name} {p.role ? `— ${p.role}` : ''}
-                            </option>
-                          ))}
-                          <option value="custom">Outro / Digitar manualmente</option>
-                        </select>
-
-                        <input
-                          type="text"
-                          className="input"
-                          placeholder="Nome completo do Instrutor (Opcional)"
-                          value={inst.name || ''}
-                          onChange={e => handleUpdateInstructorInTurma(index, { name: e.target.value })}
-                          style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0.65rem' }}
-                        />
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                          <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '2px' }}>Cargo / Qualificação</label>
-                            <input
-                              type="text"
-                              className="input"
-                              placeholder="Ex: Téc. Segurança do Trabalho"
-                              value={inst.role || ''}
-                              onChange={e => handleUpdateInstructorInTurma(index, { role: e.target.value })}
-                              style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '2px' }}>Registro MTE / SRTE / CREA</label>
-                            <input
-                              type="text"
-                              className="input"
-                              placeholder="Ex: MTE0009995/RN"
-                              value={inst.registration || ''}
-                              onChange={e => handleUpdateInstructorInTurma(index, { registration: e.target.value })}
-                              style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+              <div className="tc-turma-modal-body">
+                {turmaFormErrors.submit && (
+                  <div className="tc-form-alert" role="alert">
+                    <AlertCircle size={15} />
+                    {turmaFormErrors.submit}
                   </div>
                 )}
-              </div>
 
-              {/* ========================================================================= */}
-              {/* SEÇÃO DO RESPONSÁVEL TÉCNICO (CONFIGURÁVEL)                               */}
-              {/* ========================================================================= */}
-              <div style={{
-                backgroundColor: '#faf5ff',
-                border: '1px solid #e9d5ff',
-                borderRadius: '0.85rem',
-                padding: '0.85rem'
-              }}>
-                <label className="modal-label" style={{ fontWeight: '800', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: '0 0 0.4rem 0', color: '#7c3aed' }}>
-                  <ShieldCheck size={16} />
-                  Responsável Técnico do Treinamento
-                </label>
-                <span style={{ fontSize: '0.7rem', color: '#6b21a8', display: 'block', marginBottom: '0.6rem' }}>
-                  Profissional habilitado responsável pela emissão técnica dos certificados desta turma.
-                </span>
+                <section className="tc-modal-section" aria-labelledby="tc-identificacao-title">
+                  <h3 id="tc-identificacao-title">Identificação</h3>
+                  <div className="tc-modal-field">
+                    <label htmlFor="tc-turma-name">Nome da turma <span aria-hidden="true">*</span></label>
+                    <input
+                      id="tc-turma-name"
+                      type="text"
+                      required
+                      autoFocus
+                      className={`tc-input ${turmaFormErrors.name ? 'is-invalid' : ''}`}
+                      placeholder="Ex: Turma 01 · NR-35 · Março 2026"
+                      value={turmaFormData.name}
+                      aria-invalid={Boolean(turmaFormErrors.name)}
+                      aria-describedby={turmaFormErrors.name ? 'tc-turma-name-error' : undefined}
+                      onChange={(event) => {
+                        setTurmaFormData(prev => ({ ...prev, name: event.target.value }));
+                        if (turmaFormErrors.name) setTurmaFormErrors(prev => ({ ...prev, name: '' }));
+                      }}
+                    />
+                    {turmaFormErrors.name && <span id="tc-turma-name-error" className="tc-field-error">{turmaFormErrors.name}</span>}
+                  </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                  <select
-                    className="input"
-                    value={profiles.some(p => p.name.trim() === turmaFormData.tech_lead?.name?.trim()) ? turmaFormData.tech_lead?.name : (turmaFormData.tech_lead?.name ? 'custom' : '')}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val && val !== 'custom') {
-                        const sel = profiles.find(p => p.name === val);
-                        handleUpdateTechLeadInTurma({
-                          name: sel ? sel.name : val,
-                          role: sel?.role || 'Responsável Técnico / Engenheiro de Segurança',
-                          registration: sel?.registration || 'CREA 210874512-0 / MTE 0009995/RN'
-                        });
-                      }
-                    }}
-                    style={{ width: '100%', fontSize: '0.78rem', padding: '0.45rem 0.65rem', backgroundColor: '#ffffff' }}
-                  >
-                    <option value="">Selecione dos profissionais cadastrados...</option>
-                    {profiles.map(p => (
-                      <option key={p.id || p.name} value={p.name}>
-                        {p.name} {p.role ? `— ${p.role}` : ''}
-                      </option>
-                    ))}
-                    <option value="custom">Outro Responsável / Digitar Manualmente</option>
-                  </select>
+                  <div className="tc-modal-field">
+                    <label htmlFor="tc-turma-preset">Curso do catálogo oficial</label>
+                    <select
+                      id="tc-turma-preset"
+                      className="tc-input"
+                      value={turmaFormData.selectedPresetKey || 'custom'}
+                      onChange={(event) => {
+                        handleCoursePresetChangeInTurma(event.target.value);
+                        if (turmaFormErrors.course_name) setTurmaFormErrors(prev => ({ ...prev, course_name: '' }));
+                      }}
+                    >
+                      <option value="custom">Curso personalizado</option>
+                      {COURSE_PRESETS.map(preset => (
+                        <option key={preset.name} value={preset.name}>
+                          {preset.name} · {preset.duration}
+                        </option>
+                      ))}
+                    </select>
+                    <span
+                      className={`tc-autofill-note ${turmaFormData.selectedPresetKey && turmaFormData.selectedPresetKey !== 'custom' ? '' : 'is-hidden'}`}
+                      role={turmaFormData.selectedPresetKey && turmaFormData.selectedPresetKey !== 'custom' ? 'status' : undefined}
+                      aria-hidden={!(turmaFormData.selectedPresetKey && turmaFormData.selectedPresetKey !== 'custom')}
+                    >
+                      <Check size={13} /> Dados do curso preenchidos automaticamente
+                    </span>
+                  </div>
+                </section>
 
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Nome completo do Responsável Técnico"
-                    value={turmaFormData.tech_lead?.name || ''}
-                    onChange={e => handleUpdateTechLeadInTurma({ name: e.target.value })}
-                    style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0.65rem', backgroundColor: '#ffffff' }}
-                  />
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#6b21a8', display: 'block', marginBottom: '2px' }}>Cargo / Qualificação</label>
+                <section className="tc-modal-section" aria-labelledby="tc-training-data-title">
+                  <h3 id="tc-training-data-title">Dados do treinamento</h3>
+                  <div className="tc-modal-grid">
+                    <div className="tc-modal-field tc-modal-span-2">
+                      <label htmlFor="tc-turma-course-name">Nome oficial do curso <span aria-hidden="true">*</span></label>
                       <input
+                        id="tc-turma-course-name"
                         type="text"
-                        className="input"
-                        placeholder="Ex: Engenheiro de Segurança do Trabalho"
-                        value={turmaFormData.tech_lead?.role || ''}
-                        onChange={e => handleUpdateTechLeadInTurma({ role: e.target.value })}
-                        style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem', backgroundColor: '#ffffff' }}
+                        required
+                        className={`tc-input ${turmaFormErrors.course_name ? 'is-invalid' : ''}`}
+                        placeholder="Ex: NR-35 – Trabalho em Altura – Nível Básico"
+                        value={turmaFormData.course_name}
+                        aria-invalid={Boolean(turmaFormErrors.course_name)}
+                        aria-describedby={turmaFormErrors.course_name ? 'tc-turma-course-error' : undefined}
+                        onChange={(event) => {
+                          setTurmaFormData(prev => ({ ...prev, course_name: event.target.value }));
+                          if (turmaFormErrors.course_name) setTurmaFormErrors(prev => ({ ...prev, course_name: '' }));
+                        }}
                       />
+                      {turmaFormErrors.course_name && <span id="tc-turma-course-error" className="tc-field-error">{turmaFormErrors.course_name}</span>}
                     </div>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: '600', color: '#6b21a8', display: 'block', marginBottom: '2px' }}>Registro CREA / CFT / MTE</label>
-                      <input
-                        type="text"
-                        className="input"
-                        placeholder="Ex: CREA 210874512-0"
-                        value={turmaFormData.tech_lead?.registration || ''}
-                        onChange={e => handleUpdateTechLeadInTurma({ registration: e.target.value })}
-                        style={{ width: '100%', fontSize: '0.78rem', padding: '0.4rem 0.6rem', backgroundColor: '#ffffff' }}
-                      />
+                    <div className="tc-modal-field">
+                      <label htmlFor="tc-turma-duration">Carga horária</label>
+                      <input id="tc-turma-duration" type="text" className="tc-input" placeholder="Ex: 8 horas" value={turmaFormData.duration} onChange={event => setTurmaFormData(prev => ({ ...prev, duration: event.target.value }))} />
+                    </div>
+                    <div className="tc-modal-field">
+                      <label htmlFor="tc-turma-validade">Validade</label>
+                      <input id="tc-turma-validade" type="text" className="tc-input" placeholder="Ex: 24 meses" value={turmaFormData.validade || ''} onChange={event => setTurmaFormData(prev => ({ ...prev, validade: event.target.value }))} />
+                    </div>
+                    <div className="tc-modal-field">
+                      <label htmlFor="tc-turma-date">Data de realização</label>
+                      <input id="tc-turma-date" type="date" className="tc-input" value={turmaFormData.start_date} onChange={event => setTurmaFormData(prev => ({ ...prev, start_date: event.target.value }))} />
+                    </div>
+                    <div className="tc-modal-field">
+                      <label htmlFor="tc-turma-location">Local</label>
+                      <input id="tc-turma-location" type="text" className="tc-input" placeholder="Ex: Mossoró - RN" value={turmaFormData.location} onChange={event => setTurmaFormData(prev => ({ ...prev, location: event.target.value }))} />
                     </div>
                   </div>
-                </div>
+                </section>
+
+                <section className="tc-modal-section" aria-labelledby="tc-complementary-title">
+                  <h3 id="tc-complementary-title">Dados complementares</h3>
+                  <div className="tc-modal-grid">
+                    <div className="tc-modal-field tc-modal-span-2">
+                      <label htmlFor="tc-turma-company">Empresa solicitante</label>
+                      <div className="tc-company-field">
+                        {companies.length > 0 && (
+                          <select
+                            className="tc-input"
+                            aria-label="Selecionar empresa cadastrada"
+                            value={companies.some(company => company.name === turmaFormData.company) ? turmaFormData.company : (turmaFormData.company ? 'custom' : '')}
+                            onChange={(event) => {
+                              if (event.target.value && event.target.value !== 'custom') {
+                                setTurmaFormData(prev => ({ ...prev, company: event.target.value }));
+                              }
+                            }}
+                          >
+                            <option value="">Empresa cadastrada</option>
+                            {companies.map(company => <option key={company.id || company.name} value={company.name}>{company.name}</option>)}
+                            <option value="custom">Outra empresa</option>
+                          </select>
+                        )}
+                        <input id="tc-turma-company" type="text" className="tc-input" placeholder="Nome da empresa" value={turmaFormData.company} onChange={event => setTurmaFormData(prev => ({ ...prev, company: event.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="tc-modal-field">
+                      <label htmlFor="tc-turma-status">Status</label>
+                      <select id="tc-turma-status" className="tc-input" value={turmaFormData.status} onChange={event => setTurmaFormData(prev => ({ ...prev, status: event.target.value }))}>
+                        <option value="Aberta">Aberta</option>
+                        <option value="Em Andamento">Em andamento</option>
+                        <option value="Concluída">Concluída</option>
+                      </select>
+                    </div>
+                  </div>
+                </section>
+
+                <details className="tc-modal-details">
+                  <summary>
+                    <span>Instrutores e responsável técnico</span>
+                    <small>{turmaFormData.instructors?.length || 0} instrutor{turmaFormData.instructors?.length === 1 ? '' : 'es'}</small>
+                    <ChevronDown size={16} />
+                  </summary>
+                  <div className="tc-details-body">
+                    <div className="tc-subsection-head">
+                      <h4>Instrutores</h4>
+                      <button type="button" className="tc-link" onClick={handleAddInstructorToTurma}>
+                        <Plus size={13} /> Adicionar
+                      </button>
+                    </div>
+                    {(!turmaFormData.instructors || turmaFormData.instructors.length === 0) ? (
+                      <p className="tc-compact-empty">Nenhum instrutor definido.</p>
+                    ) : (
+                      <div className="tc-instructor-list">
+                        {turmaFormData.instructors.map((inst, index) => (
+                          <div className="tc-instructor-row" key={inst.id || index}>
+                            <div className="tc-instructor-head">
+                              <strong>{index === 0 ? 'Instrutor principal' : `Instrutor ${index + 1}`}</strong>
+                              <button type="button" className="tc-link tc-link--danger" onClick={() => handleRemoveInstructorFromTurma(index)} aria-label={`Remover instrutor ${index + 1}`}>
+                                <Trash2 size={13} /> Remover
+                              </button>
+                            </div>
+                            <select
+                              className="tc-input tc-modal-span-2"
+                              value={profiles.some(profile => profile.name.trim() === inst.name?.trim()) ? inst.name : (inst.name ? 'custom' : '')}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                if (value && value !== 'custom') {
+                                  const selected = profiles.find(profile => profile.name === value);
+                                  handleUpdateInstructorInTurma(index, {
+                                    name: selected?.name || value,
+                                    role: selected?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (selected?.role ? `Instrutor / ${selected.role}` : (inst.role || 'Instrutor')),
+                                    registration: selected?.registration || inst.registration || ''
+                                  });
+                                }
+                              }}
+                            >
+                              <option value="">Selecionar profissional</option>
+                              {profiles.map(profile => <option key={profile.id || profile.name} value={profile.name}>{profile.name}{profile.role ? ` — ${profile.role}` : ''}</option>)}
+                              <option value="custom">Outro profissional</option>
+                            </select>
+                            <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome do instrutor" placeholder="Nome completo" value={inst.name || ''} onChange={event => handleUpdateInstructorInTurma(index, { name: event.target.value })} />
+                            <input type="text" className="tc-input" aria-label="Cargo do instrutor" placeholder="Cargo ou qualificação" value={inst.role || ''} onChange={event => handleUpdateInstructorInTurma(index, { role: event.target.value })} />
+                            <input type="text" className="tc-input" aria-label="Registro do instrutor" placeholder="Registro MTE, SRTE ou CREA" value={inst.registration || ''} onChange={event => handleUpdateInstructorInTurma(index, { registration: event.target.value })} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="tc-subsection-head tc-subsection-head--divided">
+                      <h4>Responsável técnico</h4>
+                    </div>
+                    <div className="tc-modal-grid">
+                      <select
+                        className="tc-input tc-modal-span-2"
+                        aria-label="Selecionar responsável técnico"
+                        value={profiles.some(profile => profile.name.trim() === turmaFormData.tech_lead?.name?.trim()) ? turmaFormData.tech_lead?.name : (turmaFormData.tech_lead?.name ? 'custom' : '')}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value && value !== 'custom') {
+                            const selected = profiles.find(profile => profile.name === value);
+                            handleUpdateTechLeadInTurma({ name: selected?.name || value, role: selected?.role || 'Responsável Técnico / Engenheiro de Segurança', registration: selected?.registration || 'CREA 210874512-0 / MTE 0009995/RN' });
+                          }
+                        }}
+                      >
+                        <option value="">Selecionar profissional</option>
+                        {profiles.map(profile => <option key={profile.id || profile.name} value={profile.name}>{profile.name}{profile.role ? ` — ${profile.role}` : ''}</option>)}
+                        <option value="custom">Outro profissional</option>
+                      </select>
+                      <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome do responsável técnico" placeholder="Nome completo" value={turmaFormData.tech_lead?.name || ''} onChange={event => handleUpdateTechLeadInTurma({ name: event.target.value })} />
+                      <input type="text" className="tc-input" aria-label="Cargo do responsável técnico" placeholder="Cargo ou qualificação" value={turmaFormData.tech_lead?.role || ''} onChange={event => handleUpdateTechLeadInTurma({ role: event.target.value })} />
+                      <input type="text" className="tc-input" aria-label="Registro do responsável técnico" placeholder="Registro CREA, CFT ou MTE" value={turmaFormData.tech_lead?.registration || ''} onChange={event => handleUpdateTechLeadInTurma({ registration: event.target.value })} />
+                    </div>
+                  </div>
+                </details>
+
+                <details className="tc-modal-details">
+                  <summary>
+                    <span>Configurações do certificado</span>
+                    <small>Modelo e conteúdo programático</small>
+                    <ChevronDown size={16} />
+                  </summary>
+                  <div className="tc-details-body tc-modal-grid">
+                    <div className="tc-modal-field">
+                      <label htmlFor="tc-turma-model">Modelo</label>
+                      <select id="tc-turma-model" className="tc-input" value={turmaFormData.cert_model} onChange={event => setTurmaFormData(prev => ({ ...prev, cert_model: event.target.value }))}>
+                        <option value="modelo1">EcoCurvas</option>
+                        <option value="modelo2">Ondas e Colmeia</option>
+                      </select>
+                    </div>
+                    <div className="tc-modal-field tc-modal-span-2">
+                      <label htmlFor="tc-turma-content">Conteúdo programático</label>
+                      <textarea id="tc-turma-content" className="tc-input tc-textarea" rows="6" value={turmaFormData.content || ''} onChange={event => setTurmaFormData(prev => ({ ...prev, content: event.target.value }))} />
+                    </div>
+                  </div>
+                </details>
               </div>
 
-              <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Status da Turma</label>
-                <select
-                  className="input"
-                  value={turmaFormData.status}
-                  onChange={e => setTurmaFormData(prev => ({ ...prev, status: e.target.value }))}
-                  style={{ width: '100%', marginTop: '0.35rem' }}
-                >
-                  <option value="Aberta">Aberta (Aceitando inscrições)</option>
-                  <option value="Em Andamento">Em Andamento</option>
-                  <option value="Concluída">Concluída</option>
-                </select>
-              </div>
-
-              <div className="modal-actions" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowTurmaModal(false)}>
-                  Cancelar
+              <footer className="tc-turma-modal-footer">
+                <button type="button" className="tc-btn" onClick={requestCloseTurmaModal} disabled={turmaSaving}>Cancelar</button>
+                <button id="btn-submit-turma" type="submit" className="tc-btn tc-btn--primary" disabled={turmaSaving}>
+                  {turmaSaving && <Loader size={15} className="animate-spin" />}
+                  {turmaSaving ? 'Salvando...' : (editingTurma ? 'Salvar alterações' : 'Criar turma')}
                 </button>
-                <button id="btn-submit-turma" type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7', fontWeight: '700' }}>
-                  {editingTurma ? 'Salvar Alterações' : 'Criar Turma'}
-                </button>
-              </div>
+              </footer>
             </form>
           </div>
         </div>
