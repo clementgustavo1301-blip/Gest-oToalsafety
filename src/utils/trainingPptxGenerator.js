@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { getInstructorSignatureUrl } from '../data/officialTrainingModels';
+import { getInstructorSignatureUrl } from '../data/officialTrainingModels.js';
 
 /**
  * Utilitário de geração de certificados PPTX para o setor de Treinamento.
@@ -52,6 +52,63 @@ export function balanceSyllabusColumns(rawText, maxCharsPerLine = 38) {
     totalWeight,
     maxLinesInCol
   };
+}
+
+/**
+ * Define a área útil do conteúdo frontal nos modelos oficiais.
+ * A geometria varia conforme a densidade do texto e é compartilhada pela
+ * pré-visualização e pelo arquivo exportado para manter os dois alinhados.
+ */
+export function getCertificateFrontGeometry({
+  certModel = 'modelo2',
+  description = '',
+  course = '',
+  studentName = ''
+} = {}) {
+  const visualWeight = description.length + (course.length * 1.6) + (studentName.length * 0.8);
+  const isDense = visualWeight > 410;
+  const isComfortable = visualWeight < 210;
+
+  if (certModel === 'modelo1') {
+    return {
+      shapeNames: ['Corpo Certificado'],
+      bodyTopIn: isDense ? 1.92 : 2.08,
+      bodyHeightIn: isDense ? 3.66 : 3.48,
+      previewContentMaxHeight: isDense ? '70%' : '64%'
+    };
+  }
+
+  return {
+    shapeNames: ['Certificado Header e Corpo'],
+    bodyTopIn: isDense ? 1.18 : (isComfortable ? 1.44 : 1.32),
+    bodyHeightIn: isDense ? 4.3 : (isComfortable ? 3.92 : 4.08),
+    previewContentMaxHeight: isDense ? '78%' : (isComfortable ? '70%' : '74%')
+  };
+}
+
+const EMU_PER_INCH = 914400;
+
+function applyOfficialFrontGeometry(xml, geometry) {
+  if (!geometry?.shapeNames?.length) return xml;
+  const targetNames = new Set(geometry.shapeNames);
+
+  return xml.replace(/<p:sp>[\s\S]*?<\/p:sp>/g, (shapeXml) => {
+    const shapeName = shapeXml.match(/<p:cNvPr\b[^>]*\bname="([^"]+)"/)?.[1];
+    if (!targetNames.has(shapeName)) return shapeXml;
+
+    const y = Math.round(geometry.bodyTopIn * EMU_PER_INCH);
+    const cy = Math.round(geometry.bodyHeightIn * EMU_PER_INCH);
+    let updated = shapeXml
+      .replace(/(<a:off\b[^>]*\bx="\d+"\s+y=")\d+("\s*\/>)/, `$1${y}$2`)
+      .replace(/(<a:ext\b[^>]*\bcx="\d+"\s+cy=")\d+("\s*\/>)/, `$1${cy}$2`);
+
+    updated = updated.replace(/<a:bodyPr\b([^>]*?)(\/)?>/, (bodyPr, rawAttrs = '', selfClosing = '') => {
+      const attrsWithoutAnchor = rawAttrs.replace(/\sanchor="[^"]*"/g, '');
+      return `<a:bodyPr${attrsWithoutAnchor} anchor="ctr"${selfClosing || ''}>`;
+    });
+
+    return updated;
+  });
 }
 
 export async function generateTrainingPPTX({
@@ -170,6 +227,13 @@ export async function generateTrainingPPTX({
       const regexPattern = chars.map(c => escapeRegexChar(c)).join('(?:<[^>]+>)*');
       const regex = new RegExp('>\\s*' + regexPattern + '\\s*<', 'g');
       result = result.replace(regex, () => '>' + safeReplace + '<');
+
+      // Alguns modelos mantêm o placeholder dentro de uma frase no mesmo <a:t>
+      // (ex.: "Programa: {{CURSO}}"). Nesse caso, a busca por nó inteiro acima
+      // não se aplica e a substituição literal segura completa o processamento.
+      if (/^(?:\{\{[^}]+\}\}|\[[^\]]+\])$/.test(searchStr.trim())) {
+        result = result.split(escapeXml(searchStr.trim())).join(safeReplace);
+      }
     }
     return result;
   };
@@ -190,6 +254,12 @@ export async function generateTrainingPPTX({
 
   for (const colab of listToProcess) {
     const formattedCpf = formatCPF(colab.cpf);
+    const frontGeometry = getCertificateFrontGeometry({
+      certModel,
+      description: descricao || '',
+      course: curso || '',
+      studentName: colab.nome || ''
+    });
 
     for (let i = 0; i < templateSlides.length; i++) {
       const template = templateSlides[i];
@@ -311,7 +381,13 @@ export async function generateTrainingPPTX({
         xml = xml.replace(/(<a:rPr[^>]*\bsz=")2200(")/g, `$11800$2`);
       }
 
-      // 13. Ativar auto-ajuste nativo (normAutofit) no PowerPoint em todas as caixas de texto
+      // 13.1 Centraliza o conjunto de conteúdo dentro da área útil da frente.
+      // O ajuste é aplicado apenas às caixas nomeadas dos modelos oficiais.
+      if (i === 0) {
+        xml = applyOfficialFrontGeometry(xml, frontGeometry);
+      }
+
+      // 14. Ativar auto-ajuste nativo (normAutofit) no PowerPoint em todas as caixas de texto
       xml = xml.replace(/<a:bodyPr\b([^>]*?)\/>/g, (match, attrs) => {
         if (attrs.includes('normAutofit') || attrs.includes('spAutoFit')) return match;
         return `<a:bodyPr${attrs}><a:normAutofit/></a:bodyPr>`;

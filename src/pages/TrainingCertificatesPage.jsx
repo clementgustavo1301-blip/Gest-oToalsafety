@@ -5,10 +5,10 @@ import {
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
   Edit, Key, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
-  Eye, CheckCircle, Clock, Briefcase, MapPin, Building,
+  CheckCircle, Clock, Briefcase, MapPin, Building,
   Smartphone, QrCode, PenTool, Share2
 } from 'lucide-react';
-import { generateTrainingPPTX, balanceSyllabusColumns } from '../utils/trainingPptxGenerator';
+import { generateTrainingPPTX, balanceSyllabusColumns, getCertificateFrontGeometry } from '../utils/trainingPptxGenerator';
 import { formatCpf } from '../services/cpfService';
 import { getProfiles, getCompanies, getGroups } from '../services/storageService';
 import { 
@@ -270,11 +270,10 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
  */
 export const getModelo1VersoStyles = (conteudo = '') => {
   const { totalLines } = balanceSyllabusColumns(conteudo, 42);
-  const useTwoCols = totalLines > 10;
 
   if (totalLines > 22) {
     return {
-      useTwoCols: true,
+      useTwoCols: false,
       fontSize: '0.46rem',
       lineHeight: '1.22',
       gap: '0.9rem',
@@ -284,7 +283,7 @@ export const getModelo1VersoStyles = (conteudo = '') => {
   }
   if (totalLines > 10) {
     return {
-      useTwoCols: true,
+      useTwoCols: false,
       fontSize: '0.54rem',
       lineHeight: '1.28',
       gap: '1.0rem',
@@ -1100,12 +1099,14 @@ const TrainingCertificatesPage = () => {
   const handleGenerate = async () => {
     const validColaboradores = colaboradores.filter(c => c.nome.trim());
     if (validColaboradores.length === 0) {
-      alert('Informe ao menos um participante com nome para gerar os certificados.');
+      setFeedback({ type: 'error', text: 'Informe o nome de ao menos um participante.' });
+      requestAnimationFrame(() => document.getElementById('student-name-0')?.focus());
       return;
     }
 
     if (!formData.curso.trim()) {
-      alert('Informe o Nome do Treinamento/Curso.');
+      setFeedback({ type: 'error', text: 'Informe o curso do treinamento.' });
+      requestAnimationFrame(() => document.getElementById('tc-curso')?.focus());
       return;
     }
 
@@ -1146,7 +1147,8 @@ const TrainingCertificatesPage = () => {
       setTimeout(() => setFeedback(null), 5000);
     } catch (err) {
       console.error('Erro ao gerar certificados:', err);
-      alert('Erro ao gerar apresentação PPTX: ' + err.message);
+      setFeedback({ type: 'error', text: `Não foi possível gerar o PowerPoint: ${err.message}` });
+      setTimeout(() => setFeedback(null), 5000);
     } finally {
       setGenerating(false);
     }
@@ -1183,6 +1185,12 @@ const TrainingCertificatesPage = () => {
     studentName: firstStudent?.nome
   });
   const m1VersoStyles = getModelo1VersoStyles(formData.conteudo);
+  const certificateFrontGeometry = getCertificateFrontGeometry({
+    certModel,
+    description: formData.descricao,
+    course: formData.curso,
+    studentName: firstStudent?.nome || ''
+  });
 
   // Dados derivados para o layout do gerador
   const selectedPreset = COURSE_PRESETS.find(p =>
@@ -1261,7 +1269,7 @@ const TrainingCertificatesPage = () => {
       {/* Alerta de Feedback Global */}
       {feedback && (
         <div className={`tc-toast tc-toast--${feedback.type}`} role="status">
-          <CheckCircle2 size={16} />
+          {feedback.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
           <span>{feedback.text}</span>
         </div>
       )}
@@ -1279,18 +1287,14 @@ const TrainingCertificatesPage = () => {
 
             {/* ETAPA 1: Treinamento */}
             <section className="tc-card" aria-labelledby="tc-step1-title">
-              <div className="tc-step-head">
-                <span className="tc-step-num">1</span>
-                <div>
-                  <h2 id="tc-step1-title">Treinamento</h2>
-                  <p>Escolha a turma ou o curso — os demais campos são preenchidos automaticamente.</p>
-                </div>
+              <div className="tc-step-head tc-step-head--compact">
+                <h2 id="tc-step1-title">Treinamento</h2>
               </div>
 
               {/* Turma (opcional) */}
               <div className="tc-field">
                 <label htmlFor="tc-turma">
-                  Turma <span className="tc-optional">(opcional — importa os alunos inscritos)</span>
+                  Turma <span className="tc-optional">(opcional)</span>
                 </label>
                 <div className="tc-inline">
                   <select
@@ -1535,12 +1539,9 @@ const TrainingCertificatesPage = () => {
 
             {/* ETAPA 2: Participantes */}
             <section className="tc-card" aria-labelledby="tc-step2-title">
-              <div className="tc-step-head">
-                <span className="tc-step-num">2</span>
-                <div>
-                  <h2 id="tc-step2-title">Participantes</h2>
-                  <p>{validCount} pronto{validCount !== 1 ? 's' : ''} para emissão</p>
-                </div>
+              <div className="tc-step-head tc-step-head--compact">
+                <h2 id="tc-step2-title">Participantes</h2>
+                <span className="tc-count" aria-label={`${validCount} participantes prontos`}>{validCount}</span>
                 <div className="tc-step-actions">
                   <button
                     id="btn-paste-students"
@@ -1621,12 +1622,9 @@ const TrainingCertificatesPage = () => {
 
             {/* ETAPA 3: Assinaturas da Turma (Em Lote) */}
             <section className="tc-card" aria-labelledby="tc-step3-title">
-              <div className="tc-step-head">
-                <span className="tc-step-num">3</span>
-                <div>
-                  <h2 id="tc-step3-title">Assinaturas da turma</h2>
-                  <p>Assine uma vez e vale para todos os certificados · {signedCount}/{signatureRoles.length} assinadas</p>
-                </div>
+              <div className="tc-step-head tc-step-head--compact">
+                <h2 id="tc-step3-title">Assinaturas</h2>
+                <span className="tc-count" aria-label={`${signedCount} de ${signatureRoles.length} assinaturas concluídas`}>{signedCount}/{signatureRoles.length}</span>
                 <div className="tc-step-actions">
                   <button
                     id="btn-sign-mobile"
@@ -1812,7 +1810,6 @@ const TrainingCertificatesPage = () => {
             <div className="tc-card tc-preview-card">
               <div className="tc-preview-head">
                 <div className="tc-preview-title">
-                  <Eye size={16} />
                   Pré-visualização
                 </div>
                 <div className="tc-preview-controls">
@@ -1855,36 +1852,23 @@ const TrainingCertificatesPage = () => {
                 </div>
               </div>
 
-                {/* MOLDURA DO CERTIFICADO MOCKUP REALISTA (EXATAMENTE COMO O PDF SELECIONADO) */}
-                <div style={{
-                  position: 'relative',
-                  width: '100%',
-                  aspectRatio: '1.414 / 1',
-                  borderRadius: '0.85rem',
-                  overflow: 'hidden',
-                  backgroundColor: '#ffffff',
+                {/* Prévia na mesma proporção e com a mesma área útil dos slides oficiais */}
+                <div
+                  className={`tc-certificate-preview tc-certificate-preview--${certModel}`}
+                  style={{
                   backgroundImage: certModel === 'modelo1'
                     ? `url(${previewTab === 'frente' ? '/certificate-templates/m1_frente_bg.jpg' : '/certificate-templates/m1_verso_bg.jpg'})`
                     : `url(${previewTab === 'frente' ? '/certificate-templates/m2_frente_bg.png?v=ecosafety_v2' : '/certificate-templates/m2_verso_bg.png?v=ecosafety_v2'})`,
-                  backgroundSize: '100% 100%',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                  boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.06)',
-                  border: certModel === 'modelo1' ? '1.5px solid rgba(100, 38, 138, 0.35)' : '1.5px solid rgba(51, 64, 230, 0.35)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  padding: certModel === 'modelo1' ? '3.5% 9.5% 3.5% 9.5%' : '3% 7% 3.5% 7%',
-                  boxSizing: 'border-box',
                   fontFamily: certModel === 'modelo1' ? "'Roboto', 'Lato', sans-serif" : "'Lato', 'Montserrat', sans-serif"
-                }}>
+                  }}
+                >
                   {/* ========================================================================= */}
                   {/* RENDERIZAÇÃO: MODELO 1 (EcoCurvas Laterais - Roxo Oficial EcoSafety)       */}
                   {/* ========================================================================= */}
                   {certModel === 'modelo1' ? (
                     previewTab === 'frente' ? (
                       /* MODELO 1 - FRENTE */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Roboto', sans-serif" }}>
+                      <div className="tc-certificate-front" style={{ fontFamily: "'Roboto', sans-serif" }}>
                         {/* Topo: Header Banner Oficial com Logomarca EcoSafety e Título */}
                         <div style={{ textAlign: 'center' }}>
                           <img 
@@ -1895,17 +1879,18 @@ const TrainingCertificatesPage = () => {
                         </div>
 
                         {/* Corpo: Texto Narrativo Justificado Contínuo (Roboto, Preto Absoluto #000000) */}
-                        <div style={{ 
+                        <div className="tc-certificate-main" style={{
                           fontFamily: "'Roboto', sans-serif",
                           fontSize: m1FrenteStyles.bodySize, 
                           lineHeight: m1FrenteStyles.bodyLineHeight, 
                           textAlign: 'justify', 
                           color: '#000000', 
-                          margin: m1FrenteStyles.bodyMargin 
+                          margin: m1FrenteStyles.bodyMargin,
+                          maxHeight: certificateFrontGeometry.previewContentMaxHeight
                         }}>
-                          A ECOSAFETY certifica que: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong> e Matrícula: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.matricula || '266522'}</strong>, completou com aprovação no período de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.local || 'Mossoró/RN'}</strong>, o treinamento de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.curso}</strong>. {formData.descricao}
+                          A ECOSAFETY certifica que: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.local || 'Mossoró/RN'}</strong>, o treinamento de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.curso}</strong>. {formData.descricao}
                           <div style={{ marginTop: m1FrenteStyles.dateMarginTop, textAlign: 'left', fontWeight: '400', color: '#000000' }}>
-                            {formData.local || 'Mossoró/RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
+                            {formData.local || 'Mossoró/RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}.
                           </div>
                         </div>
 
@@ -2026,9 +2011,9 @@ const TrainingCertificatesPage = () => {
                     /* ========================================================================= */
                     previewTab === 'frente' ? (
                       /* MODELO 2 - FRENTE */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
-                        {/* Topo do Certificado - Ajustado dinamicamente para preservar respiro da logo EcoSafety */}
-                        <div style={{ textAlign: 'center', paddingTop: m2FrenteStyles.topPadding }}>
+                      <div className="tc-certificate-front" style={{ fontFamily: "'Lato', sans-serif" }}>
+                        {/* Conteúdo centralizado dentro da área útil, com densidade adaptativa */}
+                        <div className="tc-certificate-main" style={{ textAlign: 'center', maxHeight: certificateFrontGeometry.previewContentMaxHeight }}>
                           <div style={{ 
                             fontFamily: "'Montserrat', sans-serif",
                             fontSize: m2FrenteStyles.titleSize, 
@@ -2084,7 +2069,7 @@ const TrainingCertificatesPage = () => {
                           )}
 
                           <div style={{ fontSize: m2FrenteStyles.dateSize, color: '#000000', marginTop: m2FrenteStyles.dateMarginTop }}>
-                            {formData.local || 'Mossoró, RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data'}.
+                            {formData.local || 'Mossoró, RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}.
                           </div>
                         </div>
 
@@ -2249,19 +2234,19 @@ const TrainingCertificatesPage = () => {
                 <button
                   id="btn-generate-pptx"
                   type="button"
-                  className={`tc-generate-btn ${generating ? 'is-loading' : ''}`}
+                  className={`tc-btn tc-btn--primary tc-generate-btn ${generating ? 'is-loading' : ''}`}
                   onClick={handleGenerate}
                   disabled={generating || validCount === 0}
                 >
                   {generating ? (
                     <>
                       <Loader size={19} className="animate-spin" />
-                      Gerando {validCount} certificado{validCount !== 1 ? 's' : ''}...
+                      Gerando certificados...
                     </>
                   ) : (
                     <>
                       <Download size={19} />
-                      Baixar certificados (.pptx)
+                      Baixar certificados
                     </>
                   )}
                 </button>
