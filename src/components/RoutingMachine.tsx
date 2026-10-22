@@ -5,21 +5,39 @@ import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 
 interface RoutingMachineProps {
-  start: [number, number];
-  end: [number, number];
+  start?: [number, number];
+  end?: [number, number];
+  waypoints?: [number, number][];
   color?: string;
 }
 
-export default function RoutingMachine({ start, end, color = '#2563eb' }: RoutingMachineProps) {
+export default function RoutingMachine({ start, end, waypoints, color = '#2563eb' }: RoutingMachineProps) {
   const map = useMap();
+
+  const waypointsKey = waypoints ? waypoints.map(p => `${p[0]},${p[1]}`).join(';') : '';
+  const startEndKey = start && end ? `${start[0]},${start[1]}->${end[0]},${end[1]}` : '';
 
   useEffect(() => {
     if (!map) return;
 
-    // Check if start and end are identical or missing
-    if (!start || !end) return;
-    const isSame = Math.abs(start[0] - end[0]) < 0.0001 && Math.abs(start[1] - end[1]) < 0.0001;
-    if (isSame) return;
+    const rawPoints: [number, number][] = waypoints && waypoints.length >= 2
+      ? waypoints
+      : (start && end ? [start, end] : []);
+
+    // Filter out undefined/NaN or consecutive duplicates
+    const cleanPoints: [number, number][] = [];
+    for (const pt of rawPoints) {
+      if (!pt || isNaN(pt[0]) || isNaN(pt[1])) continue;
+      if (cleanPoints.length > 0) {
+        const prev = cleanPoints[cleanPoints.length - 1];
+        if (Math.abs(prev[0] - pt[0]) < 0.0001 && Math.abs(prev[1] - pt[1]) < 0.0001) {
+          continue;
+        }
+      }
+      cleanPoints.push(pt);
+    }
+
+    if (cleanPoints.length < 2) return;
 
     // Ensure leaflet-routing-machine is loaded
     if (!(L as any).Routing) {
@@ -34,14 +52,14 @@ export default function RoutingMachine({ start, end, color = '#2563eb' }: Routin
     // Create an immediate visual fallback so the user always sees the route connecting
     // while OSRM loads, or if public OSRM is slow/offline
     try {
-      fallbackPolyline = L.polyline([start, end], {
+      fallbackPolyline = L.polyline(cleanPoints, {
         color: color,
         weight: 6,
         opacity: 0.8,
         dashArray: '8, 12'
       }).addTo(map);
 
-      fallbackGlow = L.polyline([start, end], {
+      fallbackGlow = L.polyline(cleanPoints, {
         color: '#ffffff',
         weight: 4,
         opacity: 1,
@@ -64,10 +82,7 @@ export default function RoutingMachine({ start, end, color = '#2563eb' }: Routin
 
     try {
       routingControl = (L as any).Routing.control({
-        waypoints: [
-          L.latLng(start[0], start[1]),
-          L.latLng(end[0], end[1])
-        ],
+        waypoints: cleanPoints.map(pt => L.latLng(pt[0], pt[1])),
         router: (L as any).Routing.osrmv1({
           serviceUrl: 'https://router.project-osrm.org/route/v1',
           suppressDemoServerWarning: true,
@@ -118,7 +133,7 @@ export default function RoutingMachine({ start, end, color = '#2563eb' }: Routin
         }
       }
     };
-  }, [map, start[0], start[1], end[0], end[1], color]);
+  }, [map, waypointsKey, startEndKey, color]);
 
   return null;
 }
