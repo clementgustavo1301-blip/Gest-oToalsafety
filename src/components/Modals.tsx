@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Campaign, PartnerAppointment, EventType } from '../types';
 import { EVENT_TYPE_LABELS } from '../types';
 import { X, Calendar, MapPin, Building, DollarSign } from 'lucide-react';
+import { resolveCoordinates, geocodeAddress } from '../utils/geocodeHelper';
 
 /* ============================================= */
 /* Modal Base                                    */
@@ -74,17 +75,11 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
           const fullAddress = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
           setLocation(fullAddress);
           
-          // Fetch coordinates via Nominatim
-          const searchParams = new URLSearchParams({
-            format: 'json',
-            q: `${data.logradouro}, ${data.localidade}, Brazil`,
-            limit: '1'
-          });
-          const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?${searchParams}`);
-          const geoData = await geoRes.json();
-          if (geoData && geoData.length > 0) {
-            setLat(parseFloat(geoData[0].lat));
-            setLng(parseFloat(geoData[0].lon));
+          // Fetch coordinates via geocodeAddress
+          const coords = (await geocodeAddress(fullAddress)) ?? (await geocodeAddress(`${data.localidade} - ${data.uf}`));
+          if (coords) {
+            setLat(coords[0]);
+            setLng(coords[1]);
           }
         }
       } catch (err) {
@@ -95,8 +90,26 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    let finalLat = lat;
+    let finalLng = lng;
+
+    if (!finalLat || !finalLng) {
+      const fastCoords = resolveCoordinates(location);
+      if (fastCoords) {
+        finalLat = fastCoords[0];
+        finalLng = fastCoords[1];
+      } else if (location.trim()) {
+        const asyncCoords = await geocodeAddress(location);
+        if (asyncCoords) {
+          finalLat = asyncCoords[0];
+          finalLng = asyncCoords[1];
+        }
+      }
+    }
+
     onSave({
       company,
       location,
@@ -108,8 +121,8 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
       returnedAsos: eventType === 'campanha' ? (Number(returnedAsos) || 0) : 0,
       scanned: initial?.scanned ?? false,
       insertedSOC: initial?.insertedSOC ?? false,
-      lat,
-      lng,
+      lat: finalLat,
+      lng: finalLng,
       notes,
     });
     onClose();

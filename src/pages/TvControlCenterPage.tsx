@@ -15,18 +15,26 @@ import RoutingMachine from '../components/RoutingMachine';
 import L from 'leaflet';
 import type { Campaign, PartnerAppointment } from '../types';
 import { fmtCurrency, fmtDate } from '../utils/format';
+import { resolveCoordinates, geocodeAddress } from '../utils/geocodeHelper';
 
 interface TvControlCenterPageProps {
   campaigns: Campaign[];
   partners: PartnerAppointment[];
 }
 
+const BASE_COORDS: [number, number] = [-5.2056619002795514, -37.32918467893605];
+
 /* ─── Map helpers ─── */
-function MapBoundsController({ bounds }: { bounds?: L.LatLngBounds }) {
+function MapBoundsController({ bounds, center }: { bounds?: L.LatLngBounds; center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-  }, [map, bounds]);
+    map.invalidateSize();
+    if (bounds && bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13, animate: true });
+    } else {
+      map.setView(center, 12);
+    }
+  }, [map, bounds, center]);
   return null;
 }
 
@@ -77,6 +85,8 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [asyncCoords, setAsyncCoords] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -95,22 +105,57 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
 
   const onlyCampaigns = campaigns.filter(c => c.eventType === 'campanha');
 
-  /* ─── Derived data ─── */
-  const nextCampaign = useMemo(() => {
+  // Compare dates using local YYYY-MM-DD strings to avoid UTC-3 timezone parsing issues
+  const todayStr = useMemo(() => {
     const now = new Date();
-    const upcoming = onlyCampaigns
-      .filter(c => new Date(c.date) >= new Date(now.toDateString()))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return upcoming[0] ?? onlyCampaigns[0] ?? null;
-  }, [onlyCampaigns]);
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  /* ─── Derived data ─── */
+  const upcomingCampaigns = useMemo(() => {
+    return onlyCampaigns
+      .filter(c => c.date >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [onlyCampaigns, todayStr]);
+
+  const activeCampaign = useMemo(() => {
+    if (selectedCampaignId) {
+      const found = campaigns.find(c => c.id === selectedCampaignId);
+      if (found) return found;
+    }
+    // Default to the upcoming campaign, or the first available campaign
+    return upcomingCampaigns[0] ?? onlyCampaigns[0] ?? campaigns[0] ?? null;
+  }, [selectedCampaignId, campaigns, upcomingCampaigns, onlyCampaigns]);
 
   const upcomingList = useMemo(() => {
-    const now = new Date();
     return campaigns
-      .filter(c => new Date(c.date) >= new Date(now.toDateString()))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(0, 5);
-  }, [campaigns]);
+      .filter(c => c.date >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 6);
+  }, [campaigns, todayStr]);
+
+  // Synchronous resolution of destination coordinates
+  const syncCoords = useMemo(() => {
+    if (!activeCampaign) return null;
+    return resolveCoordinates(activeCampaign.location, activeCampaign.lat, activeCampaign.lng, BASE_COORDS);
+  }, [activeCampaign]);
+
+  // Fallback asynchronous geocoding if not present in DB or KNOWN_CITIES
+  useEffect(() => {
+    if (syncCoords) {
+      setAsyncCoords(null);
+      return;
+    }
+    if (activeCampaign?.location) {
+      let isMounted = true;
+      geocodeAddress(activeCampaign.location).then(coords => {
+        if (isMounted && coords) setAsyncCoords(coords);
+      });
+      return () => { isMounted = false; };
+    }
+  }, [activeCampaign, syncCoords]);
+
+  const targetCoords = syncCoords ?? asyncCoords;
 
   const totalExpected = onlyCampaigns.reduce((s, c) => s + c.expectedCount, 0);
   const totalAttended = onlyCampaigns.reduce((s, c) => s + c.attendedCount, 0);
@@ -131,32 +176,28 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
     Atendidos: c.attendedCount,
   }));
 
-
-
   /* Time */
   const time = currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const date = currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
 
   /* Map */
-  const mapCenter: [number, number] = nextCampaign
-    ? [nextCampaign.lat ?? -5.2056619002795514, nextCampaign.lng ?? -37.32918467893605]
-    : [-5.2056619002795514, -37.32918467893605];
+  const mapCenter: [number, number] = targetCoords ?? BASE_COORDS;
 
   const mapBounds = useMemo(() => {
-    if (nextCampaign?.lat && nextCampaign?.lng) {
-      const same = nextCampaign.lat === -5.2056619002795514 && nextCampaign.lng === -37.32918467893605;
-      if (!same) return L.latLngBounds([-5.2056619002795514, -37.32918467893605], [nextCampaign.lat, nextCampaign.lng]).pad(0.15);
+    if (targetCoords) {
+      const isBase = Math.abs(targetCoords[0] - BASE_COORDS[0]) < 0.0001 && Math.abs(targetCoords[1] - BASE_COORDS[1]) < 0.0001;
+      if (!isBase) {
+        return L.latLngBounds(BASE_COORDS, targetCoords).pad(0.18);
+      }
     }
     return undefined;
-  }, [nextCampaign]);
-
-
+  }, [targetCoords]);
 
   /* Ticker */
   const alerts = [
     kitsPending > 0 ? `⚠ ${kitsPending} kits pendentes de separação` : null,
     awaitingSOC > 0 ? `📄 ${awaitingSOC} eventos aguardando inserção no SOC` : null,
-    nextCampaign ? `🚐 Próxima: ${nextCampaign.company} — ${fmtDate(nextCampaign.date)}` : null,
+    activeCampaign ? `🚐 Rota Ativa: ${activeCampaign.company} — ${fmtDate(activeCampaign.date)}` : null,
     `🏥 Rede credenciada: ${partners.length} atendimentos (${fmtCurrency(totalPartValue)})`,
   ].filter(Boolean);
 
@@ -216,8 +257,6 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
           <div className="tv2-kpi-bar"><div className="tv2-kpi-fill" style={{ width: `${pctAttended}%`, background: '#10b981' }} /></div>
         </div>
 
-
-
         <div className="tv2-kpi-card">
           <div className="tv2-kpi-icon bg-emerald-dim"><ShieldCheck size={18} /></div>
           <div className="tv2-kpi-body">
@@ -253,7 +292,18 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
           <div className="tv2-map-head">
             <div className="tv2-map-head-left">
               <Navigation size={16} className="text-blue" />
-              <h3>Próxima Campanha — Unidade Móvel</h3>
+              <div>
+                <h3>
+                  {activeCampaign
+                    ? `Trajeto: CACIM ➔ ${activeCampaign.company}`
+                    : 'Próxima Campanha — Unidade Móvel'}
+                </h3>
+                {activeCampaign && (
+                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: 0 }}>
+                    {activeCampaign.location} · {fmtDate(activeCampaign.date)}
+                  </p>
+                )}
+              </div>
             </div>
             <span className="tv2-badge-live">
               <span className="tv2-live-dot" />
@@ -264,60 +314,77 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
           <div className="tv2-map-area">
             <MapContainer
               center={mapCenter}
-              zoom={nextCampaign ? 13 : 10}
+              zoom={10}
               scrollWheelZoom={true}
               zoomControl={false}
               attributionControl={false}
               style={{ height: '100%', width: '100%' }}
             >
-              <MapBoundsController bounds={mapBounds} />
+              <MapBoundsController bounds={mapBounds} center={mapCenter} />
               <TileLayer 
                 attribution='&copy; Google Maps'
                 url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" 
               />
 
-              <Marker position={[-5.2056619002795514, -37.32918467893605]} icon={basePin}>
+              <Marker position={BASE_COORDS} icon={basePin}>
                 <Popup>
                   <strong>★ Ponto de Partida</strong>
                   <p>CACIM — Alto de São Manoel</p>
-                  <p style={{fontSize: '0.75rem', color: '#64748b'}}>Rua Francisco Mota, 645</p>
+                  <p style={{fontSize: '0.75rem', color: '#64748b'}}>Rua Francisco Mota, 645 - Mossoró/RN</p>
                 </Popup>
               </Marker>
 
-              {nextCampaign && (
+              {activeCampaign && targetCoords && (
                 <>
                   <RoutingMachine
-                    start={[-5.2056619002795514, -37.32918467893605]}
-                    end={[nextCampaign.lat ?? -5.2056619002795514, nextCampaign.lng ?? -37.32918467893605]}
+                    start={BASE_COORDS}
+                    end={targetCoords}
                     color="#2563eb"
                   />
-                  <Marker position={[nextCampaign.lat ?? -5.2056619002795514, nextCampaign.lng ?? -37.32918467893605]} icon={nextPin}>
+                  <Marker position={targetCoords} icon={nextPin}>
                     <Popup>
-                      <strong>★ Próxima Campanha</strong>
-                      <p style={{ fontWeight: 700 }}>{nextCampaign.company}</p>
-                      <p style={{ fontSize: '0.8rem', color: '#64748b' }}>{nextCampaign.location}</p>
+                      <strong>★ {activeCampaign.company}</strong>
+                      <p style={{ fontWeight: 700 }}>{activeCampaign.eventType === 'campanha' ? 'Unidade Móvel' : 'Atendimento'}</p>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b' }}>{activeCampaign.location}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '4px' }}>Data: {fmtDate(activeCampaign.date)}</p>
                     </Popup>
                   </Marker>
                 </>
               )}
 
-              {campaigns.filter(c => c.id !== nextCampaign?.id).map(c => (
-                <Marker key={c.id} position={[c.lat ?? -5.2056619002795514, c.lng ?? -37.32918467893605]} icon={campPin}>
-                  <Popup>
-                    <strong>{c.company}</strong>
-                    <p style={{ fontSize: '0.8rem', color: '#64748b' }}>{c.location}</p>
-                  </Popup>
-                </Marker>
-              ))}
+              {/* Other campaigns */}
+              {campaigns.filter(c => c.id !== activeCampaign?.id).map(c => {
+                const cCoords = resolveCoordinates(c.location, c.lat, c.lng, BASE_COORDS);
+                if (!cCoords) return null;
+                return (
+                  <Marker 
+                    key={c.id} 
+                    position={cCoords} 
+                    icon={campPin}
+                    eventHandlers={{ click: () => setSelectedCampaignId(c.id) }}
+                  >
+                    <Popup>
+                      <strong>{c.company}</strong>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b' }}>{c.location}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#2563eb' }}>{fmtDate(c.date)}</p>
+                    </Popup>
+                  </Marker>
+                );
+              })}
 
-              {partners.map(p => (
-                <Marker key={p.id} position={[p.lat ?? -5.2056619002795514, p.lng ?? -37.32918467893605]} icon={partPin}>
-                  <Popup>
-                    <strong>{p.client}</strong>
-                    <p style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.partnerClinic} ({p.state})</p>
-                  </Popup>
-                </Marker>
-              ))}
+              {/* Partners */}
+              {partners.map(p => {
+                const pCoords = resolveCoordinates(p.partnerClinic, p.lat, p.lng, BASE_COORDS);
+                if (!pCoords) return null;
+                return (
+                  <Marker key={p.id} position={pCoords} icon={partPin}>
+                    <Popup>
+                      <strong>{p.client}</strong>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.partnerClinic} ({p.state})</p>
+                    </Popup>
+                  </Marker>
+                );
+              })}
             </MapContainer>
 
           </div>
@@ -357,20 +424,39 @@ export const TvControlCenterPage: React.FC<TvControlCenterPageProps> = ({
                   Nenhum evento futuro agendado
                 </div>
               ) : (
-                upcomingList.map((c, i) => (
-                  <div key={i} style={{ 
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                    padding: '8px 12px', background: '#f8fafc', borderRadius: '6px', borderLeft: `3px solid ${c.eventType === 'campanha' ? '#3b82f6' : c.eventType === 'palestra' ? '#8b5cf6' : '#10b981'}`
-                  }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.company}</span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {c.eventType === 'campanha' ? 'Unidade Móvel' : c.eventType === 'palestra' ? 'Palestra/SIPAT' : 'Ação In-Company'} — {c.location}
-                      </span>
+                upcomingList.map((c, i) => {
+                  const isSelected = activeCampaign?.id === c.id;
+                  return (
+                    <div 
+                      key={c.id || i}
+                      onClick={() => setSelectedCampaignId(c.id)}
+                      title="Clique para ver o trajeto desta campanha no mapa"
+                      style={{ 
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                        padding: '8px 12px',
+                        background: isSelected ? '#eff6ff' : '#f8fafc',
+                        borderRadius: '6px',
+                        borderLeft: `4px solid ${isSelected ? '#2563eb' : c.eventType === 'campanha' ? '#3b82f6' : c.eventType === 'palestra' ? '#8b5cf6' : '#10b981'}`,
+                        borderTop: isSelected ? '1px solid #bfdbfe' : 'none',
+                        borderRight: isSelected ? '1px solid #bfdbfe' : 'none',
+                        borderBottom: isSelected ? '1px solid #bfdbfe' : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.company}</span>
+                          {isSelected && <span style={{ fontSize: '0.65rem', background: '#2563eb', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>NO MAPA</span>}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {c.eventType === 'campanha' ? 'Unidade Móvel' : c.eventType === 'palestra' ? 'Palestra/SIPAT' : 'Ação In-Company'} — {c.location}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 500, color: isSelected ? '#2563eb' : '#475569', flexShrink: 0, marginLeft: '8px' }}>{fmtDate(c.date)}</span>
                     </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#475569', flexShrink: 0, marginLeft: '8px' }}>{fmtDate(c.date)}</span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
