@@ -791,6 +791,10 @@ textarea.tc-input {
   background-size: 100% 100%;
   background-position: center;
   background-repeat: no-repeat;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 .tc-certificate-preview--modelo1 { padding: 3.5% 9.5%; }

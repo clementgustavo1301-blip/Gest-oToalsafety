@@ -238,18 +238,28 @@ export const getModelo2VersoStyles = (conteudo = '') => {
 };
 
 /**
- * Adaptação para a Frente do Modelo 1 (EcoCurvas Laterais)
+ * Adaptação para a Frente do Modelo 1 (EcoCurvas Laterais - Roxo Oficial EcoSafety #64268a)
  */
 export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName = '' }) => {
-  const totalLen = (descricao || '').length + (curso || '').length + (studentName || '').length;
+  const visualWeight = (descricao || '').length + ((curso || '').length * 1.5) + ((studentName || '').length * 0.8);
+  const nameLen = (studentName || '').length;
 
-  if (totalLen > 450) {
+  if (visualWeight > 380) {
     return {
       headerMaxHeight: '44px',
-      bodySize: '0.52rem',
-      bodyLineHeight: '1.26',
-      bodyMargin: '0.15rem 0',
-      dateMarginTop: '0.20rem',
+      subTitleSize: '0.60rem',
+      subTitleMargin: '0.10rem',
+      studentNameSize: nameLen > 30 ? '0.92rem' : '1.04rem',
+      studentNameMargin: '0.16rem 0',
+      cpfTextSize: '0.55rem',
+      cpfLineHeight: '1.24',
+      courseSize: '0.76rem',
+      courseMargin: '0.16rem 0',
+      descSize: '0.47rem',
+      descLineHeight: '1.20',
+      descMargin: '0.10rem auto',
+      dateSize: '0.53rem',
+      dateMarginTop: '0.18rem',
       sigHeight: '18px',
       sigTitleSize: '0.46rem',
       sigNameSize: '0.44rem',
@@ -257,13 +267,22 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
       sigGap: '0.3rem'
     };
   }
-  if (totalLen > 300) {
+  if (visualWeight > 230) {
     return {
-      headerMaxHeight: '50px',
-      bodySize: '0.58rem',
-      bodyLineHeight: '1.34',
-      bodyMargin: '0.22rem 0',
-      dateMarginTop: '0.28rem',
+      headerMaxHeight: '48px',
+      subTitleSize: '0.65rem',
+      subTitleMargin: '0.16rem',
+      studentNameSize: nameLen > 30 ? '1.02rem' : '1.14rem',
+      studentNameMargin: '0.22rem 0',
+      cpfTextSize: '0.59rem',
+      cpfLineHeight: '1.30',
+      courseSize: '0.84rem',
+      courseMargin: '0.22rem 0',
+      descSize: '0.53rem',
+      descLineHeight: '1.26',
+      descMargin: '0.15rem auto',
+      dateSize: '0.57rem',
+      dateMarginTop: '0.25rem',
       sigHeight: '20px',
       sigTitleSize: '0.50rem',
       sigNameSize: '0.47rem',
@@ -272,11 +291,20 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
     };
   }
   return {
-    headerMaxHeight: '56px',
-    bodySize: '0.67rem',
-    bodyLineHeight: '1.52',
-    bodyMargin: '0.3rem 0',
-    dateMarginTop: '0.4rem',
+    headerMaxHeight: '54px',
+    subTitleSize: '0.70rem',
+    subTitleMargin: '0.24rem',
+    studentNameSize: nameLen > 30 ? '1.10rem' : '1.22rem',
+    studentNameMargin: '0.30rem 0',
+    cpfTextSize: '0.64rem',
+    cpfLineHeight: '1.40',
+    courseSize: '0.90rem',
+    courseMargin: '0.28rem 0',
+    descSize: '0.58rem',
+    descLineHeight: '1.34',
+    descMargin: '0.20rem auto',
+    dateSize: '0.62rem',
+    dateMarginTop: '0.32rem',
     sigHeight: '24px',
     sigTitleSize: '0.54rem',
     sigNameSize: '0.51rem',
@@ -1168,8 +1196,12 @@ const TrainingCertificatesPage = () => {
             });
           }));
 
+          const previewWidth = previewNode.clientWidth || 550;
+          // Escala dinâmica de alta definição para impressão nítida a 300 DPI (mínimo 2400px de largura)
+          const printScale = Math.max(3.8, Math.min(5.5, 2400 / previewWidth));
+
           const canvas = await html2canvas(previewNode, {
-            scale: 3,
+            scale: printScale,
             useCORS: true,
             backgroundColor: '#ffffff',
             logging: false,
@@ -1177,7 +1209,7 @@ const TrainingCertificatesPage = () => {
           });
 
           if (pageIndex > 0) pdf.addPage('a4', 'landscape');
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfPageWidth, pdfPageHeight, undefined, 'FAST');
+          pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, pdfPageWidth, pdfPageHeight, undefined, 'SLOW');
           pageIndex += 1;
         }
       }
@@ -1240,6 +1272,10 @@ const TrainingCertificatesPage = () => {
     course: formData.curso,
     studentName: firstStudent?.nome || ''
   });
+
+  const cleanDescricao = (formData.descricao || '')
+    .replace(/\s*(?:Mossor[oó]\s*,?\s*)+$/i, '')
+    .trim();
 
   // Dados derivados para o layout do gerador
   const selectedPreset = COURSE_PRESETS.find(p =>
@@ -1901,19 +1937,81 @@ const TrainingCertificatesPage = () => {
                           />
                         </div>
 
-                        {/* Corpo: Texto Narrativo Justificado Contínuo (Roboto, Preto Absoluto #000000) */}
+                        {/* Corpo: Conteúdo Centralizado com Hierarquia Visual e Identidade Oficial EcoSafety */}
                         <div className="tc-certificate-main" style={{
-                          fontFamily: "'Roboto', sans-serif",
-                          fontSize: m1FrenteStyles.bodySize, 
-                          lineHeight: m1FrenteStyles.bodyLineHeight, 
-                          textAlign: 'justify', 
-                          color: '#000000', 
-                          margin: m1FrenteStyles.bodyMargin,
-                          maxHeight: certificateFrontGeometry.previewContentMaxHeight
+                          textAlign: 'center',
+                          maxHeight: certificateFrontGeometry.previewContentMaxHeight,
+                          fontFamily: "'Roboto', sans-serif"
                         }}>
-                          A ECOSAFETY certifica que: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ color: '#000000', fontWeight: '700' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.local || 'Mossoró/RN'}</strong>, o treinamento de <strong style={{ color: '#000000', fontWeight: '700' }}>{formData.curso}</strong>. {formData.descricao}
-                          <div style={{ marginTop: m1FrenteStyles.dateMarginTop, textAlign: 'left', fontWeight: '400', color: '#000000' }}>
-                            {formData.local || 'Mossoró/RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}.
+                          {/* 1. Subtítulo */}
+                          <div style={{
+                            fontSize: m1FrenteStyles.subTitleSize,
+                            fontWeight: '500',
+                            color: '#374151',
+                            letterSpacing: '0.3px',
+                            marginTop: m1FrenteStyles.subTitleMargin
+                          }}>
+                            A ECOSAFETY certifica que:
+                          </div>
+
+                          {/* 2. Nome do Participante em Destaque (Roxo Oficial EcoSafety #64268a) */}
+                          <div style={{
+                            fontSize: m1FrenteStyles.studentNameSize,
+                            fontWeight: '800',
+                            color: '#64268a',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            margin: m1FrenteStyles.studentNameMargin
+                          }}>
+                            {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
+                          </div>
+
+                          {/* 3. Conclusão, CPF, Período e Cidade */}
+                          <div style={{
+                            fontSize: m1FrenteStyles.cpfTextSize,
+                            color: '#111827',
+                            lineHeight: m1FrenteStyles.cpfLineHeight,
+                            maxWidth: '96%',
+                            margin: '0 auto'
+                          }}>
+                            portador(a) do CPF <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
+                            <strong style={{ color: '#000000' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong style={{ color: '#000000' }}>{formData.local || 'Mossoró - RN'}</strong>, o treinamento de:
+                          </div>
+
+                          {/* 4. Nome do Curso / Treinamento em Destaque */}
+                          <div style={{
+                            fontSize: m1FrenteStyles.courseSize,
+                            fontWeight: '800',
+                            color: '#64268a',
+                            margin: m1FrenteStyles.courseMargin,
+                            letterSpacing: '0.3px',
+                            textTransform: 'uppercase'
+                          }}>
+                            {formData.curso}
+                          </div>
+
+                          {/* 5. Embasamento Normativo e Descrição */}
+                          {cleanDescricao && (
+                            <div style={{
+                              fontSize: m1FrenteStyles.descSize,
+                              color: '#374151',
+                              textAlign: 'justify',
+                              lineHeight: m1FrenteStyles.descLineHeight,
+                              maxWidth: '94%',
+                              margin: m1FrenteStyles.descMargin
+                            }}>
+                              {cleanDescricao}
+                            </div>
+                          )}
+
+                          {/* 6. Localidade e Data */}
+                          <div style={{
+                            fontSize: m1FrenteStyles.dateSize,
+                            color: '#111827',
+                            marginTop: m1FrenteStyles.dateMarginTop,
+                            fontWeight: '500'
+                          }}>
+                            {formData.local || 'Mossoró - RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}.
                           </div>
                         </div>
 
@@ -2078,7 +2176,7 @@ const TrainingCertificatesPage = () => {
                             {formData.curso}
                           </div>
 
-                          {formData.descricao && (
+                          {cleanDescricao && (
                             <div style={{ 
                               fontSize: m2FrenteStyles.descSize, 
                               color: '#000000', 
@@ -2087,7 +2185,7 @@ const TrainingCertificatesPage = () => {
                               maxWidth: '94%', 
                               margin: m2FrenteStyles.descMargin 
                             }}>
-                              {formData.descricao}
+                              {cleanDescricao}
                             </div>
                           )}
 

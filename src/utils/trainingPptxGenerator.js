@@ -162,9 +162,9 @@ export function getCertificateFrontGeometry({
   if (certModel === 'modelo1') {
     return {
       shapeNames: ['Corpo Certificado'],
-      bodyTopIn: isDense ? 1.92 : 2.08,
-      bodyHeightIn: isDense ? 3.66 : 3.48,
-      previewContentMaxHeight: isDense ? '70%' : '64%'
+      bodyTopIn: isDense ? 1.82 : (isComfortable ? 2.02 : 1.92),
+      bodyHeightIn: isDense ? 3.75 : (isComfortable ? 3.50 : 3.62),
+      previewContentMaxHeight: isDense ? '74%' : (isComfortable ? '68%' : '71%')
     };
   }
 
@@ -390,11 +390,12 @@ export async function generateTrainingPPTX({
 
       // 4. Descrição do Certificado
       if (descricao) {
+        const cleanDesc = descricao.replace(/\s*(?:Mossor[oó]\s*,?\s*)+$/i, '').trim();
         xml = replaceText(xml, [
           '{{DESCRICAO}}', '[DESCRICAO]',
           'Sobre uso e guarda de EPI conzxzxzxforme exigências da Norma Regulamentadora - NR 06',
           'Sobre uso e guarda de EPI conforme exigências da Norma Regulamentadora - NR 06'
-        ], descricao);
+        ], cleanDesc);
       }
 
       // 5. Carga Horária / Duração
