@@ -423,30 +423,12 @@ const ExamsBudgetPage = () => {
       </header>
 
       {/* Tabs Switcher */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '0.75rem', 
-        marginBottom: '1.5rem', 
-        borderBottom: '1px solid var(--border)',
-        paddingBottom: '0.75rem'
-      }}>
+      <div className="tabs-container" role="tablist" aria-label="Tipo de modelo">
         <button
           onClick={() => setActiveTab('budget')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1.25rem',
-            borderRadius: 'var(--radius-md)',
-            fontWeight: '600',
-            fontSize: '0.9375rem',
-            cursor: 'pointer',
-            border: activeTab === 'budget' ? '1px solid var(--primary)' : '1px solid transparent',
-            backgroundColor: activeTab === 'budget' ? 'var(--primary-light)' : 'var(--surface)',
-            color: activeTab === 'budget' ? 'var(--primary)' : 'var(--text-secondary)',
-            boxShadow: activeTab === 'budget' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-            transition: 'all 0.2s ease'
-          }}
+          className={activeTab === 'budget' ? 'active' : ''}
+          role="tab"
+          aria-selected={activeTab === 'budget'}
         >
           <Stethoscope size={18} />
           💰 Orçamento de Exames
@@ -454,21 +436,9 @@ const ExamsBudgetPage = () => {
 
         <button
           onClick={() => setActiveTab('scheduling')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1.25rem',
-            borderRadius: 'var(--radius-md)',
-            fontWeight: '600',
-            fontSize: '0.9375rem',
-            cursor: 'pointer',
-            border: activeTab === 'scheduling' ? '1px solid var(--primary)' : '1px solid transparent',
-            backgroundColor: activeTab === 'scheduling' ? 'var(--primary-light)' : 'var(--surface)',
-            color: activeTab === 'scheduling' ? 'var(--primary)' : 'var(--text-secondary)',
-            boxShadow: activeTab === 'scheduling' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-            transition: 'all 0.2s ease'
-          }}
+          className={activeTab === 'scheduling' ? 'active' : ''}
+          role="tab"
+          aria-selected={activeTab === 'scheduling'}
         >
           <UserCheck size={18} />
           📋 Solicitação de Dados e PCMSO (Agendamento & Orçamento)

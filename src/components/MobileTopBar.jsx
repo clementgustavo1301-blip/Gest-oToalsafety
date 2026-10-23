@@ -1,34 +1,30 @@
 import React from 'react';
-import { Menu, Bell, ShieldCheck } from 'lucide-react';
+import { Bell, Menu, Moon, Sun } from 'lucide-react';
 import { useAI } from '../context/AIContext';
+import { useTheme } from '../hooks/useTheme';
 
 const MobileTopBar = ({ onOpenSidebar }) => {
   const { unreadCount } = useAI();
+  const { isDark, toggleTheme } = useTheme();
 
   return (
-    <div className="mobile-topbar">
-      <button 
-        onClick={onOpenSidebar}
-        style={{ color: 'var(--text-secondary)', padding: '0.25rem' }}
-      >
-        <Menu size={24} />
+    <header className="mobile-topbar">
+      <button className="mobile-topbar__action" onClick={onOpenSidebar} aria-label="Abrir menu">
+        <Menu size={22} />
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-        <img src="/logo-totalsafety.png" alt="TotalSafety" style={{ height: '48px', transform: 'scale(1.6)', objectFit: 'contain' }} />
-      </div>
+      <img className="mobile-topbar__logo" src="/logo-totalsafety.png" alt="TotalSafety" />
 
-      <div style={{ position: 'relative' }}>
-        <Bell size={20} color="var(--text-secondary)" />
-        {unreadCount > 0 && (
-          <span style={{
-            position: 'absolute', top: -4, right: -4,
-            backgroundColor: 'var(--danger)', width: 10, height: 10,
-            borderRadius: '50%', border: '2px solid var(--surface)'
-          }} />
-        )}
+      <div className="mobile-topbar__actions">
+        <button className="mobile-topbar__action" onClick={toggleTheme} aria-label={isDark ? 'Usar tema claro' : 'Usar tema escuro'}>
+          {isDark ? <Sun size={19} /> : <Moon size={19} />}
+        </button>
+        <span className="mobile-topbar__notification" aria-label={`${unreadCount} notificações`}>
+          <Bell size={19} />
+          {unreadCount > 0 && <span className="mobile-topbar__notification-dot" />}
+        </span>
       </div>
-    </div>
+    </header>
   );
 };
 

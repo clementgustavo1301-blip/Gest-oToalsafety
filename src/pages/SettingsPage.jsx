@@ -51,7 +51,7 @@ const SettingsPage = () => {
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1rem' }}>
-      <div style={{ marginBottom: '2rem' }}>
+      <div className="page-header">
         <h1 className="text-h1" style={{ color: 'var(--text-primary)' }}>Configurações</h1>
         <p className="text-body" style={{ color: 'var(--text-secondary)' }}>Gerencie suas preferências, segurança e integrações.</p>
       </div>
@@ -59,23 +59,12 @@ const SettingsPage = () => {
       <div className="grid-responsive-sidebar">
         
         {/* Sidebar Menu Interno */}
-        <div className="card flex-col-desktop" style={{ padding: '0.5rem', gap: '0.25rem' }}>
+        <div className="card flex-col-desktop settings-tabs" style={{ padding: '0.5rem', gap: '0.25rem' }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem',
-                padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)',
-                backgroundColor: activeTab === tab.id ? 'var(--primary-light)' : 'transparent',
-                color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                border: 'none', cursor: 'pointer', textAlign: 'left',
-                transition: 'var(--transition)',
-                whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => { if (activeTab !== tab.id) e.currentTarget.style.backgroundColor = 'var(--background)'; }}
-              onMouseLeave={(e) => { if (activeTab !== tab.id) e.currentTarget.style.backgroundColor = 'transparent'; }}
+              className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
             >
               {tab.icon} {tab.label}
             </button>
@@ -83,15 +72,7 @@ const SettingsPage = () => {
           <div style={{ height: '1px', backgroundColor: 'var(--border)', margin: '0.5rem 0' }} />
           <button
             onClick={signOut}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
-              padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'transparent', color: 'var(--danger)',
-              fontWeight: '500', border: 'none', cursor: 'pointer', textAlign: 'left',
-              whiteSpace: 'nowrap'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            className="settings-tab settings-tab--danger"
           >
             <LogOut size={18} /> Sair da Conta
           </button>

@@ -76,35 +76,19 @@ const InventoryPage = () => {
       </header>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+      <div className="tabs-container" role="tablist" aria-label="Setor do estoque">
         <button
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'Clínica' ? '2px solid var(--primary)' : '2px solid transparent',
-            color: activeTab === 'Clínica' ? 'var(--primary)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'Clínica' ? '600' : '500',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            transition: 'var(--transition)'
-          }}
+          className={activeTab === 'Clínica' ? 'active' : ''}
+          role="tab"
+          aria-selected={activeTab === 'Clínica'}
           onClick={() => setActiveTab('Clínica')}
         >
           Clínica
         </button>
         <button
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'SST' ? '2px solid var(--primary)' : '2px solid transparent',
-            color: activeTab === 'SST' ? 'var(--primary)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'SST' ? '600' : '500',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            transition: 'var(--transition)'
-          }}
+          className={activeTab === 'SST' ? 'active' : ''}
+          role="tab"
+          aria-selected={activeTab === 'SST'}
           onClick={() => setActiveTab('SST')}
         >
           SST

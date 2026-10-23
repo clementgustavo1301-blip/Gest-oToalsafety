@@ -178,8 +178,8 @@
   border-radius: 0.25rem;
 }
 .flow-status.ok { color: var(--success); background-color: var(--secondary-light); }
-.flow-status.warn { color: var(--warning); background-color: #fef3c7; }
-.flow-status.err { color: var(--danger); background-color: #fee2e2; }
+.flow-status.warn { color: var(--warning); background-color: var(--warning-light); }
+.flow-status.err { color: var(--danger); background-color: var(--danger-light); }
 .flow-status.neutral { color: var(--text-secondary); background-color: var(--background); }
 
 .uf-badge {

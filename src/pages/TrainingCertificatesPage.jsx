@@ -8,7 +8,7 @@ import {
   Copy, Check, ExternalLink, Calendar, Search, Filter,
   Edit, Key, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
   CheckCircle, Clock, Briefcase, MapPin, Building,
-  Smartphone, QrCode, PenTool, Share2
+  Smartphone, QrCode, PenTool, Share2, FileSpreadsheet, Upload
 } from 'lucide-react';
 import { balanceSyllabusColumns, getCertificateFrontGeometry } from '../utils/trainingPptxGenerator';
 import { renderCertificateDomPage } from '../utils/domCertificatePdf';
@@ -16,8 +16,10 @@ import { formatCpf } from '../services/cpfService';
 import { getProfiles, getCompanies, getGroups } from '../services/storageService';
 import { 
   getTrainingClasses, saveTrainingClass, deleteTrainingClass,
-  getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments 
+  getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments,
+  importTrainingEnrollments
 } from '../services/trainingClassesService';
+import { parseTrainingParticipantRows } from '../utils/trainingSpreadsheetImport';
 import SignaturePadModal from '../components/SignaturePadModal';
 import './TrainingCertificatesPage.css';
 import { 
@@ -375,6 +377,14 @@ const TrainingCertificatesPage = () => {
   const [turmaSaving, setTurmaSaving] = useState(false);
   const [turmaFormErrors, setTurmaFormErrors] = useState({});
   const turmaInitialFormRef = useRef('');
+  const spreadsheetInputRef = useRef(null);
+  const [showSpreadsheetImportModal, setShowSpreadsheetImportModal] = useState(false);
+  const [spreadsheetImportTurma, setSpreadsheetImportTurma] = useState(null);
+  const [spreadsheetFileName, setSpreadsheetFileName] = useState('');
+  const [spreadsheetPreview, setSpreadsheetPreview] = useState(null);
+  const [spreadsheetImportError, setSpreadsheetImportError] = useState('');
+  const [spreadsheetReading, setSpreadsheetReading] = useState(false);
+  const [spreadsheetImporting, setSpreadsheetImporting] = useState(false);
   const [turmaFormData, setTurmaFormData] = useState({
     name: '',
     selectedPresetKey: '',
@@ -889,6 +899,119 @@ const TrainingCertificatesPage = () => {
     await deleteTrainingClass(id);
     loadData();
   };
+
+  const spreadsheetTemplateUrl = `${import.meta.env.BASE_URL}modelo-importacao-turma.xlsx`;
+
+  const resetSpreadsheetImport = () => {
+    setSpreadsheetFileName('');
+    setSpreadsheetPreview(null);
+    setSpreadsheetImportError('');
+    setSpreadsheetReading(false);
+    if (spreadsheetInputRef.current) spreadsheetInputRef.current.value = '';
+  };
+
+  const handleOpenSpreadsheetImport = (turma) => {
+    setSpreadsheetImportTurma(turma);
+    resetSpreadsheetImport();
+    setShowSpreadsheetImportModal(true);
+  };
+
+  const handleCloseSpreadsheetImport = () => {
+    if (spreadsheetImporting) return;
+    setShowSpreadsheetImportModal(false);
+    setSpreadsheetImportTurma(null);
+    resetSpreadsheetImport();
+  };
+
+  const handleSpreadsheetFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    resetSpreadsheetImport();
+    if (!file) return;
+
+    setSpreadsheetFileName(file.name);
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setSpreadsheetImportError('Selecione uma planilha no formato .xlsx.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSpreadsheetImportError('A planilha deve ter no máximo 5 MB.');
+      return;
+    }
+
+    setSpreadsheetReading(true);
+    try {
+      const { readSheet } = await import('read-excel-file/browser');
+      const rows = await readSheet(file);
+      const parsed = parseTrainingParticipantRows(rows);
+      setSpreadsheetPreview(parsed);
+      if (parsed.participants.length === 0) {
+        setSpreadsheetImportError('Nenhuma linha válida foi encontrada para importar.');
+      }
+    } catch (error) {
+      console.error('[TrainingSpreadsheetImport] Falha ao ler planilha:', error);
+      setSpreadsheetPreview(null);
+      setSpreadsheetImportError(error?.message || 'Não foi possível ler a planilha selecionada.');
+    } finally {
+      setSpreadsheetReading(false);
+    }
+  };
+
+  const handleImportSpreadsheet = async () => {
+    if (!spreadsheetImportTurma?.id || !spreadsheetPreview?.participants?.length) return;
+
+    setSpreadsheetImporting(true);
+    setSpreadsheetImportError('');
+    try {
+      const result = await importTrainingEnrollments(
+        spreadsheetImportTurma.id,
+        spreadsheetPreview.participants
+      );
+      await loadData();
+
+      if (result.imported === 0 && result.duplicates === 0 && result.failed.length > 0) {
+        setSpreadsheetImportError('Não foi possível importar os participantes. Tente novamente.');
+        return;
+      }
+
+      const ignoredCount = spreadsheetPreview.issues.length + result.duplicates + result.failed.length;
+      setShowSpreadsheetImportModal(false);
+      setSpreadsheetImportTurma(null);
+      resetSpreadsheetImport();
+      setFeedback({
+        type: result.imported > 0 ? 'success' : 'info',
+        text: result.imported > 0
+          ? `${result.imported} participante(s) importado(s) para a turma${ignoredCount ? `; ${ignoredCount} linha(s) não adicionada(s)` : ''}.`
+          : 'Os participantes válidos da planilha já estavam vinculados a esta turma.'
+      });
+      setTimeout(() => setFeedback(null), 5000);
+    } catch (error) {
+      console.error('[TrainingSpreadsheetImport] Falha na importação:', error);
+      setSpreadsheetImportError(error?.message || 'Não foi possível importar a planilha.');
+    } finally {
+      setSpreadsheetImporting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showSpreadsheetImportModal) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape' || spreadsheetImporting) return;
+      setShowSpreadsheetImportModal(false);
+      setSpreadsheetImportTurma(null);
+      setSpreadsheetFileName('');
+      setSpreadsheetPreview(null);
+      setSpreadsheetImportError('');
+      setSpreadsheetReading(false);
+      if (spreadsheetInputRef.current) spreadsheetInputRef.current.value = '';
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showSpreadsheetImportModal, spreadsheetImporting]);
 
   const getPublicEnrollmentUrl = (turmaId) =>
     `${window.location.origin}/inscricao/${encodeURIComponent(String(turmaId))}`;
@@ -2546,6 +2669,15 @@ const TrainingCertificatesPage = () => {
                           <button
                             type="button"
                             className="tc-btn"
+                            onClick={() => handleOpenSpreadsheetImport(turma)}
+                            title="Importar participantes por planilha"
+                          >
+                            <FileSpreadsheet size={14} />
+                            Importar planilha
+                          </button>
+                          <button
+                            type="button"
+                            className="tc-btn"
                             onClick={() => handleOpenQrModal(turma)}
                             title="Gerar e gerenciar links exclusivos de assinatura desta turma"
                           >
@@ -2731,6 +2863,150 @@ const TrainingCertificatesPage = () => {
         </div>
         );
       })()}
+
+      {/* ========================================================================= */}
+      {/* MODAL: IMPORTAR PARTICIPANTES POR PLANILHA                                */}
+      {/* ========================================================================= */}
+      {showSpreadsheetImportModal && spreadsheetImportTurma && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) handleCloseSpreadsheetImport();
+          }}
+        >
+          <div className="tc-import-modal" role="dialog" aria-modal="true" aria-labelledby="tc-import-modal-title">
+            <header className="tc-import-modal-header">
+              <div>
+                <h2 id="tc-import-modal-title">Importar participantes</h2>
+                <p>Turma: <strong>{spreadsheetImportTurma.name}</strong></p>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={handleCloseSpreadsheetImport}
+                disabled={spreadsheetImporting}
+                aria-label="Fechar importação"
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="tc-import-modal-body">
+              <div className="tc-import-guide">
+                <div>
+                  <strong>1. Preencha o modelo</strong>
+                  <span>Mantenha as colunas Nome e CPF. O CPF pode estar com ou sem pontuação.</span>
+                </div>
+                <a
+                  href={spreadsheetTemplateUrl}
+                  download="modelo-importacao-turma.xlsx"
+                  className="tc-btn tc-btn--soft"
+                >
+                  <Download size={14} />
+                  Baixar modelo
+                </a>
+              </div>
+
+              <div className="tc-import-guide">
+                <div>
+                  <strong>2. Envie a planilha preenchida</strong>
+                  <span>Formato aceito: .xlsx, com até 5 MB.</span>
+                </div>
+              </div>
+
+              <label className={`tc-file-drop ${spreadsheetFileName ? 'has-file' : ''}`}>
+                <input
+                  ref={spreadsheetInputRef}
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  onChange={handleSpreadsheetFileChange}
+                  disabled={spreadsheetReading || spreadsheetImporting}
+                />
+                {spreadsheetReading ? <Loader size={24} className="animate-spin" /> : <Upload size={24} />}
+                <span>{spreadsheetFileName || 'Clique para selecionar a planilha'}</span>
+                <small>{spreadsheetReading ? 'Lendo e validando dados...' : 'Os dados serão conferidos antes da importação.'}</small>
+              </label>
+
+              {spreadsheetImportError && (
+                <div className="tc-form-alert" role="alert">
+                  <AlertCircle size={16} />
+                  <span>{spreadsheetImportError}</span>
+                </div>
+              )}
+
+              {spreadsheetPreview && (
+                <div className="tc-import-preview">
+                  <div className="tc-import-summary" aria-label="Resumo da planilha">
+                    <div>
+                      <strong>{spreadsheetPreview.participants.length}</strong>
+                      <span>prontos para importar</span>
+                    </div>
+                    <div className={spreadsheetPreview.issues.length ? 'has-issues' : ''}>
+                      <strong>{spreadsheetPreview.issues.length}</strong>
+                      <span>linhas com problema</span>
+                    </div>
+                  </div>
+
+                  {spreadsheetPreview.participants.length > 0 && (
+                    <div className="tc-import-table-wrap">
+                      <table className="tc-import-table">
+                        <thead>
+                          <tr>
+                            <th>Nome</th>
+                            <th>CPF</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {spreadsheetPreview.participants.slice(0, 5).map(participant => (
+                            <tr key={participant.cpf}>
+                              <td>{participant.nome}</td>
+                              <td>{participant.cpf}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {spreadsheetPreview.participants.length > 5 && (
+                        <p>Mais {spreadsheetPreview.participants.length - 5} participante(s) na planilha.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {spreadsheetPreview.issues.length > 0 && (
+                    <details className="tc-import-issues">
+                      <summary>Ver linhas que não serão importadas</summary>
+                      <ul>
+                        {spreadsheetPreview.issues.slice(0, 8).map(issue => (
+                          <li key={`${issue.rowNumber}-${issue.message}`}>
+                            Linha {issue.rowNumber}: {issue.message}
+                          </li>
+                        ))}
+                      </ul>
+                      {spreadsheetPreview.issues.length > 8 && (
+                        <p>Mais {spreadsheetPreview.issues.length - 8} problema(s) não exibido(s).</p>
+                      )}
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <footer className="tc-import-modal-footer">
+              <button type="button" className="tc-btn" onClick={handleCloseSpreadsheetImport} disabled={spreadsheetImporting}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="tc-btn tc-btn--primary"
+                onClick={handleImportSpreadsheet}
+                disabled={spreadsheetReading || spreadsheetImporting || !spreadsheetPreview?.participants?.length}
+              >
+                {spreadsheetImporting ? <Loader size={15} className="animate-spin" /> : <Upload size={15} />}
+                {spreadsheetImporting ? 'Importando...' : 'Importar participantes'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL: CRIAR OU EDITAR TURMA                                              */}

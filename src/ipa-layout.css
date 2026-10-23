@@ -103,8 +103,8 @@
   border-radius: 1rem;
 }
 .value-badge.success { background-color: var(--secondary-light); color: var(--secondary-hover); }
-.value-badge.warning { background-color: #fef3c7; color: #b45309; }
-.value-badge.danger { background-color: #fee2e2; color: var(--danger); }
+.value-badge.warning { background-color: var(--warning-light); color: var(--warning); }
+.value-badge.danger { background-color: var(--danger-light); color: var(--danger); }
 
 .stat-icon-wrapper {
   width: 48px;
@@ -116,8 +116,8 @@
 }
 
 .stat-icon-wrapper.bg-blue-dim { background-color: var(--primary-light); color: var(--primary); }
-.stat-icon-wrapper.bg-amber-dim { background-color: #fef3c7; color: #b45309; }
-.stat-icon-wrapper.bg-rose-dim { background-color: #fee2e2; color: var(--danger); }
+.stat-icon-wrapper.bg-amber-dim { background-color: var(--warning-light); color: var(--warning); }
+.stat-icon-wrapper.bg-rose-dim { background-color: var(--danger-light); color: var(--danger); }
 .stat-icon-wrapper.bg-emerald-dim { background-color: var(--secondary-light); color: var(--secondary-hover); }
 
 .stat-progress-bar {
@@ -266,8 +266,8 @@
   padding: 0.25rem 0.5rem;
   border-radius: 1rem;
 }
-.badge.warning { background-color: #fef3c7; color: #b45309; }
-.badge.danger { background-color: #fee2e2; color: var(--danger); }
+.badge.warning { background-color: var(--warning-light); color: var(--warning); }
+.badge.danger { background-color: var(--danger-light); color: var(--danger); }
 
 /* List Header actions */
 .page-header-actions {

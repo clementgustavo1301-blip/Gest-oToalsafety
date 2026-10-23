@@ -246,14 +246,9 @@ const CompanyDetailsPage = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.75rem 1.25rem', borderRadius: 'var(--radius-md)',
-              fontWeight: activeTab === tab.id ? '600' : '500',
-              fontSize: '0.875rem', transition: 'var(--transition)',
-              backgroundColor: activeTab === tab.id ? 'var(--primary)' : 'transparent',
-              color: activeTab === tab.id ? 'white' : 'var(--text-secondary)',
-            }}
+            className={activeTab === tab.id ? 'active' : ''}
+            role="tab"
+            aria-selected={activeTab === tab.id}
           >
             {tab.icon} {tab.label}
           </button>

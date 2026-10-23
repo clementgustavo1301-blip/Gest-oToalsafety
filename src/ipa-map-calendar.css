@@ -211,8 +211,8 @@
   text-transform: uppercase;
 }
 
-.mini-pill.campaign { background-color: #eff6ff; color: #2563eb; }
-.mini-pill.partner { background-color: #ecfdf5; color: #10b981; }
+.mini-pill.campaign { background-color: var(--primary-light); color: var(--primary); }
+.mini-pill.partner { background-color: var(--success-light); color: var(--success); }
 
 .mini-pill-status {
   font-size: 0.65rem;
@@ -220,8 +220,8 @@
   padding: 0.125rem 0.5rem;
   border-radius: 1rem;
 }
-.mini-pill-status.ok { background-color: #ecfdf5; color: #10b981; }
-.mini-pill-status.pending { background-color: #fef3c7; color: #b45309; }
+.mini-pill-status.ok { background-color: var(--success-light); color: var(--success); }
+.mini-pill-status.pending { background-color: var(--warning-light); color: var(--warning); }
 
 .map-legend-box {
   padding: 1rem 1.5rem;
@@ -286,7 +286,7 @@
   border-radius: 1rem;
 }
 .popup-status.ok { background-color: var(--secondary-light); color: var(--secondary-hover); }
-.popup-status.warn { background-color: #fef3c7; color: #b45309; }
+.popup-status.warn { background-color: var(--warning-light); color: var(--warning); }
 
 .popup-title {
   font-size: 1rem;

@@ -283,6 +283,47 @@ export async function registerStudent(studentData) {
   }
 }
 
+export async function importTrainingEnrollments(turmaId, participants = []) {
+  if (!turmaId) {
+    throw new Error('Selecione uma turma antes de importar a planilha.');
+  }
+
+  const importParticipant = async (participant) => {
+    try {
+      const saved = await registerStudent({
+        turma_id: turmaId,
+        nome: participant.nome,
+        cpf: participant.cpf,
+        status: 'Inscrito'
+      });
+      return {
+        participant,
+        status: saved?.already_registered ? 'duplicate' : 'imported'
+      };
+    } catch (error) {
+      return {
+        participant,
+        status: 'failed',
+        message: error?.message || 'Não foi possível importar este participante.'
+      };
+    }
+  };
+
+  const results = [];
+  const batchSize = 8;
+  for (let start = 0; start < participants.length; start += batchSize) {
+    const batch = participants.slice(start, start + batchSize);
+    results.push(...await Promise.all(batch.map(importParticipant)));
+  }
+
+  return {
+    imported: results.filter(result => result.status === 'imported').length,
+    duplicates: results.filter(result => result.status === 'duplicate').length,
+    failed: results.filter(result => result.status === 'failed'),
+    results
+  };
+}
+
 export async function updateStudent(id, updates) {
   try {
     await supabase.from('training_enrollments').update(updates).eq('id', id);

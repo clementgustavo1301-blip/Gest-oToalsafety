@@ -257,7 +257,7 @@
   color: var(--primary);
 }
 .btn-icon.text-rose:hover {
-  background-color: #fee2e2;
+  background-color: var(--danger-light);
   color: var(--danger);
 }
 

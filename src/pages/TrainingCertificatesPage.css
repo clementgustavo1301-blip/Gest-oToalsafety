@@ -14,6 +14,9 @@
 }
 
 .dark .tc-page {
+  --tc-accent: var(--primary);
+  --tc-accent-strong: var(--primary-hover);
+  --tc-accent-soft: var(--primary-light);
   --tc-muted-bg: rgba(148, 163, 184, 0.08);
 }
 
@@ -153,6 +156,22 @@
   border-color: #fecaca;
   background: #fef2f2;
   color: #b91c1c;
+}
+
+.dark .tc-toast {
+  border-color: var(--border-strong);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.dark .tc-toast--success {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.dark .tc-toast--error {
+  background: var(--danger-light);
+  color: var(--danger);
 }
 
 @keyframes tcFadeIn {
@@ -1486,6 +1505,230 @@ a.tc-btn { text-decoration: none; }
   border-color: var(--tc-accent);
 }
 
+/* ---------- Modal de importação por planilha ---------- */
+.tc-import-modal {
+  width: min(620px, 100%);
+  max-height: min(88vh, 760px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px -24px rgba(15, 23, 42, 0.45);
+}
+
+.tc-import-modal-header,
+.tc-import-modal-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  background: var(--surface);
+}
+
+.tc-import-modal-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.tc-import-modal-header h2 {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tc-import-modal-header p {
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.tc-import-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 1.2rem;
+}
+
+.tc-import-modal-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+
+.tc-import-guide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.tc-import-guide > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.tc-import-guide strong {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+}
+
+.tc-import-guide span {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.tc-file-drop {
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  background: var(--tc-muted-bg);
+  color: var(--tc-accent);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tc-file-drop:hover,
+.tc-file-drop:focus-within,
+.tc-file-drop.has-file {
+  border-color: var(--tc-accent);
+  background: var(--tc-accent-soft);
+}
+
+.tc-file-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.tc-file-drop span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.tc-file-drop small {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.tc-import-preview {
+  margin-top: 0.9rem;
+}
+
+.tc-import-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.tc-import-summary > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.tc-import-summary strong {
+  color: var(--success);
+  font-size: 1rem;
+}
+
+.tc-import-summary span {
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+}
+
+.tc-import-summary .has-issues strong {
+  color: #b45309;
+}
+
+.tc-import-table-wrap {
+  margin-top: 0.75rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tc-import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.tc-import-table th,
+.tc-import-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.tc-import-table th {
+  background: var(--tc-muted-bg);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.tc-import-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.tc-import-table td:last-child {
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tc-import-table-wrap > p,
+.tc-import-issues > p {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  color: var(--text-secondary);
+  font-size: 0.71rem;
+}
+
+.tc-import-issues {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: 0.73rem;
+}
+
+.tc-import-issues summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tc-import-issues ul {
+  margin: 0.55rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.tc-import-issues li + li {
+  margin-top: 0.25rem;
+}
+
 /* ---------- Modal de turma ---------- */
 .tc-turma-modal {
   width: min(720px, 100%);
@@ -1624,8 +1867,8 @@ a.tc-btn { text-decoration: none; }
   margin-top: 0.8rem;
   padding: 0.55rem 0.65rem;
   border-radius: 7px;
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--danger-light);
+  color: var(--danger);
   font-size: 0.76rem;
 }
 
@@ -1746,19 +1989,27 @@ a.tc-btn { text-decoration: none; }
   }
 
   .tc-turma-modal,
-  .tc-turma-modal-form {
+  .tc-turma-modal-form,
+  .tc-import-modal {
     width: 100%;
     max-height: 94dvh;
   }
 
-  .tc-turma-modal {
+  .tc-turma-modal,
+  .tc-import-modal {
     border-radius: 14px 14px 0 0;
     border-bottom: 0;
   }
 
   .tc-turma-modal-header,
-  .tc-turma-modal-footer { padding: 0.85rem 1rem; }
+  .tc-turma-modal-footer,
+  .tc-import-modal-header,
+  .tc-import-modal-footer { padding: 0.85rem 1rem; }
   .tc-turma-modal-body { padding: 0.15rem 1rem 0.8rem; }
+  .tc-import-modal-body { padding: 0.85rem 1rem; }
+  .tc-import-guide { align-items: flex-start; flex-direction: column; }
+  .tc-import-guide .tc-btn { width: 100%; }
+  .tc-import-summary { grid-template-columns: 1fr; }
   .tc-modal-grid,
   .tc-instructor-row,
   .tc-company-field { grid-template-columns: 1fr; }

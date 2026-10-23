@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MobileTopBar from './components/MobileTopBar';
@@ -29,12 +29,15 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AIProvider } from './context/AIContext';
+import { ThemeProvider } from './context/ThemeContext';
 import IPASystem from './App.tsx';
 
 // Novo componente para proteger o layout dependendo do perfil
 const AppLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { activeLink } = useAuth();
+  const openSidebar = useCallback(() => setIsSidebarOpen(true), []);
+  const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
 
   if (!activeLink) {
     return (
@@ -47,11 +50,11 @@ const AppLayout = () => {
   return (
     <AIProvider>
       <div className="app-layout">
-        <MobileTopBar onOpenSidebar={() => setIsSidebarOpen(true)} />
-        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        <MobileTopBar onOpenSidebar={openSidebar} />
+        <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
         <div 
           className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`}
-          onClick={() => setIsSidebarOpen(false)}
+          onClick={closeSidebar}
         />
         <main className="main-content">
           <Routes>
@@ -164,9 +167,10 @@ const AppLayout = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/cat-form" element={<PublicCATPage />} />
           <Route path="/inscricao" element={<PublicTrainingEnrollmentPage />} />
@@ -181,9 +185,10 @@ function App() {
               <AppLayout />
             </ProtectedRoute>
           } />
-        </Routes>
-      </Router>
-    </AuthProvider>
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
