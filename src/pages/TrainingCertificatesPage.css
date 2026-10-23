@@ -996,7 +996,16 @@ textarea.tc-input {
 .tc-portal-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.65rem;
+}
+
+.tc-portal-description {
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 /* URL + botão de copiar unidos num único controle */
@@ -1186,6 +1195,29 @@ a.tc-btn { text-decoration: none; }
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
+}
+
+.tc-turma-public-link {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.tc-turma-public-link .tc-url-field {
+  flex: 1;
+  width: auto;
+  background: var(--tc-muted-bg);
+}
+
+.tc-turma-public-link > .tc-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .tc-turma-public-link { flex-wrap: wrap; }
+  .tc-turma-public-link .tc-url-field { flex: 1 1 100%; }
+  .tc-turma-public-link > .tc-btn { width: 100%; }
 }
 
 .tc-turma-foot-row {

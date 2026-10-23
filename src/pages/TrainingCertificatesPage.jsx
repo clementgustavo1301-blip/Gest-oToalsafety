@@ -830,7 +830,7 @@ const TrainingCertificatesPage = () => {
 
       const primary = validInstructors[0] || {};
 
-      await saveTrainingClass({
+      const savedTurma = await saveTrainingClass({
         id: editingTurma ? editingTurma.id : null,
         ...turmaFormData,
         instructors: validInstructors,
@@ -848,10 +848,12 @@ const TrainingCertificatesPage = () => {
         coordinator: turmaFormData.coordinator || getDefaultCoordinator(turmaFormData.course_name)
       });
       setShowTurmaModal(false);
-      loadData();
+      await loadData();
       setFeedback({ 
         type: 'success', 
-        text: editingTurma ? 'Turma atualizada com sucesso!' : 'Turma criada com sucesso!' 
+        text: editingTurma
+          ? 'Turma atualizada com sucesso!'
+          : `Turma criada com sucesso! O link público de ${savedTurma.name} já está disponível.`
       });
       setTimeout(() => setFeedback(null), 4000);
     } catch (err) {
@@ -888,10 +890,14 @@ const TrainingCertificatesPage = () => {
     loadData();
   };
 
-  // Copia o link público da turma ou link geral
-  const copyPublicLink = async (turmaId = null, key = 'general') => {
+  const getPublicEnrollmentUrl = (turmaId) =>
+    `${window.location.origin}/inscricao/${encodeURIComponent(String(turmaId))}`;
+
+  // Cada link público pertence obrigatoriamente a uma turma.
+  const copyPublicLink = async (turmaId, key) => {
+    if (!turmaId) return;
     const origin = window.location.origin;
-    const url = turmaId ? `${origin}/inscricao?turma=${turmaId}` : `${origin}/inscricao`;
+    const url = `${origin}/inscricao/${encodeURIComponent(String(turmaId))}`;
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
@@ -2363,39 +2369,20 @@ const TrainingCertificatesPage = () => {
 
         return (
         <div className="tc-turmas">
-          {/* Link público geral de inscrição */}
+          {/* Orientação do fluxo de inscrição por turma */}
           <section className="tc-portal" aria-labelledby="tc-portal-title">
             <div className="tc-portal-heading">
-              <h2 id="tc-portal-title">Link público de inscrição</h2>
+              <h2 id="tc-portal-title">Inscrição vinculada à turma</h2>
               <span className="tc-portal-verified" title="Os dados informados no formulário são validados pela API da Receita Federal">
                 <ShieldCheck size={13} />
                 CPF validado
               </span>
             </div>
             <div className="tc-portal-row">
-              <div className="tc-url-field">
-                <code title={`${window.location.origin}/inscricao`}>{window.location.origin}/inscricao</code>
-                <button
-                  id="btn-copy-public-link"
-                  type="button"
-                  className={copiedKey === 'banner-general' ? 'is-copied' : ''}
-                  onClick={() => copyPublicLink(null, 'banner-general')}
-                  aria-live="polite"
-                >
-                  {copiedKey === 'banner-general' ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedKey === 'banner-general' ? 'Copiado' : 'Copiar'}
-                </button>
-              </div>
-              <a
-                id="btn-test-public-form"
-                href="/inscricao"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tc-link tc-portal-test"
-              >
-                <ExternalLink size={13} />
-                Testar formulário
-              </a>
+              <p className="tc-portal-description">
+                Crie a turma e compartilhe o link exibido no cartão dela. Ao confirmar CPF e data de nascimento,
+                o colaborador entra automaticamente na lista de presença daquela turma.
+              </p>
               <button
                 id="btn-api-cpf-token"
                 type="button"
@@ -2452,7 +2439,8 @@ const TrainingCertificatesPage = () => {
             ) : (
               <div className="tc-turma-grid">
                 {turmas.map(turma => {
-                  const studentCount = enrollments.filter(e => e.turma_id === turma.id).length;
+                  const studentCount = enrollments.filter(e => String(e.turma_id) === String(turma.id)).length;
+                  const publicEnrollmentUrl = getPublicEnrollmentUrl(turma.id);
                   return (
                     <article key={turma.id} className="tc-turma-card">
                       <div className="tc-turma-top">
@@ -2517,6 +2505,31 @@ const TrainingCertificatesPage = () => {
                         )}
                       </ul>
 
+                      <div className="tc-turma-public-link">
+                        <div className="tc-url-field">
+                          <code title={publicEnrollmentUrl}>{publicEnrollmentUrl}</code>
+                          <button
+                            type="button"
+                            className={copiedKey === `turma-${turma.id}` ? 'is-copied' : ''}
+                            onClick={() => copyPublicLink(turma.id, `turma-${turma.id}`)}
+                            aria-live="polite"
+                          >
+                            {copiedKey === `turma-${turma.id}` ? <Check size={14} /> : <Copy size={14} />}
+                            {copiedKey === `turma-${turma.id}` ? 'Copiado' : 'Copiar link'}
+                          </button>
+                        </div>
+                        <a
+                          href={publicEnrollmentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="tc-btn"
+                          title="Abrir formulário público desta turma"
+                        >
+                          <ExternalLink size={14} />
+                          Abrir formulário
+                        </a>
+                      </div>
+
                       <div className="tc-turma-foot">
                         <div className="tc-turma-foot-row">
                           <button
@@ -2530,15 +2543,6 @@ const TrainingCertificatesPage = () => {
                           </button>
                         </div>
                         <div className="tc-turma-actions">
-                          <button
-                            type="button"
-                            className="tc-btn"
-                            onClick={() => copyPublicLink(turma.id, `turma-${turma.id}`)}
-                            title="Copiar link de inscrição específico desta turma"
-                          >
-                            {copiedKey === `turma-${turma.id}` ? <Check size={14} style={{ color: 'var(--success)' }} /> : <Copy size={14} />}
-                            {copiedKey === `turma-${turma.id}` ? 'Link copiado' : 'Link da turma'}
-                          </button>
                           <button
                             type="button"
                             className="tc-btn"

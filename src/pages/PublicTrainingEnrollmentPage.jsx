@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { 
-  CheckCircle2, AlertCircle, Loader2, Calendar, 
-  CreditCard, Award, ArrowRight, ShieldCheck, 
-  RefreshCw, Copy, Check, Search, UserCheck
+  CheckCircle2, AlertCircle, Loader2, ArrowRight,
+  RefreshCw, Copy, Check, Search
 } from 'lucide-react';
 import { formatCpf, cleanCpf, searchCpfA } from '../services/cpfService';
-import { getTrainingClasses, registerStudent } from '../services/trainingClassesService';
+import { getTrainingClassById, registerStudent } from '../services/trainingClassesService';
 
 export default function PublicTrainingEnrollmentPage() {
   const { turmaId: paramTurmaId } = useParams();
@@ -23,6 +22,8 @@ export default function PublicTrainingEnrollmentPage() {
 
   // Informações da turma se vinculada
   const [activeTurma, setActiveTurma] = useState(null);
+  const [turmaLoading, setTurmaLoading] = useState(true);
+  const [turmaError, setTurmaError] = useState('');
 
   // Estados de controle
   const [searching, setSearching] = useState(false);
@@ -32,16 +33,42 @@ export default function PublicTrainingEnrollmentPage() {
   const [successData, setSuccessData] = useState(null);
   const [copiedProtocol, setCopiedProtocol] = useState(false);
 
-  // Carrega turma se o link tiver ID
+  // O formulário público só funciona quando está vinculado a uma turma válida.
   useEffect(() => {
+    let cancelled = false;
+
     async function loadTurma() {
-      if (targetTurmaId) {
-        const list = await getTrainingClasses();
-        const found = list.find(t => String(t.id) === String(targetTurmaId));
-        if (found) setActiveTurma(found);
+      setActiveTurma(null);
+      setTurmaError('');
+
+      if (!targetTurmaId) {
+        setTurmaLoading(false);
+        setTurmaError('Este link não está vinculado a uma turma. Solicite ao responsável o link correto.');
+        return;
+      }
+
+      setTurmaLoading(true);
+      try {
+        const found = await getTrainingClassById(targetTurmaId);
+        if (cancelled) return;
+
+        if (!found) {
+          setTurmaError('Turma não encontrada. Confirme se o link recebido está completo.');
+          return;
+        }
+
+        setActiveTurma(found);
+      } catch (error) {
+        if (!cancelled) {
+          setTurmaError(error.message || 'Não foi possível carregar esta turma.');
+        }
+      } finally {
+        if (!cancelled) setTurmaLoading(false);
       }
     }
+
     loadTurma();
+    return () => { cancelled = true; };
   }, [targetTurmaId]);
 
   const handleCpfChange = (e) => {
@@ -66,6 +93,11 @@ export default function PublicTrainingEnrollmentPage() {
   // Etapa 1: Busca o nome na API após preencher CPF e Data de Nascimento
   const handleBuscarNome = async (e) => {
     if (e) e.preventDefault();
+
+    if (!activeTurma) {
+      setErrorMsg('Não foi possível identificar a turma deste link.');
+      return;
+    }
 
     const digits = cleanCpf(cpf);
     if (digits.length !== 11) {
@@ -102,6 +134,11 @@ export default function PublicTrainingEnrollmentPage() {
 
   // Etapa 2: Confirma e envia para a lista de participação do sistema
   const handleConfirmarEnvio = async () => {
+    if (!activeTurma?.id) {
+      setErrorMsg('Não foi possível identificar a turma deste link.');
+      return;
+    }
+
     if (!nome) {
       setErrorMsg('Busque o nome antes de confirmar.');
       return;
@@ -114,7 +151,7 @@ export default function PublicTrainingEnrollmentPage() {
     try {
       const protocolNumber = `PART-${Date.now().toString().slice(-6)}`;
       const result = await registerStudent({
-        turma_id: targetTurmaId || null,
+        turma_id: activeTurma.id,
         nome: nome.trim(),
         cpf: formatCpf(digits),
         data_nascimento: birthDate,
@@ -129,7 +166,7 @@ export default function PublicTrainingEnrollmentPage() {
       });
     } catch (err) {
       console.error('Erro ao enviar:', err);
-      setErrorMsg('Erro ao registrar participação no sistema. Tente novamente.');
+      setErrorMsg(err.message || 'Erro ao registrar participação no sistema. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -142,7 +179,7 @@ export default function PublicTrainingEnrollmentPage() {
     setTimeout(() => setCopiedProtocol(false), 2500);
   };
 
-  const canSearch = cleanCpf(cpf).length === 11 && Boolean(birthDate) && !searching;
+  const canSearch = Boolean(activeTurma) && cleanCpf(cpf).length === 11 && Boolean(birthDate) && !searching;
 
   return (
     <div style={{
@@ -216,7 +253,30 @@ export default function PublicTrainingEnrollmentPage() {
 
         {/* Corpo do Formulário */}
         <div style={{ padding: '1.75rem' }}>
-          {successData ? (
+          {turmaLoading ? (
+            <div style={{ padding: '1.5rem 0', textAlign: 'center', color: '#64748b' }}>
+              <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 0.75rem' }} />
+              <p style={{ margin: 0, fontSize: '0.875rem' }}>Carregando dados da turma...</p>
+            </div>
+          ) : turmaError ? (
+            <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#fef2f2',
+                color: '#dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1rem'
+              }}>
+                <AlertCircle size={26} />
+              </div>
+              <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.45rem' }}>Link de inscrição inválido</h2>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>{turmaError}</p>
+            </div>
+          ) : successData ? (
             <div style={{ textAlign: 'center' }}>
               <div style={{
                 width: '48px',
@@ -233,10 +293,12 @@ export default function PublicTrainingEnrollmentPage() {
               </div>
 
               <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.35rem' }}>
-                Participação Registrada
+                {successData.already_registered ? 'Presença já registrada' : 'Participação registrada'}
               </h2>
               <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>
-                Seus dados foram enviados com sucesso para a lista de presença.
+                {successData.already_registered
+                  ? 'Seu CPF já constava na lista de presença desta turma.'
+                  : 'Seu nome já foi incluído na lista de presença desta turma.'}
               </p>
 
               {/* Tabela de Comprovante */}
@@ -276,7 +338,7 @@ export default function PublicTrainingEnrollmentPage() {
                   <div>
                     <span style={{ color: '#64748b' }}>Data de Nascimento: </span>
                     <strong style={{ color: '#0f172a' }}>
-                      {successData.data_nascimento ? new Date(successData.data_nascimento).toLocaleDateString('pt-BR') : '-'}
+                      {successData.data_nascimento ? new Date(`${successData.data_nascimento}T12:00:00`).toLocaleDateString('pt-BR') : '-'}
                     </strong>
                   </div>
                 </div>

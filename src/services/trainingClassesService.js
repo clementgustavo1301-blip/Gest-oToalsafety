@@ -64,6 +64,40 @@ export async function getTrainingClasses() {
   return local.map(normalizeTrainingClass);
 }
 
+export async function getTrainingClassById(id) {
+  if (!id) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('training_classes')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    const normalizedClass = normalizeTrainingClass(data);
+    const localList = getLocal(LOCAL_CLASSES_KEY);
+    const existingIdx = localList.findIndex(c => String(c.id) === String(normalizedClass.id));
+    if (existingIdx >= 0) {
+      localList[existingIdx] = normalizedClass;
+    } else {
+      localList.unshift(normalizedClass);
+    }
+    setLocal(LOCAL_CLASSES_KEY, localList);
+    return normalizedClass;
+  } catch (err) {
+    const cachedClass = getLocal(LOCAL_CLASSES_KEY)
+      .find(c => String(c.id) === String(id));
+
+    if (cachedClass) return normalizeTrainingClass(cachedClass);
+
+    console.warn('[TrainingClasses] Falha ao carregar a turma pública:', err.message);
+    throw new Error('Não foi possível carregar os dados desta turma. Tente novamente.');
+  }
+}
+
 export async function saveTrainingClass(turma) {
   const isNew = !turma.id || String(turma.id).startsWith('local-');
 
@@ -117,50 +151,45 @@ export async function saveTrainingClass(turma) {
     updated_at: new Date().toISOString()
   };
 
-  let savedItem = null;
-
   try {
+    let response;
     if (isNew) {
-      const { data, error } = await supabase
+      response = await supabase
         .from('training_classes')
         .insert([payload])
         .select()
         .single();
-      if (!error && data) savedItem = data;
     } else {
-      const { data, error } = await supabase
+      response = await supabase
         .from('training_classes')
         .update(payload)
         .eq('id', turma.id)
         .select()
         .single();
-      if (!error && data) savedItem = data;
     }
+
+    if (response.error) throw response.error;
+    if (!response.data) throw new Error('O banco não retornou a turma salva.');
+
+    const savedItem = response.data;
+    if (!savedItem.instructors || savedItem.instructors.length === 0) {
+      savedItem.instructors = instructors;
+    }
+
+    const localList = getLocal(LOCAL_CLASSES_KEY);
+    const existingIdx = localList.findIndex(c => String(c.id) === String(savedItem.id));
+    if (existingIdx >= 0) {
+      localList[existingIdx] = savedItem;
+    } else {
+      localList.unshift(savedItem);
+    }
+    setLocal(LOCAL_CLASSES_KEY, localList);
+
+    return normalizeTrainingClass(savedItem);
   } catch (err) {
-    console.warn('[TrainingClasses] Falha ao persistir no Supabase:', err.message);
+    console.error('[TrainingClasses] Falha ao persistir no Supabase:', err.message);
+    throw new Error('Não foi possível salvar a turma no servidor. Verifique a conexão e tente novamente.');
   }
-
-  // Local sync
-  const localList = getLocal(LOCAL_CLASSES_KEY);
-  if (!savedItem) {
-    savedItem = {
-      id: turma.id || `local-${Date.now()}`,
-      ...payload,
-      created_at: turma.created_at || new Date().toISOString()
-    };
-  } else if (!savedItem.instructors || savedItem.instructors.length === 0) {
-    savedItem.instructors = instructors;
-  }
-
-  const existingIdx = localList.findIndex(c => c.id === savedItem.id);
-  if (existingIdx >= 0) {
-    localList[existingIdx] = savedItem;
-  } else {
-    localList.unshift(savedItem);
-  }
-  setLocal(LOCAL_CLASSES_KEY, localList);
-
-  return normalizeTrainingClass(savedItem);
 }
 
 export async function deleteTrainingClass(id) {
@@ -216,10 +245,20 @@ export async function getTrainingEnrollments(turmaId = null) {
 }
 
 export async function registerStudent(studentData) {
+  if (!studentData.turma_id) {
+    throw new Error('O link de inscrição não está vinculado a uma turma.');
+  }
+
+  const cpfDigits = String(studentData.cpf || '').replace(/\D/g, '').slice(0, 11);
+  if (cpfDigits.length !== 11 || !(studentData.nome || '').trim()) {
+    throw new Error('Os dados do participante estão incompletos.');
+  }
+
+  const normalizedCpf = cpfDigits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   const payload = {
-    turma_id: studentData.turma_id || null,
+    turma_id: studentData.turma_id,
     nome: studentData.nome.trim(),
-    cpf: studentData.cpf.trim(),
+    cpf: normalizedCpf,
     data_nascimento: studentData.data_nascimento || null,
     telefone: studentData.telefone || null,
     empresa: studentData.empresa || null,
@@ -227,35 +266,21 @@ export async function registerStudent(studentData) {
     created_at: new Date().toISOString()
   };
 
-  let savedItem = null;
-
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('training_enrollments')
-      .insert([payload])
-      .select()
-      .single();
+      .insert([payload]);
 
-    if (!error && data) {
-      savedItem = data;
+    if (error?.code === '23505') {
+      return { ...payload, already_registered: true };
     }
+    if (error) throw error;
+
+    return payload;
   } catch (err) {
-    console.warn('[TrainingEnrollments] Falha ao registrar no Supabase:', err.message);
+    console.error('[TrainingEnrollments] Falha ao registrar no Supabase:', err.message);
+    throw new Error('Não foi possível registrar sua presença no servidor. Tente novamente.');
   }
-
-  if (!savedItem) {
-    savedItem = {
-      id: `local-${Date.now()}`,
-      ...payload
-    };
-  }
-
-  // Local sync
-  const localList = getLocal(LOCAL_ENROLLMENTS_KEY);
-  localList.unshift(savedItem);
-  setLocal(LOCAL_ENROLLMENTS_KEY, localList);
-
-  return savedItem;
 }
 
 export async function updateStudent(id, updates) {
