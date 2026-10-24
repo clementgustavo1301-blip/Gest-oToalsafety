@@ -648,26 +648,26 @@
 
 /* Custom leaflet popups for dark mode */
 .custom-leaflet-popup .leaflet-popup-content-wrapper {
-  background-color: #1e293b;
-  color: white;
-  border: 1px solid #334155;
+  background-color: #0d0d0e;
+  color: #f4f4f5;
+  border: 1px solid #222226;
 }
 .custom-leaflet-popup .leaflet-popup-tip {
-  background-color: #1e293b;
+  background-color: #0d0d0e;
 }
 
 .tv-next-campaign-overlay {
   position: absolute;
   top: 1rem;
   left: 1rem;
-  background-color: rgba(15, 23, 42, 0.9);
+  background-color: rgba(10, 10, 12, 0.94);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(0, 229, 255, 0.3);
   border-radius: 1rem;
   padding: 1.5rem;
   width: 300px;
   z-index: 1000;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.85);
 }
 
 .tv-next-badge {

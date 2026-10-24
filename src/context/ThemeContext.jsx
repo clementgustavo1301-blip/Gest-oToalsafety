@@ -23,7 +23,7 @@ export const ThemeProvider = ({ children }) => {
     root.style.colorScheme = theme;
 
     const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) themeColor.setAttribute('content', theme === 'dark' ? '#08111f' : '#f6f8fb');
+    if (themeColor) themeColor.setAttribute('content', theme === 'dark' ? '#000000' : '#f6f8fb');
 
     try {
       localStorage.setItem(STORAGE_KEY, theme);

@@ -17,7 +17,7 @@
   --tc-accent: var(--primary);
   --tc-accent-strong: var(--primary-hover);
   --tc-accent-soft: var(--primary-light);
-  --tc-muted-bg: rgba(148, 163, 184, 0.08);
+  --tc-muted-bg: rgba(255, 255, 255, 0.05);
 }
 
 /* ---------- Header ---------- */
