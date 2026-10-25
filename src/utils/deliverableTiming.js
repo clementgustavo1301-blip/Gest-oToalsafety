@@ -1,5 +1,35 @@
 // Utilitários padronizados para status e prazos de entregáveis e programas SST
 
+export function parseSafeDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  if (typeof val === 'string') {
+    const s = val.trim();
+    // Verifica formato DD/MM/YYYY ou DD-MM-YYYY
+    const brMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (brMatch) {
+      const day = parseInt(brMatch[1], 10);
+      const month = parseInt(brMatch[2], 10) - 1;
+      const year = parseInt(brMatch[3], 10);
+      const d = new Date(year, month, day);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    // Verifica formato YYYY-MM-DD
+    const isoMatch = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (isoMatch) {
+      const year = parseInt(isoMatch[1], 10);
+      const month = parseInt(isoMatch[2], 10) - 1;
+      const day = parseInt(isoMatch[3], 10);
+      const d = new Date(year, month, day);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export function isDelivered(d) {
   if (!d) return false;
   return ['entregue', 'feito', 'concluido'].includes(d.status);
@@ -16,16 +46,16 @@ export function isItemExpired(d, refDate = new Date()) {
   // 1. Validade (se preenchida): se a data de validade já passou, está vencido
   // (independente de ter sido entregue anteriormente ou não)
   if (d.validityDate) {
-    const vDate = new Date(d.validityDate);
-    if (!isNaN(vDate.getTime()) && vDate < today) return true;
+    const vDate = parseSafeDate(d.validityDate);
+    if (vDate && vDate < today) return true;
   }
 
   // 2. Se não foi entregue, verifica a data limite / prazo de envio
   if (!isDelivered(d)) {
     const target = d.dueDate || d.dataEnvio || d.dataEmissao;
     if (target) {
-      const tDate = new Date(target);
-      if (!isNaN(tDate.getTime()) && tDate < today) return true;
+      const tDate = parseSafeDate(target);
+      if (tDate && tDate < today) return true;
     }
   }
 
@@ -43,15 +73,15 @@ export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
   if (isItemExpired(d, today)) return false;
 
   if (d.validityDate) {
-    const vDate = new Date(d.validityDate);
-    if (!isNaN(vDate.getTime()) && vDate >= today && vDate <= in30Days) return true;
+    const vDate = parseSafeDate(d.validityDate);
+    if (vDate && vDate >= today && vDate <= in30Days) return true;
   }
 
   if (!isDelivered(d)) {
     const target = d.dueDate || d.dataEnvio || d.dataEmissao;
     if (target) {
-      const tDate = new Date(target);
-      if (!isNaN(tDate.getTime()) && tDate >= today && tDate <= in30Days) return true;
+      const tDate = parseSafeDate(target);
+      if (tDate && tDate >= today && tDate <= in30Days) return true;
     }
   }
 
@@ -71,15 +101,15 @@ export function isItemExpiring60(d, refDate = new Date(), in30 = null, in60 = nu
   if (isItemExpiring30(d, today, in30Days)) return false;
 
   if (d.validityDate) {
-    const vDate = new Date(d.validityDate);
-    if (!isNaN(vDate.getTime()) && vDate > in30Days && vDate <= in60Days) return true;
+    const vDate = parseSafeDate(d.validityDate);
+    if (vDate && vDate > in30Days && vDate <= in60Days) return true;
   }
 
   if (!isDelivered(d)) {
     const target = d.dueDate || d.dataEnvio || d.dataEmissao;
     if (target) {
-      const tDate = new Date(target);
-      if (!isNaN(tDate.getTime()) && tDate > in30Days && tDate <= in60Days) return true;
+      const tDate = parseSafeDate(target);
+      if (tDate && tDate > in30Days && tDate <= in60Days) return true;
     }
   }
 
