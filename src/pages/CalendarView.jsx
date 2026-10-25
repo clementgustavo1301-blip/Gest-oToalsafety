@@ -214,14 +214,14 @@ const CalendarView = () => {
           }}
         >
           {/* Day Number */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px' }}>
             <span style={{ 
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: isMobile ? '20px' : '22px', height: isMobile ? '20px' : '22px', borderRadius: '50%',
+              width: isMobile ? '18px' : '19px', height: isMobile ? '18px' : '19px', borderRadius: '50%',
               backgroundColor: isToday ? 'var(--primary)' : 'transparent',
               color: isToday ? 'white' : 'inherit',
               fontWeight: isToday || isSelected ? '700' : '600',
-              fontSize: isMobile ? '0.7rem' : '0.75rem'
+              fontSize: isMobile ? '0.64rem' : '0.68rem'
             }}>
               {format(day, 'd')}
             </span>
@@ -247,11 +247,11 @@ const CalendarView = () => {
                   <div
                     key={ev.id}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '3px',
+                      display: 'flex', alignItems: 'center', gap: '2px',
                       backgroundColor: sc.bg, color: sc.color,
                       borderLeft: `2px solid ${isExt ? '#8b5cf6' : sc.color}`,
-                      padding: '1px 3px', borderRadius: '2px',
-                      fontSize: '0.52rem', fontWeight: '700',
+                      padding: '1px 2px', borderRadius: '2px',
+                      fontSize: '0.5rem', fontWeight: '700',
                       overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                       lineHeight: 1.15
                     }}
@@ -269,7 +269,7 @@ const CalendarView = () => {
                 );
               })}
               {dayEvents.length > 2 && (
-                <span style={{ fontSize: '0.52rem', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.5rem', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'center' }}>
                   +{dayEvents.length - 2}
                 </span>
               )}
@@ -283,7 +283,7 @@ const CalendarView = () => {
             const remaining = dayEvents.length - maxVisible;
 
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
                 {visibleEvents.map((event) => {
                   const sc = STATUS_CONFIG[event.status] || STATUS_CONFIG.agendado;
                   const isExt = event.isExternal || event.demandType === 'externa' || (event.description && event.description.includes('[EXTERNAL_COMPANY:'));
@@ -316,33 +316,33 @@ const CalendarView = () => {
                       title={`${displayGroup} • ${event.title} (${categoryTitle}) (${event.time || ''})`}
                       style={{
                         backgroundColor: sc.bg, color: sc.color,
-                        borderLeft: `3px solid ${isExt ? '#8b5cf6' : sc.color}`,
+                        borderLeft: `2.5px solid ${isExt ? '#8b5cf6' : sc.color}`,
                         display: 'flex', flexDirection: 'column',
-                        gap: '1px', padding: '2px 5px', borderRadius: '3px',
+                        gap: '1px', padding: '1.5px 3.5px', borderRadius: '3px',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                       }}
                     >
                       {/* Line 1: Category Dot + Group Name (Prominent & Uppercase) + Time */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '3px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', minWidth: 0, flex: 1 }}>
                           <span 
                             title={categoryTitle}
                             style={{
-                              width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                              width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
                               backgroundColor: categoryColor,
                               boxShadow: `0 0 0 1px ${categoryColor}40`
                             }} 
                           />
                           <span style={{ 
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', 
-                            fontWeight: '700', fontSize: '0.67rem', letterSpacing: '0.01em',
+                            fontWeight: '700', fontSize: '0.62rem', letterSpacing: '0.01em',
                             color: isExt ? '#7c3aed' : sc.color
                           }}>
                             {isExt ? `⚡ ${displayGroup}` : displayGroup}
                           </span>
                         </div>
                         {timeShort && (
-                          <span style={{ opacity: 0.85, fontSize: '0.58rem', flexShrink: 0, fontWeight: '600' }}>
+                          <span style={{ opacity: 0.85, fontSize: '0.54rem', flexShrink: 0, fontWeight: '600' }}>
                             {timeShort}
                           </span>
                         )}
@@ -351,8 +351,8 @@ const CalendarView = () => {
                       {/* Line 2: Activity Title */}
                       <span style={{ 
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', 
-                        fontSize: '0.63rem', opacity: 0.9, fontWeight: '500',
-                        paddingLeft: '10px'
+                        fontSize: '0.57rem', opacity: 0.9, fontWeight: '500',
+                        paddingLeft: '8px'
                       }}>
                         {event.title}
                       </span>
@@ -361,8 +361,8 @@ const CalendarView = () => {
                 })}
                 {remaining > 0 && (
                   <div style={{
-                    fontSize: '0.62rem', fontWeight: '700', color: 'var(--primary)',
-                    textAlign: 'center', padding: '1px 6px', borderRadius: '10px',
+                    fontSize: '0.56rem', fontWeight: '700', color: 'var(--primary)',
+                    textAlign: 'center', padding: '0.5px 4px', borderRadius: '8px',
                     backgroundColor: 'var(--primary-light)', alignSelf: 'center',
                     marginTop: '1px'
                   }}>
@@ -812,18 +812,18 @@ const CalendarView = () => {
           <button 
             className="btn btn-primary" 
             onClick={() => setShowModal(true)}
-            style={{ padding: '0.38rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
             title="Agendar Treinamento para Cliente TotalSafety ou Demanda Externa"
           >
-            <Plus size={15} /> Novo Agendamento
+            <Plus size={14} /> Novo Agendamento
           </button>
           <button 
             className="btn btn-secondary" 
             onClick={() => setShowScheduleModal(true)}
-            style={{ padding: '0.38rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
             title="Gerar Cronograma da Agenda em Formato Calendário A4 ou Tabela"
           >
-            <CalendarIcon size={15} /> Cronograma (A4)
+            <CalendarIcon size={14} /> Cronograma (A4)
           </button>
         </div>
       </div>
@@ -835,20 +835,20 @@ const CalendarView = () => {
           {/* Calendar Toolbar: Month Nav & Filters */}
           <div style={{
             display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
-            gap: '0.6rem', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)'
+            gap: '0.5rem', padding: '0.5rem 0.85rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)'
           }}>
             {/* Month Navigation */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <button onClick={prevMonth} className="btn btn-secondary" style={{ padding: '0.3rem 0.45rem' }} title="Mês anterior">
-                <ChevronLeft size={16} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <button onClick={prevMonth} className="btn btn-secondary" style={{ padding: '0.25rem 0.4rem' }} title="Mês anterior">
+                <ChevronLeft size={14} />
               </button>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: '700', textTransform: 'capitalize', minWidth: '135px', textAlign: 'center', margin: 0 }}>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: '700', textTransform: 'capitalize', minWidth: '125px', textAlign: 'center', margin: 0 }}>
                 {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
               </h2>
-              <button onClick={nextMonth} className="btn btn-secondary" style={{ padding: '0.3rem 0.45rem' }} title="Próximo mês">
-                <ChevronRight size={16} />
+              <button onClick={nextMonth} className="btn btn-secondary" style={{ padding: '0.25rem 0.4rem' }} title="Próximo mês">
+                <ChevronRight size={14} />
               </button>
-              <button onClick={() => setCurrentDate(new Date())} className="btn btn-secondary" style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}>
+              <button onClick={() => setCurrentDate(new Date())} className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem' }}>
                 Hoje
               </button>
             </div>

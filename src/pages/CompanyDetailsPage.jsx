@@ -15,6 +15,13 @@ import DeliverablesViewer from '../components/DeliverablesViewer';
 import AddDeliverableModal from '../components/AddDeliverableModal';
 import EditDeliverableModal from '../components/EditDeliverableModal';
 import EditCompanyModal from '../components/EditCompanyModal';
+import {
+  isDelivered,
+  isItemExpired,
+  isItemExpiring30,
+  isItemExpiring60,
+  getDeliverableTimingInfo
+} from '../utils/deliverableTiming';
 
 const TABS = [
   { id: 'overview', label: 'Visão Geral', icon: <Building2 size={16} /> },
@@ -104,40 +111,42 @@ const CompanyDetailsPage = () => {
   const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   const in60Days = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
 
-  const isDelivered = (d) => ['entregue', 'feito', 'concluido'].includes(d.status);
-  const deliveredDeliverablesList = deliverables.filter(isDelivered);
-  const pendingDeliverablesList = deliverables.filter(d => !isDelivered(d) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
-  
-  // A Vencer em até 30 dias (ou já vencidos)
-  const expiring30 = pendingDeliverablesList.filter(d => {
-    const targetDate = d.validityDate || d.dueDate || d.dataEnvio;
-    if (!targetDate) return false;
-    const dt = new Date(targetDate);
-    return dt <= in30Days;
-  });
+  const activeDeliverables = deliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+
+  // Vencidos (validade expirada ou prazo de envio passado)
+  const expiredDeliverablesList = activeDeliverables.filter(d => isItemExpired(d, today));
+
+  // A Vencer em até 30 dias (excluindo os já vencidos)
+  const expiring30 = activeDeliverables.filter(d => isItemExpiring30(d, today, in30Days));
 
   // A Vencer em 60 dias (entre 31 e 60 dias)
-  const expiring60 = pendingDeliverablesList.filter(d => {
-    const targetDate = d.validityDate || d.dueDate || d.dataEnvio;
-    if (!targetDate) return false;
-    const dt = new Date(targetDate);
-    return dt > in30Days && dt <= in60Days;
-  });
+  const expiring60 = activeDeliverables.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
 
-  // Mais de 60 dias ou sem prazo crítico
-  const regularDeliverables = pendingDeliverablesList.filter(d => {
-    const targetDate = d.validityDate || d.dueDate || d.dataEnvio;
-    if (!targetDate) return true;
-    const dt = new Date(targetDate);
-    return dt > in60Days;
-  });
+  // Entregues e vigentes (válidos, sem prazo expirado ou crítico)
+  const deliveredDeliverablesList = activeDeliverables.filter(d => 
+    isDelivered(d) && 
+    !isItemExpired(d, today) && 
+    !isItemExpiring30(d, today, in30Days) && 
+    !isItemExpiring60(d, today, in30Days, in60Days)
+  );
 
-  const totalDeliverablesCount = deliveredDeliverablesList.length + pendingDeliverablesList.length;
+  // Pendentes regulares (mais de 60 dias ou sem prazo crítico)
+  const regularDeliverables = activeDeliverables.filter(d => 
+    !isDelivered(d) && 
+    !isItemExpired(d, today) && 
+    !isItemExpiring30(d, today, in30Days) && 
+    !isItemExpiring60(d, today, in30Days, in60Days)
+  );
+
+  const pendingDeliverablesList = activeDeliverables.filter(d => !isDelivered(d));
+
+  const totalDeliverablesCount = activeDeliverables.length;
   const totalForBar = totalDeliverablesCount || 1;
-  const pctDelivered = Math.round((deliveredDeliverablesList.length / totalForBar) * 100);
+  const pctExpired = Math.round((expiredDeliverablesList.length / totalForBar) * 100);
   const pct30 = Math.round((expiring30.length / totalForBar) * 100);
   const pct60 = Math.round((expiring60.length / totalForBar) * 100);
-  const pctRegular = Math.max(0, 100 - pctDelivered - pct30 - pct60);
+  const pctDelivered = Math.round((deliveredDeliverablesList.length / totalForBar) * 100);
+  const pctRegular = Math.max(0, 100 - pctExpired - pct30 - pct60 - pctDelivered);
 
   const handleUpdateGestao = async (field, value) => {
     const updates = { [field]: value };
@@ -266,7 +275,7 @@ const CompanyDetailsPage = () => {
                   <CheckCircle2 size={20} color="var(--primary)" /> Visão Geral de Conformidade e Gestão SST
                 </h2>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  Acompanhamento de entregáveis a vencer (30 e 60 dias) e status dos programas de gestão SST
+                  Acompanhamento de programas e entregáveis vencidos ou a vencer (30 e 60 dias) e gestão SST
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
@@ -275,38 +284,68 @@ const CompanyDetailsPage = () => {
                 </span>
                 <span style={{ color: 'var(--border)' }}>•</span>
                 <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: '#10b981' }}>
-                  Entregues: <strong>{deliveredDeliverablesList.length}</strong>
+                  Entregues/Vigentes: <strong>{deliveredDeliverablesList.length}</strong>
                 </span>
+                {expiredDeliverablesList.length > 0 && (
+                  <>
+                    <span style={{ color: 'var(--border)' }}>•</span>
+                    <span style={{
+                      fontSize: '0.8125rem', fontWeight: '700', color: '#dc2626',
+                      backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '1rem',
+                      display: 'inline-flex', alignItems: 'center', gap: '4px'
+                    }}>
+                      <AlertTriangle size={13} /> Vencidos: <strong>{expiredDeliverablesList.length}</strong>
+                    </span>
+                  </>
+                )}
+                {expiring30.length > 0 && (
+                  <>
+                    <span style={{ color: 'var(--border)' }}>•</span>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: '#ea580c' }}>
+                      A Vencer (≤30d): <strong>{expiring30.length}</strong>
+                    </span>
+                  </>
+                )}
+                {expiring60.length > 0 && (
+                  <>
+                    <span style={{ color: 'var(--border)' }}>•</span>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: '#b45309' }}>
+                      A Vencer (≤60d): <strong>{expiring60.length}</strong>
+                    </span>
+                  </>
+                )}
                 <span style={{ color: 'var(--border)' }}>•</span>
-                <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: pendingDeliverablesList.length > 0 ? '#ef4444' : 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
                   Pendentes: <strong>{pendingDeliverablesList.length}</strong>
                 </span>
               </div>
             </div>
 
-            {/* Barra Visual: Entregues + A Vencer 60 dias e 30 dias */}
+            {/* Barra Visual: Vencidos + A Vencer 30/60 dias + Vigentes */}
             <div style={{ backgroundColor: 'var(--background)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.625rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  <AlertTriangle size={15} color="#f59e0b" /> Status e Prazos dos Entregáveis
+                  <AlertTriangle size={15} color={expiredDeliverablesList.length > 0 ? '#dc2626' : '#f59e0b'} /> Status e Prazos dos Entregáveis
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  Olhar barra verde, amarelo e vermelho ({pctDelivered}% concluído)
+                  {expiredDeliverablesList.length > 0 
+                    ? `⚠️ ${expiredDeliverablesList.length} programa(s)/entregável(is) vencido(s)!` 
+                    : `${pctDelivered}% concluído e vigente`}
                 </span>
               </div>
 
               {/* Barra segmentada */}
               <div style={{ height: '14px', width: '100%', borderRadius: '7px', display: 'flex', overflow: 'hidden', backgroundColor: '#e2e8f0', marginBottom: '0.75rem' }}>
-                {deliveredDeliverablesList.length > 0 && (
+                {expiredDeliverablesList.length > 0 && (
                   <div 
-                    style={{ width: `${(deliveredDeliverablesList.length / totalForBar) * 100}%`, backgroundColor: '#10b981', transition: 'width 0.3s' }} 
-                    title={`Entregues (Concluídos): ${deliveredDeliverablesList.length} (${pctDelivered}%)`}
+                    style={{ width: `${(expiredDeliverablesList.length / totalForBar) * 100}%`, backgroundColor: '#dc2626', transition: 'width 0.3s' }} 
+                    title={`Vencidos (Crítico): ${expiredDeliverablesList.length}`}
                   />
                 )}
-                {regularDeliverables.length > 0 && (
+                {expiring30.length > 0 && (
                   <div 
-                    style={{ width: `${(regularDeliverables.length / totalForBar) * 100}%`, backgroundColor: '#3b82f6', transition: 'width 0.3s' }} 
-                    title={`Mais de 60 dias / Regular: ${regularDeliverables.length} (${pctRegular}%)`}
+                    style={{ width: `${(expiring30.length / totalForBar) * 100}%`, backgroundColor: '#ea580c', transition: 'width 0.3s' }} 
+                    title={`A Vencer em até 30 dias: ${expiring30.length}`}
                   />
                 )}
                 {expiring60.length > 0 && (
@@ -315,10 +354,16 @@ const CompanyDetailsPage = () => {
                     title={`A Vencer em 60 dias (Alerta): ${expiring60.length}`}
                   />
                 )}
-                {expiring30.length > 0 && (
+                {deliveredDeliverablesList.length > 0 && (
                   <div 
-                    style={{ width: `${(expiring30.length / totalForBar) * 100}%`, backgroundColor: '#ef4444', transition: 'width 0.3s' }} 
-                    title={`Crítico / A Vencer em até 30 dias: ${expiring30.length}`}
+                    style={{ width: `${(deliveredDeliverablesList.length / totalForBar) * 100}%`, backgroundColor: '#10b981', transition: 'width 0.3s' }} 
+                    title={`Entregues / Vigentes: ${deliveredDeliverablesList.length} (${pctDelivered}%)`}
+                  />
+                )}
+                {regularDeliverables.length > 0 && (
+                  <div 
+                    style={{ width: `${(regularDeliverables.length / totalForBar) * 100}%`, backgroundColor: '#94a3b8', transition: 'width 0.3s' }} 
+                    title={`Pendentes Regulares (>60 dias): ${regularDeliverables.length}`}
                   />
                 )}
                 {totalDeliverablesCount === 0 && (
@@ -328,22 +373,28 @@ const CompanyDetailsPage = () => {
 
               {/* Legenda dos indicadores */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.8125rem' }}>
+                {expiredDeliverablesList.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#dc2626', display: 'inline-block' }} />
+                    <span style={{ color: '#dc2626', fontWeight: '700' }}>Vencidos: <strong>{expiredDeliverablesList.length}</strong></span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
-                  <span>Entregues: <strong style={{ color: '#10b981' }}>{deliveredDeliverablesList.length}</strong></span>
+                  <span>Entregues/Vigentes: <strong style={{ color: '#10b981' }}>{deliveredDeliverablesList.length}</strong></span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block' }} />
-                  <span>A Vencer em <strong>30 dias</strong> (Crítico): <strong style={{ color: '#ef4444' }}>{expiring30.length}</strong></span>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ea580c', display: 'inline-block' }} />
+                  <span>A Vencer em <strong>30 dias</strong>: <strong style={{ color: '#ea580c' }}>{expiring30.length}</strong></span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#f59e0b', display: 'inline-block' }} />
-                  <span>A Vencer em <strong>60 dias</strong> (Alerta): <strong style={{ color: '#f59e0b' }}>{expiring60.length}</strong></span>
+                  <span>A Vencer em <strong>60 dias</strong>: <strong style={{ color: '#f59e0b' }}>{expiring60.length}</strong></span>
                 </div>
                 {regularDeliverables.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'inline-block' }} />
-                    <span>Mais de 60 dias: <strong style={{ color: '#3b82f6' }}>{regularDeliverables.length}</strong></span>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#94a3b8', display: 'inline-block' }} />
+                    <span>Mais de 60 dias: <strong style={{ color: '#64748b' }}>{regularDeliverables.length}</strong></span>
                   </div>
                 )}
               </div>
@@ -517,22 +568,26 @@ const CompanyDetailsPage = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {programs.map(prog => {
-                  const isDone = prog.status === 'entregue' || prog.status === 'feito';
-                  const style = isDone
-                    ? { bg: 'var(--secondary-light)', color: 'var(--secondary-hover)' }
-                    : prog.status === 'pendente'
-                      ? { bg: '#fef3c7', color: '#b45309' }
-                      : { bg: 'var(--primary-light)', color: 'var(--primary)' };
+                  const timing = getDeliverableTimingInfo(prog, today);
+                  const isExpired = timing.isExpired;
                   
                   return (
                     <div key={prog.id} style={{
-                      padding: '1rem', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)', backgroundColor: 'var(--background)',
+                      padding: '1rem', 
+                      border: isExpired ? '1px solid #fca5a5' : '1px solid var(--border)',
+                      borderLeft: isExpired ? '4px solid #dc2626' : undefined,
+                      borderRadius: 'var(--radius-md)', 
+                      backgroundColor: isExpired ? '#fef2f2' : 'var(--background)',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                     }}>
                       <div>
-                        <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                        <h4 style={{ fontWeight: '600', fontSize: '0.875rem', color: isExpired ? '#b91c1c' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           {prog.title}
+                          {isExpired && (
+                            <span style={{ fontSize: '0.6875rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#dc2626', color: '#fff', fontWeight: '700' }}>
+                              ⚠️ VENCIDO
+                            </span>
+                          )}
                         </h4>
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                           <span>
@@ -543,9 +598,9 @@ const CompanyDetailsPage = () => {
                             </strong>
                           </span>
                           <span>
-                            Validade: <strong style={{ color: prog.validityDate && new Date(prog.validityDate) < new Date(new Date().setHours(0,0,0,0)) ? 'var(--danger)' : 'var(--text-primary)' }}>
+                            Validade: <strong style={{ color: isExpired ? '#dc2626' : 'var(--text-primary)', fontWeight: isExpired ? '700' : '600' }}>
                               {prog.validityDate 
-                                ? new Date(prog.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) 
+                                ? `${new Date(prog.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}${isExpired ? ' (Expirada)' : ''}` 
                                 : (prog.dueDate ? new Date(prog.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não informada')}
                             </strong>
                           </span>
@@ -553,11 +608,12 @@ const CompanyDetailsPage = () => {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <span style={{
-                          fontSize: '0.75rem', padding: '0.125rem 0.5rem',
-                          borderRadius: '1rem', backgroundColor: style.bg,
-                          color: style.color, fontWeight: '500', textTransform: 'capitalize', whiteSpace: 'nowrap'
+                          fontSize: '0.75rem', padding: '0.2rem 0.6rem',
+                          borderRadius: '1rem', backgroundColor: timing.bg,
+                          color: timing.color, border: `1px solid ${timing.border}`,
+                          fontWeight: '700', textTransform: 'capitalize', whiteSpace: 'nowrap'
                         }}>
-                          {prog.status}
+                          {timing.label}
                         </span>
                         {prog.fileName && (
                           <button

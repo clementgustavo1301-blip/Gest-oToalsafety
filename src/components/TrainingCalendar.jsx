@@ -149,10 +149,10 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: '28px', height: '28px', borderRadius: '50%',
+              width: '19px', height: '19px', borderRadius: '50%',
               backgroundColor: isToday ? 'var(--primary)' : 'transparent',
               color: isToday ? 'white' : 'inherit',
-              fontWeight: isToday ? 'bold' : 'normal', fontSize: '0.875rem'
+              fontWeight: isToday ? 'bold' : 'normal', fontSize: '0.68rem'
             }}>
               {format(day, 'd')}
             </span>
@@ -169,31 +169,31 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
               return (
                 <div key={t.id} className="calendar-event-item" style={{
                   backgroundColor: sc.bg, color: sc.color,
-                  borderRadius: '3px', borderLeft: `3px solid ${sc.color}`,
-                  overflow: 'hidden', fontWeight: '500'
+                  borderRadius: '3px', borderLeft: `2.5px solid ${sc.color}`,
+                  overflow: 'hidden', fontWeight: '500', padding: '1px 3px'
                 }}>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="calendar-event-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</span>
-                    {t.time && <span className="calendar-event-time" style={{ opacity: 0.8, marginLeft: '0.25rem', flexShrink: 0 }}>{t.time.split(' ')[0]}</span>}
+                    <span className="calendar-event-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.58rem' }}>{t.title}</span>
+                    {t.time && <span className="calendar-event-time" style={{ opacity: 0.8, marginLeft: '0.2rem', flexShrink: 0, fontSize: '0.52rem' }}>{t.time.split(' ')[0]}</span>}
                   </div>
                 </div>
               );
             };
 
             return (
-              <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div style={{ marginTop: '0.15rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                 {manhaEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div className="calendar-period-label" style={{ fontSize: '0.5625rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sunrise size={10} /> Manhã
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <div className="calendar-period-label" style={{ fontSize: '0.52rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.15rem', opacity: 0.9 }}>
+                      <Sunrise size={9} /> Manhã
                     </div>
                     {manhaEvents.map(renderItem)}
                   </div>
                 )}
                 {tardeEvents.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                    <div className="calendar-period-label" style={{ fontSize: '0.5625rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.2rem', opacity: 0.9 }}>
-                      <Sun size={10} /> Tarde
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <div className="calendar-period-label" style={{ fontSize: '0.52rem', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.15rem', opacity: 0.9 }}>
+                      <Sun size={9} /> Tarde
                     </div>
                     {tardeEvents.map(renderItem)}
                   </div>
@@ -224,61 +224,62 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
   return (
     <div>
       {/* Stats */}
-      <div className="grid-responsive-stats" style={{ marginBottom: '1.5rem' }}>
+      <div className="grid-responsive-stats" style={{ marginBottom: '0.75rem' }}>
         {[
           { label: 'Agendados', value: agendados, ...STATUS_CONFIG.agendado },
           { label: 'Concluídos', value: concluidos, ...STATUS_CONFIG.concluido },
           { label: 'Adiados', value: adiados, ...STATUS_CONFIG.adiado },
           { label: 'Não Feitos', value: naoFeitos, ...STATUS_CONFIG.nao_feito },
         ].map((s, i) => (
-          <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem 1rem' }}>
+          <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.75rem' }}>
             <div style={{
-              width: '36px', height: '36px', borderRadius: '50%',
+              width: '28px', height: '28px', borderRadius: '50%',
               backgroundColor: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: s.color
+              color: s.color, flexShrink: 0
             }}>
               {s.icon}
             </div>
             <div>
-              <span style={{ fontSize: '1.25rem', fontWeight: '700', color: s.color }}>{s.value}</span>
-              <span style={{ display: 'block', fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{s.label}</span>
+              <span style={{ fontSize: '1.05rem', fontWeight: '700', color: s.color }}>{s.value}</span>
+              <span style={{ display: 'block', fontSize: '0.64rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{s.label}</span>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1.5rem' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1rem' }}>
         {/* Calendar Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)'
+          padding: '0.6rem 0.85rem', borderBottom: '1px solid var(--border)'
         }}>
-          <h2 className="text-h2" style={{ textTransform: 'capitalize' }}>
+          <h2 className="text-h2" style={{ textTransform: 'capitalize', fontSize: '0.95rem', margin: 0 }}>
             {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
           </h2>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={prevMonth} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
-              <ChevronLeft size={20} />
+          <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <button onClick={prevMonth} className="btn btn-secondary" style={{ padding: '0.25rem 0.4rem' }}>
+              <ChevronLeft size={15} />
             </button>
-            <button onClick={() => setCurrentDate(new Date())} className="btn btn-secondary">
+            <button onClick={() => setCurrentDate(new Date())} className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem' }}>
               Hoje
             </button>
-            <button onClick={nextMonth} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
-              <ChevronRight size={20} />
+            <button onClick={nextMonth} className="btn btn-secondary" style={{ padding: '0.25rem 0.4rem' }}>
+              <ChevronRight size={15} />
             </button>
             <button
               className="btn btn-secondary"
               onClick={() => setShowScheduleModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.6rem', fontSize: '0.74rem' }}
               title="Gerar Cronograma desta Empresa em Formato Calendário A4 ou Tabela"
             >
-              <FileText size={15} /> Gerar Cronograma (A4)
+              <FileText size={13} /> Gerar Cronograma (A4)
             </button>
             <button
               className="btn btn-primary"
               onClick={() => { setSelectedDate(format(new Date(), 'yyyy-MM-dd')); setShowModal(true); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.6rem', fontSize: '0.74rem' }}
             >
-              <Plus size={16} /> Agendar
+              <Plus size={14} /> Agendar
             </button>
           </div>
         </div>
@@ -292,8 +293,8 @@ const TrainingCalendar = ({ companyId, onUpdate }) => {
             }}>
               {weekDays.map(d => (
                 <div key={d} style={{
-                  padding: '0.625rem', textAlign: 'center', fontWeight: '600',
-                  fontSize: '0.8125rem', color: 'var(--text-secondary)'
+                  padding: '0.35rem', textAlign: 'center', fontWeight: '600',
+                  fontSize: '0.72rem', color: 'var(--text-secondary)'
                 }}>
                   {d}
                 </div>

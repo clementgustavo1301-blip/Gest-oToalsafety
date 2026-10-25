@@ -1,0 +1,134 @@
+// Utilitários padronizados para status e prazos de entregáveis e programas SST
+
+export function isDelivered(d) {
+  if (!d) return false;
+  return ['entregue', 'feito', 'concluido'].includes(d.status);
+}
+
+export function isItemExpired(d, refDate = new Date()) {
+  if (!d) return false;
+  if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
+  if (d.status === 'vencido') return true;
+
+  const today = new Date(refDate);
+  today.setHours(0, 0, 0, 0);
+
+  // 1. Validade (se preenchida): se a data de validade já passou, está vencido
+  // (independente de ter sido entregue anteriormente ou não)
+  if (d.validityDate) {
+    const vDate = new Date(d.validityDate);
+    if (!isNaN(vDate.getTime()) && vDate < today) return true;
+  }
+
+  // 2. Se não foi entregue, verifica a data limite / prazo de envio
+  if (!isDelivered(d)) {
+    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+    if (target) {
+      const tDate = new Date(target);
+      if (!isNaN(tDate.getTime()) && tDate < today) return true;
+    }
+  }
+
+  return false;
+}
+
+export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
+  if (!d) return false;
+  if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
+
+  const today = new Date(refDate);
+  today.setHours(0, 0, 0, 0);
+  const in30Days = in30 || new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  if (isItemExpired(d, today)) return false;
+
+  if (d.validityDate) {
+    const vDate = new Date(d.validityDate);
+    if (!isNaN(vDate.getTime()) && vDate >= today && vDate <= in30Days) return true;
+  }
+
+  if (!isDelivered(d)) {
+    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+    if (target) {
+      const tDate = new Date(target);
+      if (!isNaN(tDate.getTime()) && tDate >= today && tDate <= in30Days) return true;
+    }
+  }
+
+  return false;
+}
+
+export function isItemExpiring60(d, refDate = new Date(), in30 = null, in60 = null) {
+  if (!d) return false;
+  if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
+
+  const today = new Date(refDate);
+  today.setHours(0, 0, 0, 0);
+  const in30Days = in30 || new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const in60Days = in60 || new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+  if (isItemExpired(d, today)) return false;
+  if (isItemExpiring30(d, today, in30Days)) return false;
+
+  if (d.validityDate) {
+    const vDate = new Date(d.validityDate);
+    if (!isNaN(vDate.getTime()) && vDate > in30Days && vDate <= in60Days) return true;
+  }
+
+  if (!isDelivered(d)) {
+    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+    if (target) {
+      const tDate = new Date(target);
+      if (!isNaN(tDate.getTime()) && tDate > in30Days && tDate <= in60Days) return true;
+    }
+  }
+
+  return false;
+}
+
+export function getDeliverableTimingInfo(d, refDate = new Date()) {
+  const today = new Date(refDate);
+  today.setHours(0, 0, 0, 0);
+  const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const in60Days = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+  if (!d) {
+    return { statusKey: 'pendente', label: 'Pendente', bg: '#fef3c7', color: '#b45309', border: '#fde68a' };
+  }
+
+  if (d.status === 'cancelado') {
+    return { statusKey: 'cancelado', label: 'Cancelado', bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1' };
+  }
+  if (d.status === 'nao_se_aplica') {
+    return { statusKey: 'nao_se_aplica', label: 'Não Se Aplica', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' };
+  }
+
+  const expired = isItemExpired(d, today);
+  if (expired) {
+    return { statusKey: 'vencido', label: 'Vencido', bg: '#fee2e2', color: '#dc2626', border: '#fca5a5', isExpired: true };
+  }
+
+  const exp30 = isItemExpiring30(d, today, in30Days);
+  if (exp30) {
+    return { statusKey: 'expiring30', label: 'A Vencer (≤30d)', bg: '#fff7ed', color: '#c2410c', border: '#fdba74', isExpiring30: true };
+  }
+
+  const exp60 = isItemExpiring60(d, today, in30Days, in60Days);
+  if (exp60) {
+    return { statusKey: 'expiring60', label: 'A Vencer (≤60d)', bg: '#fffbeb', color: '#b45309', border: '#fde68a', isExpiring60: true };
+  }
+
+  if (isDelivered(d)) {
+    return { statusKey: 'entregue', label: 'Entregue', bg: '#dcfce7', color: '#15803d', border: '#86efac', isDelivered: true };
+  }
+
+  if (d.status === 'em_elaboracao') {
+    return { statusKey: 'em_elaboracao', label: 'Em Elaboração', bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
+  }
+
+  if (d.status === 'agendado') {
+    return { statusKey: 'agendado', label: 'Agendado', bg: '#f0fdfa', color: '#0d9488', border: '#99f6e4' };
+  }
+
+  return { statusKey: 'pendente', label: 'Pendente', bg: '#fef3c7', color: '#b45309', border: '#fde68a' };
+}

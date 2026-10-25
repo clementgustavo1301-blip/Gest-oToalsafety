@@ -9,6 +9,13 @@ import { useAuth } from '../context/AuthContext';
 import {
   getContracts, getDeliverables, getTrainings, getCompanies, getGroups, getProfiles
 } from '../services/storageService';
+import {
+  isDelivered,
+  isItemExpired,
+  isItemExpiring30,
+  isItemExpiring60,
+  getDeliverableTimingInfo
+} from '../utils/deliverableTiming';
 
 // Helpers de normalização e comparação de nomes
 function normalizeName(str) {
@@ -140,42 +147,40 @@ const Dashboard = () => {
 
   // Análise Global de Entregáveis
   const deliverablesAnalysis = useMemo(() => {
-    const delivered = deliverables.filter(isDelivered);
-    const pending = deliverables.filter(d => !isDelivered(d) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
-    const expiring30 = [];
-    const expiring60 = [];
-    const regular = [];
+    const activeDeliverables = deliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+    const expired = activeDeliverables.filter(d => isItemExpired(d, today));
+    const expiring30 = activeDeliverables.filter(d => isItemExpiring30(d, today, in30Days));
+    const expiring60 = activeDeliverables.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
+    const delivered = activeDeliverables.filter(d => 
+      isDelivered(d) && 
+      !isItemExpired(d, today) && 
+      !isItemExpiring30(d, today, in30Days) && 
+      !isItemExpiring60(d, today, in30Days, in60Days)
+    );
+    const regular = activeDeliverables.filter(d => 
+      !isDelivered(d) && 
+      !isItemExpired(d, today) && 
+      !isItemExpiring30(d, today, in30Days) && 
+      !isItemExpiring60(d, today, in30Days, in60Days)
+    );
+    const pending = activeDeliverables.filter(d => !isDelivered(d));
 
-    pending.forEach(d => {
-      const targetDate = d.validityDate || d.dueDate || d.dataEnvio;
-      if (!targetDate) {
-        regular.push(d);
-        return;
-      }
-      const dt = new Date(targetDate);
-      if (dt <= in30Days) {
-        expiring30.push(d);
-      } else if (dt <= in60Days) {
-        expiring60.push(d);
-      } else {
-        regular.push(d);
-      }
-    });
-
-    const total = delivered.length + pending.length || 1;
+    const total = activeDeliverables.length || 1;
     return {
-      total: delivered.length + pending.length,
+      total: activeDeliverables.length,
       delivered,
       pending,
+      expired,
       expiring30,
       expiring60,
       regular,
       pctDelivered: Math.round((delivered.length / total) * 100),
+      pctExpired: Math.round((expired.length / total) * 100),
       pct30: Math.round((expiring30.length / total) * 100),
       pct60: Math.round((expiring60.length / total) * 100),
-      pctRegular: Math.max(0, 100 - Math.round((delivered.length / total) * 100) - Math.round((expiring30.length / total) * 100) - Math.round((expiring60.length / total) * 100)),
+      pctRegular: Math.max(0, 100 - Math.round((delivered.length / total) * 100) - Math.round((expired.length / total) * 100) - Math.round((expiring30.length / total) * 100) - Math.round((expiring60.length / total) * 100)),
     };
-  }, [deliverables, in30Days, in60Days]);
+  }, [deliverables, today, in30Days, in60Days]);
 
   // Identificação do Usuário Logado
   const loggedUserName = userProfile?.name || user?.user_metadata?.full_name || '';
@@ -247,33 +252,31 @@ const Dashboard = () => {
       );
       const companyIds = new Set(relatedCompanies.map(c => c.id));
       const respDeliverables = deliverables.filter(d => companyIds.has(d.companyId));
-      const deliveredDeliverables = respDeliverables.filter(isDelivered);
-      const pendingDeliverables = respDeliverables.filter(d => !isDelivered(d) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
-
-      const exp30 = pendingDeliverables.filter(d => {
-        const dt = d.validityDate || d.dueDate || d.dataEnvio;
-        return dt && new Date(dt) <= in30Days;
-      });
-
-      const exp60 = pendingDeliverables.filter(d => {
-        const dt = d.validityDate || d.dueDate || d.dataEnvio;
-        if (!dt) return false;
-        const target = new Date(dt);
-        return target > in30Days && target <= in60Days;
-      });
+      const activeRespDeliv = respDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+      const expired = activeRespDeliv.filter(d => isItemExpired(d, today));
+      const exp30 = activeRespDeliv.filter(d => isItemExpiring30(d, today, in30Days));
+      const exp60 = activeRespDeliv.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
+      const deliveredDeliverables = activeRespDeliv.filter(d => 
+        isDelivered(d) && 
+        !isItemExpired(d, today) && 
+        !isItemExpiring30(d, today, in30Days) && 
+        !isItemExpiring60(d, today, in30Days, in60Days)
+      );
+      const pendingDeliverables = activeRespDeliv.filter(d => !isDelivered(d));
 
       return {
         name,
         companies: relatedCompanies,
         totalCompanies: relatedCompanies.length,
-        totalDeliverables: deliveredDeliverables.length + pendingDeliverables.length,
+        totalDeliverables: activeRespDeliv.length,
         deliveredCount: deliveredDeliverables.length,
         pendingDeliverablesCount: pendingDeliverables.length,
+        expiredCount: expired.length,
         exp30Count: exp30.length,
         exp60Count: exp60.length,
       };
     }).filter(r => r.totalCompanies > 0);
-  }, [responsiblesList, companiesWithHeritage, deliverables, in30Days, in60Days, loggedUserName, loggedUserId]);
+  }, [responsiblesList, companiesWithHeritage, deliverables, today, in30Days, in60Days, loggedUserName, loggedUserId]);
 
   // Dados exclusivos para a pessoa selecionada (ou usuário logado)
   const selectedPersonData = useMemo(() => {
@@ -292,37 +295,44 @@ const Dashboard = () => {
 
     const companyIds = new Set(personCompanies.map(c => c.id));
     const personDeliverables = deliverables.filter(d => companyIds.has(d.companyId));
-    const delivered = personDeliverables.filter(isDelivered);
-    const pending = personDeliverables.filter(d => !isDelivered(d) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+    const activePersonDeliv = personDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+    const expired = activePersonDeliv.filter(d => isItemExpired(d, today));
+    const exp30 = activePersonDeliv.filter(d => isItemExpiring30(d, today, in30Days));
+    const exp60 = activePersonDeliv.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
+    const delivered = activePersonDeliv.filter(d => 
+      isDelivered(d) && 
+      !isItemExpired(d, today) && 
+      !isItemExpiring30(d, today, in30Days) && 
+      !isItemExpiring60(d, today, in30Days, in60Days)
+    );
+    const regular = activePersonDeliv.filter(d => 
+      !isDelivered(d) && 
+      !isItemExpired(d, today) && 
+      !isItemExpiring30(d, today, in30Days) && 
+      !isItemExpiring60(d, today, in30Days, in60Days)
+    );
+    const pending = activePersonDeliv.filter(d => !isDelivered(d));
 
-    const exp30 = pending.filter(d => {
-      const dt = d.validityDate || d.dueDate || d.dataEnvio;
-      return dt && new Date(dt) <= in30Days;
-    });
-
-    const exp60 = pending.filter(d => {
-      const dt = d.validityDate || d.dueDate || d.dataEnvio;
-      if (!dt) return false;
-      const target = new Date(dt);
-      return target > in30Days && target <= in60Days;
-    });
-
-    const regular = pending.filter(d => {
-      const dt = d.validityDate || d.dueDate || d.dataEnvio;
-      if (!dt) return true;
-      return new Date(dt) > in60Days;
-    });
-
-    const total = delivered.length + pending.length || 1;
+    const total = activePersonDeliv.length || 1;
     const pctDelivered = Math.round((delivered.length / total) * 100);
+    const pctExpired = Math.round((expired.length / total) * 100);
     const pct30 = Math.round((exp30.length / total) * 100);
     const pct60 = Math.round((exp60.length / total) * 100);
-    const pctRegular = Math.max(0, 100 - pctDelivered - pct30 - pct60);
+    const pctRegular = Math.max(0, 100 - pctDelivered - pctExpired - pct30 - pct60);
 
     const getCompName = (id) => personCompanies.find(c => c.id === id)?.name || 'Empresa';
 
-    const upcomingDeliverables = pending
-      .sort((a, b) => (a.validityDate || a.dueDate || a.dataEnvio || '9999').localeCompare(b.validityDate || b.dueDate || b.dataEnvio || '9999'))
+    // Priorizar vencidos e com prazo crítico na lista de ação
+    const upcomingDeliverables = [...expired, ...exp30, ...exp60, ...regular]
+      .sort((a, b) => {
+        const expA = isItemExpired(a, today);
+        const expB = isItemExpired(b, today);
+        if (expA && !expB) return -1;
+        if (!expA && expB) return 1;
+        const dateA = a.validityDate || a.dueDate || a.dataEnvio || '9999-12-31';
+        const dateB = b.validityDate || b.dueDate || b.dataEnvio || '9999-12-31';
+        return dateA.localeCompare(dateB);
+      })
       .slice(0, 6)
       .map(d => ({
         ...d,
@@ -362,10 +372,12 @@ const Dashboard = () => {
       deliverables: personDeliverables,
       delivered,
       pending,
+      expired,
       exp30,
       exp60,
       regular,
       pctDelivered,
+      pctExpired,
       pct30,
       pct60,
       pctRegular,
@@ -373,6 +385,32 @@ const Dashboard = () => {
       upcomingTrainings,
     };
   }, [activePerson, companiesWithHeritage, deliverables, trainings, in30Days, in60Days, loggedUserName, loggedUserId]);
+
+  // Empresas que possuem programas ou entregáveis vencidos (Consolidado)
+  const companiesWithExpiredList = useMemo(() => {
+    const map = new Map();
+    deliverables.forEach(d => {
+      if (isItemExpired(d, today)) {
+        if (!map.has(d.companyId)) {
+          map.set(d.companyId, []);
+        }
+        map.get(d.companyId).push(d);
+      }
+    });
+
+    return Array.from(map.entries()).map(([compId, items]) => {
+      const comp = companiesWithHeritage.find(c => c.id === compId);
+      const programs = items.filter(it => it.type === 'programa');
+      return {
+        companyId: compId,
+        company: comp,
+        expiredItems: items,
+        expiredPrograms: programs,
+        hasExpiredPrograms: programs.length > 0,
+      };
+    }).filter(entry => entry.company)
+      .sort((a, b) => (b.hasExpiredPrograms - a.hasExpiredPrograms) || (b.expiredItems.length - a.expiredItems.length));
+  }, [deliverables, companiesWithHeritage, today]);
 
   if (loading || authLoading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Carregando dados do painel...</div>;
@@ -384,20 +422,28 @@ const Dashboard = () => {
   const attentionItems = trainings.filter(t => t.status === 'nao_feito' || t.status === 'adiado').length;
 
   const globalStats = [
-    { title: 'Grupos Cadastrados', value: String(groups.length), icon: <Building2 size={24} color="var(--info)" />, trend: 'Total de grupos' },
-    { title: 'Empresas Ativas', value: String(companies.length), icon: <Building2 size={24} color="var(--primary)" />, trend: 'Matrizes e filiais' },
-    { title: 'Contratos Ativos', value: String(activeContracts), icon: <FileText size={24} color="var(--primary)" />, trend: `${contracts.length} total` },
-    { title: 'Entregáveis Pendentes', value: String(pendingDeliverables), icon: <Clock size={24} color="var(--warning)" />, trend: 'Aguardando ação' },
-    { title: 'Treinamentos Concluídos', value: String(completedTrainings), icon: <Users size={24} color="var(--secondary)" />, trend: `de ${trainings.length} agendados` },
-    { title: 'Atenção Requerida', value: String(attentionItems), icon: <AlertTriangle size={24} color="var(--danger)" />, trend: 'Adiados / Não feitos' },
+    { title: 'Grupos Cadastrados', value: String(groups.length), icon: <Building2 size={16} color="var(--info)" />, trend: 'Total de grupos' },
+    { title: 'Empresas Ativas', value: String(companies.length), icon: <Building2 size={16} color="var(--primary)" />, trend: 'Matrizes e filiais' },
+    { title: 'Contratos Ativos', value: String(activeContracts), icon: <FileText size={16} color="var(--primary)" />, trend: `${contracts.length} total` },
+    { title: 'Entregáveis Pendentes', value: String(pendingDeliverables), icon: <Clock size={16} color="var(--warning)" />, trend: 'Aguardando ação' },
+    { title: 'Treinamentos Concluídos', value: String(completedTrainings), icon: <Users size={16} color="var(--secondary)" />, trend: `de ${trainings.length} agendados` },
+    { title: 'Atenção Requerida', value: String(attentionItems), icon: <AlertTriangle size={16} color="var(--danger)" />, trend: 'Adiados / Não feitos' },
   ];
 
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
 
   const globalUpcomingDeliverables = deliverables
-    .filter(d => !isDelivered(d) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica')
-    .sort((a, b) => (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31'))
-    .slice(0, 5)
+    .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && (isItemExpired(d, today) || !isDelivered(d)))
+    .sort((a, b) => {
+      const expA = isItemExpired(a, today);
+      const expB = isItemExpired(b, today);
+      if (expA && !expB) return -1;
+      if (!expA && expB) return 1;
+      const dateA = a.validityDate || a.dueDate || a.dataEnvio || '9999-12-31';
+      const dateB = b.validityDate || b.dueDate || b.dataEnvio || '9999-12-31';
+      return dateA.localeCompare(dateB);
+    })
+    .slice(0, 6)
     .map(d => ({
       ...d,
       companyName: getCompanyName(d.companyId),
@@ -427,13 +473,13 @@ const Dashboard = () => {
   const globalUpcomingTrainings = [...globalUpcomingTrainingsScheduled, ...globalPendingTrainingDeliverables].slice(0, 5);
 
   const statusIcons = {
-    concluido: <CheckCircle color="var(--secondary)" size={18} />,
-    pendente: <Clock color="var(--warning)" size={18} />,
-    em_elaboracao: <AlertTriangle color="var(--primary)" size={18} />,
-    agendado: <Clock color="var(--info)" size={18} />,
-    adiado: <PauseCircle color="#b45309" size={18} />,
-    nao_feito: <XCircle color="var(--danger)" size={18} />,
-    entregue: <CheckCircle color="var(--secondary)" size={18} />,
+    concluido: <CheckCircle color="var(--secondary)" size={14} />,
+    pendente: <Clock color="var(--warning)" size={14} />,
+    em_elaboracao: <AlertTriangle color="var(--primary)" size={14} />,
+    agendado: <Clock color="var(--info)" size={14} />,
+    adiado: <PauseCircle color="#b45309" size={14} />,
+    nao_feito: <XCircle color="var(--danger)" size={14} />,
+    entregue: <CheckCircle color="var(--secondary)" size={14} />,
   };
 
   const statusLabels = {
@@ -454,13 +500,13 @@ const Dashboard = () => {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header Superior */}
-      <header className="header-responsive" style={{ marginBottom: '1.25rem' }}>
+      <header className="header-responsive" style={{ marginBottom: '1rem' }}>
         <div>
           <h1 className="text-h1">Dashboard</h1>
           <p className="text-subtitle">Gestão TotalSafety — Supervisor ou Técnico Responsável e Visão Geral</p>
         </div>
-        <Link to="/companies" className="btn btn-primary">
-          <Building2 size={18} /> Ver Empresas
+        <Link to="/companies" className="btn btn-primary" style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem' }}>
+          <Building2 size={14} /> Ver Empresas
         </Link>
       </header>
 
@@ -468,12 +514,12 @@ const Dashboard = () => {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.5rem',
-        padding: '0.375rem',
+        gap: '0.35rem',
+        padding: '0.25rem',
         backgroundColor: 'var(--surface-hover, #f1f5f9)',
-        borderRadius: 'var(--radius-lg, 12px)',
+        borderRadius: 'var(--radius-md, 8px)',
         border: '1px solid var(--border, #e2e8f0)',
-        marginBottom: '1.75rem',
+        marginBottom: '1rem',
         width: 'fit-content'
       }}>
         <button
@@ -482,20 +528,20 @@ const Dashboard = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1.25rem',
-            borderRadius: 'var(--radius-md, 8px)',
+            gap: '0.35rem',
+            padding: '0.35rem 0.85rem',
+            borderRadius: 'var(--radius-sm, 6px)',
             border: 'none',
-            fontSize: '0.875rem',
+            fontSize: '0.78rem',
             fontWeight: dashMode === 'responsavel' ? '700' : '500',
             backgroundColor: dashMode === 'responsavel' ? 'var(--primary, #0ea5e9)' : 'transparent',
             color: dashMode === 'responsavel' ? '#ffffff' : 'var(--text-secondary, #64748b)',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
-            boxShadow: dashMode === 'responsavel' ? '0 2px 8px rgba(14, 165, 233, 0.3)' : 'none'
+            boxShadow: dashMode === 'responsavel' ? '0 2px 6px rgba(14, 165, 233, 0.25)' : 'none'
           }}
         >
-          <UserCheck size={16} /> #1 Supervisor ou Técnico Responsável
+          <UserCheck size={14} /> #1 Supervisor ou Técnico Responsável
         </button>
 
         <button
@@ -504,20 +550,20 @@ const Dashboard = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1.25rem',
-            borderRadius: 'var(--radius-md, 8px)',
+            gap: '0.35rem',
+            padding: '0.35rem 0.85rem',
+            borderRadius: 'var(--radius-sm, 6px)',
             border: 'none',
-            fontSize: '0.875rem',
+            fontSize: '0.78rem',
             fontWeight: dashMode === 'overview' ? '700' : '500',
             backgroundColor: dashMode === 'overview' ? 'var(--primary, #0ea5e9)' : 'transparent',
             color: dashMode === 'overview' ? '#ffffff' : 'var(--text-secondary, #64748b)',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
-            boxShadow: dashMode === 'overview' ? '0 2px 8px rgba(14, 165, 233, 0.3)' : 'none'
+            boxShadow: dashMode === 'overview' ? '0 2px 6px rgba(14, 165, 233, 0.25)' : 'none'
           }}
         >
-          <Building2 size={16} /> #2 Visão Geral
+          <Building2 size={14} /> #2 Visão Geral
         </button>
       </div>
 
@@ -528,28 +574,28 @@ const Dashboard = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Barra de Filtro e Contexto */}
-          <div className="card" style={{ padding: '1.125rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="card" style={{ padding: '0.65rem 0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
               <div style={{
-                width: '38px', height: '38px', borderRadius: '50%',
+                width: '30px', height: '30px', borderRadius: '50%',
                 backgroundColor: 'var(--primary-light)', display: 'flex',
-                alignItems: 'center', justifyContent: 'center'
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0
               }}>
-                <UserCheck size={20} color="var(--primary)" />
+                <UserCheck size={16} color="var(--primary)" />
               </div>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                     Painel do Colaborador:
                   </span>
                   {activePerson !== 'all' && (
-                    <strong style={{ color: 'var(--primary)', fontSize: '0.9375rem' }}>
+                    <strong style={{ color: 'var(--primary)', fontSize: '0.82rem' }}>
                       {activePerson}
                     </strong>
                   )}
                   {isCurrentActiveUser && (
                     <span style={{
-                      fontSize: '0.7rem', fontWeight: '700', padding: '0.15rem 0.5rem',
+                      fontSize: '0.65rem', fontWeight: '700', padding: '0.1rem 0.45rem',
                       borderRadius: '1rem', backgroundColor: '#e0f2fe', color: '#0369a1',
                       border: '1px solid #bae6fd'
                     }}>
@@ -557,23 +603,23 @@ const Dashboard = () => {
                     </span>
                   )}
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                   Visualizando apenas empresas atribuídas como Supervisor ou Técnico Responsável
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Filter size={16} color="var(--text-secondary)" />
-              <label htmlFor="select-responsible-filter" style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                Supervisor ou Técnico Responsável:
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <Filter size={14} color="var(--text-secondary)" />
+              <label htmlFor="select-responsible-filter" style={{ fontSize: '0.74rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                Supervisor ou Técnico:
               </label>
               <select
                 id="select-responsible-filter"
                 value={activePerson}
                 onChange={(e) => setFilterResp(e.target.value)}
                 className="modal-input"
-                style={{ minWidth: '260px', padding: '0.45rem 0.75rem', fontSize: '0.8125rem' }}
+                style={{ minWidth: '220px', padding: '0.3rem 0.65rem', fontSize: '0.76rem', minHeight: '28px' }}
               >
                 {responsiblesList.map(r => {
                   const isUser = isSamePerson(r.name, loggedUserName);
@@ -592,21 +638,21 @@ const Dashboard = () => {
 
           {/* MODO 1: DASHBOARD DEDICADO DO PROFISSIONAL (PADRÃO AO ENTRAR) */}
           {activePerson !== 'all' && selectedPersonData && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               
               {/* Se o usuário não possui empresas atribuídas */}
               {selectedPersonData.totalCompanies === 0 ? (
-                <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-secondary)' }}>
-                  <UserCheck size={56} style={{ opacity: 0.3, marginBottom: '1rem', color: 'var(--primary)' }} />
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                <div className="card" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-secondary)' }}>
+                  <UserCheck size={42} style={{ opacity: 0.3, marginBottom: '0.75rem', color: 'var(--primary)' }} />
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                     Nenhuma empresa vinculada para {activePerson}
                   </h3>
-                  <p style={{ maxWidth: '480px', margin: '0 auto 1.25rem auto', fontSize: '0.875rem' }}>
+                  <p style={{ maxWidth: '480px', margin: '0 auto 1rem auto', fontSize: '0.78rem' }}>
                     {isCurrentActiveUser 
                       ? 'Você ainda não foi designado como Supervisor ou Técnico Responsável em nenhuma empresa cadastrada. Selecione outro colaborador no filtro acima ou vincule empresas ao seu nome na página de Empresas.'
                       : 'Este colaborador não possui empresas vinculadas como Supervisor ou Técnico Responsável no momento.'}
                   </p>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.55rem' }}>
                     <button 
                       type="button" 
                       onClick={() => setFilterResp('all')} 
@@ -623,94 +669,115 @@ const Dashboard = () => {
                 <>
                   {/* Grid de Métricas do Responsável */}
                   <div className="grid-responsive-stats">
-                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <p className="text-subtitle" style={{ marginBottom: '0.25rem' }}>Empresas Atendidas</p>
-                          <h3 className="text-h1" style={{ margin: 0 }}>{selectedPersonData.totalCompanies}</h3>
+                          <p className="text-subtitle" style={{ marginBottom: '0.15rem' }}>Empresas Atendidas</p>
+                          <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem' }}>{selectedPersonData.totalCompanies}</h3>
                         </div>
-                        <div style={{ padding: '0.75rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-md)' }}>
-                          <Building2 size={24} color="var(--primary)" />
+                        <div style={{ padding: '0.45rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-sm)' }}>
+                          <Building2 size={16} color="var(--primary)" />
                         </div>
                       </div>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
                         Total sob sua gestão
                       </p>
                     </div>
 
-                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <p className="text-subtitle" style={{ marginBottom: '0.25rem' }}>Como Supervisor</p>
-                          <h3 className="text-h1" style={{ margin: 0, color: '#0369a1' }}>{selectedPersonData.asSupervisor.length}</h3>
+                          <p className="text-subtitle" style={{ marginBottom: '0.15rem' }}>Como Supervisor</p>
+                          <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem', color: '#0369a1' }}>{selectedPersonData.asSupervisor.length}</h3>
                         </div>
-                        <div style={{ padding: '0.75rem', backgroundColor: '#e0f2fe', borderRadius: 'var(--radius-md)' }}>
-                          <ShieldCheck size={24} color="#0369a1" />
+                        <div style={{ padding: '0.45rem', backgroundColor: '#e0f2fe', borderRadius: 'var(--radius-sm)' }}>
+                          <ShieldCheck size={16} color="#0369a1" />
                         </div>
                       </div>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
                         Supervisão do grupo ou empresa
                       </p>
                     </div>
 
-                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <p className="text-subtitle" style={{ marginBottom: '0.25rem' }}>Como Técnico Responsável</p>
-                          <h3 className="text-h1" style={{ margin: 0, color: '#0f766e' }}>{selectedPersonData.asTecnico.length}</h3>
+                          <p className="text-subtitle" style={{ marginBottom: '0.15rem' }}>Como Técnico Responsável</p>
+                          <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem', color: '#0f766e' }}>{selectedPersonData.asTecnico.length}</h3>
                         </div>
-                        <div style={{ padding: '0.75rem', backgroundColor: '#ccfbf1', borderRadius: 'var(--radius-md)' }}>
-                          <UserCheck size={24} color="#0f766e" />
+                        <div style={{ padding: '0.45rem', backgroundColor: '#ccfbf1', borderRadius: 'var(--radius-sm)' }}>
+                          <UserCheck size={16} color="#0f766e" />
                         </div>
                       </div>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
                         Atendimento e visitas técnicas
                       </p>
                     </div>
 
-                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <p className="text-subtitle" style={{ marginBottom: '0.25rem' }}>Entregáveis Pendentes</p>
-                          <h3 className="text-h1" style={{ margin: 0, color: selectedPersonData.pending.length > 0 ? '#b45309' : '#15803d' }}>
+                          <p className="text-subtitle" style={{ marginBottom: '0.15rem' }}>Entregáveis Pendentes</p>
+                          <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem', color: selectedPersonData.pending.length > 0 ? '#b45309' : '#15803d' }}>
                             {selectedPersonData.pending.length}
                           </h3>
                         </div>
-                        <div style={{ padding: '0.75rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-md)' }}>
-                          <Clock size={24} color="var(--warning)" />
+                        <div style={{ padding: '0.45rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-sm)' }}>
+                          <Clock size={16} color="var(--warning)" />
                         </div>
                       </div>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
                         {selectedPersonData.delivered.length} entregues ({selectedPersonData.pctDelivered}%)
                       </p>
                     </div>
 
-                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="card" style={{
+                      display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem',
+                      border: selectedPersonData.expired?.length > 0 ? '1px solid #fca5a5' : '1px solid var(--border)',
+                      backgroundColor: selectedPersonData.expired?.length > 0 ? '#fef2f2' : 'var(--surface)'
+                    }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <p className="text-subtitle" style={{ marginBottom: '0.25rem' }}>A Vencer ≤ 30 Dias</p>
-                          <h3 className="text-h1" style={{ margin: 0, color: '#ef4444' }}>{selectedPersonData.exp30.length}</h3>
+                          <p className="text-subtitle" style={{ marginBottom: '0.15rem', color: selectedPersonData.expired?.length > 0 ? '#991b1b' : 'var(--text-secondary)' }}>Vencidos (SST / Validade)</p>
+                          <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem', color: selectedPersonData.expired?.length > 0 ? '#dc2626' : 'var(--text-primary)' }}>
+                            {selectedPersonData.expired?.length || 0}
+                          </h3>
                         </div>
-                        <div style={{ padding: '0.75rem', backgroundColor: '#fee2e2', borderRadius: 'var(--radius-md)' }}>
-                          <AlertTriangle size={24} color="#ef4444" />
+                        <div style={{ padding: '0.45rem', backgroundColor: selectedPersonData.expired?.length > 0 ? '#fee2e2' : 'var(--background)', borderRadius: 'var(--radius-sm)' }}>
+                          <AlertTriangle size={16} color={selectedPersonData.expired?.length > 0 ? '#dc2626' : 'var(--text-secondary)'} />
                         </div>
                       </div>
-                      <p style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: '600' }}>
+                      <p style={{ fontSize: '0.68rem', color: selectedPersonData.expired?.length > 0 ? '#b91c1c' : 'var(--text-secondary)', fontWeight: '600' }}>
+                        {selectedPersonData.expired?.length > 0 ? '⚠️ Requer Renovação Imediata' : 'Nenhum item vencido'}
+                      </p>
+                    </div>
+
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <p className="text-subtitle" style={{ marginBottom: '0.15rem' }}>A Vencer ≤ 30 Dias</p>
+                          <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem', color: '#ef4444' }}>{selectedPersonData.exp30.length}</h3>
+                        </div>
+                        <div style={{ padding: '0.45rem', backgroundColor: '#fee2e2', borderRadius: 'var(--radius-sm)' }}>
+                          <AlertTriangle size={16} color="#ef4444" />
+                        </div>
+                      </div>
+                      <p style={{ fontSize: '0.68rem', color: '#b91c1c', fontWeight: '600' }}>
                         🔴 Prazo Crítico
                       </p>
                     </div>
 
-                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <p className="text-subtitle" style={{ marginBottom: '0.25rem' }}>A Vencer em 60 Dias</p>
-                          <h3 className="text-h1" style={{ margin: 0, color: '#f59e0b' }}>{selectedPersonData.exp60.length}</h3>
+                          <p className="text-subtitle" style={{ marginBottom: '0.15rem' }}>A Vencer em 60 Dias</p>
+                          <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem', color: '#f59e0b' }}>{selectedPersonData.exp60.length}</h3>
                         </div>
-                        <div style={{ padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: 'var(--radius-md)' }}>
-                          <Clock size={24} color="#f59e0b" />
+                        <div style={{ padding: '0.45rem', backgroundColor: '#fef3c7', borderRadius: 'var(--radius-sm)' }}>
+                          <Clock size={16} color="#f59e0b" />
                         </div>
                       </div>
-                      <p style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>
+                      <p style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: '600' }}>
                         🟡 Alerta de Vencimento
                       </p>
                     </div>
@@ -746,16 +813,22 @@ const Dashboard = () => {
                             title={`Entregues / Concluídos: ${selectedPersonData.delivered.length}`}
                           />
                         )}
-                        {selectedPersonData.exp60.length > 0 && (
+                        {selectedPersonData.expired?.length > 0 && (
                           <div
-                            style={{ width: `${selectedPersonData.pct60}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s' }}
-                            title={`A Vencer em 60 dias (Alerta): ${selectedPersonData.exp60.length}`}
+                            style={{ width: `${selectedPersonData.pctExpired}%`, backgroundColor: '#dc2626', transition: 'width 0.3s' }}
+                            title={`Vencidos / Atrasados: ${selectedPersonData.expired.length}`}
                           />
                         )}
                         {selectedPersonData.exp30.length > 0 && (
                           <div
                             style={{ width: `${selectedPersonData.pct30}%`, backgroundColor: '#ef4444', transition: 'width 0.3s' }}
                             title={`A Vencer em até 30 dias (Crítico): ${selectedPersonData.exp30.length}`}
+                          />
+                        )}
+                        {selectedPersonData.exp60.length > 0 && (
+                          <div
+                            style={{ width: `${selectedPersonData.pct60}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s' }}
+                            title={`A Vencer em 60 dias (Alerta): ${selectedPersonData.exp60.length}`}
                           />
                         )}
                         {selectedPersonData.regular.length > 0 && (
@@ -776,6 +849,19 @@ const Dashboard = () => {
                           <div>
                             <span style={{ color: '#15803d', fontWeight: '500', fontSize: '0.75rem' }}>Entregues / Concluídos</span>
                             <strong style={{ display: 'block', fontSize: '1rem', color: '#15803d' }}>{selectedPersonData.delivered.length}</strong>
+                          </div>
+                        </div>
+
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem',
+                          backgroundColor: selectedPersonData.expired?.length > 0 ? '#fef2f2' : '#f8fafc',
+                          border: selectedPersonData.expired?.length > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0',
+                          borderRadius: 'var(--radius-sm)'
+                        }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#dc2626', flexShrink: 0 }} />
+                          <div>
+                            <span style={{ color: selectedPersonData.expired?.length > 0 ? '#b91c1c' : '#64748b', fontWeight: '500', fontSize: '0.75rem' }}>Vencidos / Atrasados</span>
+                            <strong style={{ display: 'block', fontSize: '1rem', color: selectedPersonData.expired?.length > 0 ? '#dc2626' : '#64748b' }}>{selectedPersonData.expired?.length || 0}</strong>
                           </div>
                         </div>
 
@@ -832,18 +918,12 @@ const Dashboard = () => {
                         const isSup = isCompanySupervisor(c, activePerson, isSamePerson(activePerson, loggedUserName) ? loggedUserId : undefined);
                         const isTec = isCompanyTecnico(c, activePerson, isSamePerson(activePerson, loggedUserName) ? loggedUserId : undefined);
 
-                        const compDeliverables = deliverables.filter(d => d.companyId === c.id);
-                        const compPending = compDeliverables.filter(d => !isDelivered(d) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
-                        const compExp30 = compPending.filter(d => {
-                          const dt = d.validityDate || d.dueDate || d.dataEnvio;
-                          return dt && new Date(dt) <= in30Days;
-                        });
-                        const compExp60 = compPending.filter(d => {
-                          const dt = d.validityDate || d.dueDate || d.dataEnvio;
-                          if (!dt) return false;
-                          const target = new Date(dt);
-                          return target > in30Days && target <= in60Days;
-                        });
+                        const compDeliverables = deliverables.filter(d => d.companyId === c.id && d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+                        const compExpired = compDeliverables.filter(d => isItemExpired(d, today));
+                        const compExp30 = compDeliverables.filter(d => isItemExpiring30(d, today, in30Days));
+                        const compExp60 = compDeliverables.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
+                        const compPending = compDeliverables.filter(d => !isDelivered(d));
+                        const compExpiredPrograms = compExpired.filter(d => d.type === 'programa');
 
                         return (
                           <div
@@ -851,7 +931,8 @@ const Dashboard = () => {
                             style={{
                               padding: '1.125rem',
                               backgroundColor: 'var(--background)',
-                              border: '1px solid var(--border)',
+                              border: compExpired.length > 0 ? '1px solid #fca5a5' : '1px solid var(--border)',
+                              borderLeft: compExpired.length > 0 ? '4px solid #dc2626' : undefined,
                               borderRadius: 'var(--radius-md)',
                               display: 'flex',
                               flexDirection: 'column',
@@ -876,6 +957,15 @@ const Dashboard = () => {
                                     {c.groupName}
                                   </span>
                                 </div>
+                                {compExpired.length > 0 && (
+                                  <span style={{
+                                    fontSize: '0.6875rem', fontWeight: '700', padding: '0.2rem 0.5rem',
+                                    borderRadius: '0.375rem', backgroundColor: '#fee2e2', color: '#dc2626',
+                                    border: '1px solid #fca5a5', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                                  }}>
+                                    <AlertTriangle size={12} /> {compExpired.length} vencido{compExpired.length !== 1 ? 's' : ''}
+                                  </span>
+                                )}
                               </div>
 
                               {/* Badges de Atuação: Supervisor / Técnico Responsável */}
@@ -915,14 +1005,26 @@ const Dashboard = () => {
                                   <Clock size={12} /> Visitas: {c.effVisitas === 'N/A' ? 'N/A' : `${c.effVisitas} dias`}
                                 </span>
                               </div>
+
+                              {compExpiredPrograms.length > 0 && (
+                                <div style={{ marginBottom: '0.5rem', fontSize: '0.72rem', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <strong>⚠️ Programas vencidos:</strong> {compExpiredPrograms.map(p => p.title.split(' ')[0]).join(', ')}
+                                </div>
+                              )}
                             </div>
 
                             {/* Rodapé do Card da Empresa */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
                               <div>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                  {compPending.length} pendente{compPending.length !== 1 ? 's' : ''}
-                                </span>
+                                {compExpired.length > 0 ? (
+                                  <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: '700' }}>
+                                    ⚠️ {compExpired.length} vencido{compExpired.length !== 1 ? 's' : ''}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                    {compPending.length} pendente{compPending.length !== 1 ? 's' : ''}
+                                  </span>
+                                )}
                                 {compExp30.length > 0 && (
                                   <span style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: '700', marginLeft: '6px' }}>
                                     🔴 {compExp30.length} ≤30d
@@ -968,6 +1070,7 @@ const Dashboard = () => {
                           ✅ Nenhum entregável pendente nas suas empresas!
                         </p>
                       ) : selectedPersonData.upcomingDeliverables.map((item) => {
+                        const isExpired = isItemExpired(item, today);
                         const sc = statusColors[item.status] || statusColors.pendente;
                         const targetDate = item.validityDate || item.dueDate || item.dataEnvio;
                         const isExpiring30 = targetDate && new Date(targetDate) <= in30Days;
@@ -976,31 +1079,37 @@ const Dashboard = () => {
                         return (
                           <div key={item.id} style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '0.75rem 0.875rem', border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius-md)', backgroundColor: 'var(--background)'
+                            padding: '0.75rem 0.875rem',
+                            border: isExpired ? '1px solid #fca5a5' : '1px solid var(--border)',
+                            borderRadius: 'var(--radius-md)',
+                            backgroundColor: isExpired ? '#fff5f5' : 'var(--background)'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                              {statusIcons[item.status] || statusIcons.pendente}
+                              {isExpired ? <AlertTriangle size={18} color="#dc2626" /> : (statusIcons[item.status] || statusIcons.pendente)}
                               <div>
-                                <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', margin: 0, fontSize: '0.8125rem' }}>
+                                <h4 style={{ fontWeight: '600', color: isExpired ? '#991b1b' : 'var(--text-primary)', margin: 0, fontSize: '0.8125rem' }}>
                                   {item.title}
                                 </h4>
                                 <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0.125rem 0 0 0' }}>
                                   {item.companyName}
-                                  {isExpiring30 && <span style={{ color: '#ef4444', fontWeight: '700', marginLeft: '6px' }}>🔴 ≤30d</span>}
-                                  {isExpiring60 && <span style={{ color: '#f59e0b', fontWeight: '700', marginLeft: '6px' }}>🟡 ≤60d</span>}
+                                  {isExpired && <span style={{ color: '#dc2626', fontWeight: '700', marginLeft: '6px' }}>⚠️ VENCIDO</span>}
+                                  {!isExpired && isExpiring30 && <span style={{ color: '#ef4444', fontWeight: '700', marginLeft: '6px' }}>🔴 ≤30d</span>}
+                                  {!isExpired && isExpiring60 && <span style={{ color: '#f59e0b', fontWeight: '700', marginLeft: '6px' }}>🟡 ≤60d</span>}
                                 </p>
                               </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <p style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-primary)', margin: '0 0 0.125rem 0' }}>
+                              <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', margin: '0 0 0.125rem 0' }}>
                                 {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}
                               </p>
                               <span style={{
                                 fontSize: '0.65rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                                backgroundColor: sc.bg, color: sc.color, fontWeight: '600'
+                                backgroundColor: isExpired ? '#fee2e2' : sc.bg,
+                                color: isExpired ? '#dc2626' : sc.color,
+                                border: isExpired ? '1px solid #fca5a5' : 'none',
+                                fontWeight: '700'
                               }}>
-                                {statusLabels[item.status] || item.status}
+                                {isExpired ? 'Vencido' : (statusLabels[item.status] || item.status)}
                               </span>
                             </div>
                           </div>
@@ -1156,50 +1265,56 @@ const Dashboard = () => {
       {/* ABA #2: VISÃO GERAL (CONSOLIDADA)                                         */}
       {/* ========================================================================= */}
       {dashMode === 'overview' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
           {/* Stats Grid Global */}
           <div className="grid-responsive-stats">
             {globalStats.map((stat, index) => (
-              <div key={index} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div key={index} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem 0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <p className="text-subtitle" style={{ marginBottom: '0.25rem' }}>{stat.title}</p>
-                    <h3 className="text-h1" style={{ margin: 0 }}>{stat.value}</h3>
+                    <p className="text-subtitle" style={{ marginBottom: '0.15rem' }}>{stat.title}</p>
+                    <h3 className="text-h1" style={{ margin: 0, fontSize: '1.25rem' }}>{stat.value}</h3>
                   </div>
                   <div style={{
-                    padding: '0.75rem',
+                    padding: '0.45rem',
                     backgroundColor: 'var(--background)',
-                    borderRadius: 'var(--radius-md)'
+                    borderRadius: 'var(--radius-sm)'
                   }}>
                     {stat.icon}
                   </div>
                 </div>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
                   {stat.trend}
                 </p>
               </div>
             ))}
           </div>
 
-          {/* Painel Central: A Vencer (Barra Amarelo e Vermelho) */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ marginBottom: '1.25rem' }}>
-              <h2 className="text-h2" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CheckCircle2 size={20} color="var(--primary)" /> Visão Geral de Prazos dos Entregáveis
+          {/* Painel Central: A Vencer e Conformidade SST */}
+          <div className="card" style={{ padding: '0.85rem 1rem' }}>
+            <div style={{ marginBottom: '0.85rem' }}>
+              <h2 className="text-h2" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <CheckCircle2 size={16} color="var(--primary)" /> Visão Geral de Conformidade e Prazos dos Entregáveis SST
               </h2>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                Consolidação geral de entregáveis a vencer em todas as empresas
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                Consolidação geral de programas SST (PGR, PCMSO, LTCAT), validades legais e entregáveis a vencer
               </p>
             </div>
 
-            {/* BARRA VISUAL COLORIDA (VERDE, AMARELO E VERMELHO) */}
-            <div style={{ backgroundColor: 'var(--background)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.625rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <AlertTriangle size={18} color="#f59e0b" /> Entregáveis a Vencer (Prazos de 30 e 60 Dias)
+            {/* BARRA VISUAL COLORIDA (VERDE, VERMELHO ESCURO, AMARELO E VERMELHO CLARO) */}
+            <div style={{ backgroundColor: 'var(--background)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.45rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <AlertTriangle size={15} color={deliverablesAnalysis.expired.length > 0 ? '#dc2626' : '#f59e0b'} />
+                  Status de Conformidade e Entregáveis
                 </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                  {deliverablesAnalysis.expired.length > 0 && (
+                    <strong style={{ color: '#dc2626', marginRight: '6px' }}>
+                      ⚠️ {deliverablesAnalysis.expired.length} Vencidos
+                    </strong>
+                  )}
                   Total Pendentes: <strong style={{ color: 'var(--text-primary)' }}>{deliverablesAnalysis.pending.length}</strong>
                 </span>
               </div>
@@ -1212,16 +1327,22 @@ const Dashboard = () => {
                     title={`Entregues / Concluídos: ${deliverablesAnalysis.delivered.length}`}
                   />
                 )}
-                {deliverablesAnalysis.expiring60.length > 0 && (
+                {deliverablesAnalysis.expired.length > 0 && (
                   <div 
-                    style={{ width: `${deliverablesAnalysis.pct60}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s' }} 
-                    title={`A Vencer em 60 dias (Alerta): ${deliverablesAnalysis.expiring60.length}`}
+                    style={{ width: `${deliverablesAnalysis.pctExpired}%`, backgroundColor: '#dc2626', transition: 'width 0.3s' }} 
+                    title={`Vencidos / Atrasados: ${deliverablesAnalysis.expired.length}`}
                   />
                 )}
                 {deliverablesAnalysis.expiring30.length > 0 && (
                   <div 
                     style={{ width: `${deliverablesAnalysis.pct30}%`, backgroundColor: '#ef4444', transition: 'width 0.3s' }} 
                     title={`A Vencer em até 30 dias (Crítico): ${deliverablesAnalysis.expiring30.length}`}
+                  />
+                )}
+                {deliverablesAnalysis.expiring60.length > 0 && (
+                  <div 
+                    style={{ width: `${deliverablesAnalysis.pct60}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s' }} 
+                    title={`A Vencer em 60 dias (Alerta): ${deliverablesAnalysis.expiring60.length}`}
                   />
                 )}
                 {deliverablesAnalysis.regular.length > 0 && (
@@ -1236,12 +1357,25 @@ const Dashboard = () => {
               </div>
 
               {/* Indicadores numéricos detalhados */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.8125rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.8125rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem', backgroundColor: '#f0fdf4', border: '1px solid #dcfce7', borderRadius: 'var(--radius-sm)' }}>
                   <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#10b981', flexShrink: 0 }} />
                   <div>
                     <span style={{ color: '#15803d', fontWeight: '500' }}>Entregues / Concluídos</span>
                     <strong style={{ display: 'block', fontSize: '1.125rem', color: '#15803d' }}>{deliverablesAnalysis.delivered.length}</strong>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem',
+                  backgroundColor: deliverablesAnalysis.expired.length > 0 ? '#fef2f2' : '#f8fafc',
+                  border: deliverablesAnalysis.expired.length > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0',
+                  borderRadius: 'var(--radius-sm)'
+                }}>
+                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#dc2626', flexShrink: 0 }} />
+                  <div>
+                    <span style={{ color: deliverablesAnalysis.expired.length > 0 ? '#b91c1c' : '#64748b', fontWeight: '500' }}>Vencidos / Atrasados</span>
+                    <strong style={{ display: 'block', fontSize: '1.125rem', color: deliverablesAnalysis.expired.length > 0 ? '#dc2626' : '#64748b' }}>{deliverablesAnalysis.expired.length}</strong>
                   </div>
                 </div>
 
@@ -1272,6 +1406,155 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* Seção Exclusiva: Empresas com Programas ou Entregáveis Vencidos */}
+          <div className="card" style={{ padding: '1.5rem', border: companiesWithExpiredList.length > 0 ? '1px solid #fca5a5' : '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h2 className="text-h2" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertTriangle size={20} color={companiesWithExpiredList.length > 0 ? '#dc2626' : 'var(--primary)'} />
+                  Empresas com Programas ou Entregáveis Vencidos
+                </h2>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                  Empresas que necessitam de renovação de programas legais de SST (PGR, PCMSO, LTCAT) ou entregáveis com validade expirada
+                </p>
+              </div>
+              <span style={{
+                fontSize: '0.75rem', fontWeight: '700', padding: '0.35rem 0.75rem',
+                borderRadius: '1rem',
+                backgroundColor: companiesWithExpiredList.length > 0 ? '#fee2e2' : '#f0fdf4',
+                color: companiesWithExpiredList.length > 0 ? '#dc2626' : '#15803d',
+                border: companiesWithExpiredList.length > 0 ? '1px solid #fca5a5' : '1px solid #dcfce7'
+              }}>
+                {companiesWithExpiredList.length > 0 
+                  ? `⚠️ ${companiesWithExpiredList.length} empresa${companiesWithExpiredList.length !== 1 ? 's' : ''} com pendência vencida`
+                  : '✅ Todas as empresas com programas em dia'}
+              </span>
+            </div>
+
+            {companiesWithExpiredList.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#f0fdf4', borderRadius: 'var(--radius-md)', border: '1px solid #dcfce7' }}>
+                <CheckCircle2 size={36} color="#16a34a" style={{ margin: '0 auto 0.5rem auto' }} />
+                <h4 style={{ margin: '0 0 0.25rem 0', color: '#166534', fontWeight: '700' }}>Todas as empresas estão em dia!</h4>
+                <p style={{ margin: 0, fontSize: '0.8125rem', color: '#15803d' }}>
+                  Não há nenhum programa legal de SST ou entregável com validade vencida registrado no sistema.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: '1rem' }}>
+                {companiesWithExpiredList.map(({ companyId, company, expiredItems, expiredPrograms, hasExpiredPrograms }) => (
+                  <div
+                    key={companyId}
+                    style={{
+                      padding: '1.25rem',
+                      backgroundColor: 'var(--background)',
+                      border: '1px solid #fca5a5',
+                      borderLeft: '4px solid #dc2626',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '0.875rem'
+                    }}
+                  >
+                    <div>
+                      {/* Topo: Nome da empresa e Grupo */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <div>
+                          <Link
+                            to={`/company/${companyId}`}
+                            style={{
+                              fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text-primary)',
+                              textDecoration: 'none', display: 'block', lineHeight: 1.3
+                            }}
+                          >
+                            {company.name}
+                          </Link>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                            {company.groupName}
+                          </span>
+                        </div>
+                        {hasExpiredPrograms && (
+                          <span style={{
+                            fontSize: '0.6875rem', fontWeight: '700', padding: '0.2rem 0.5rem',
+                            borderRadius: '0.375rem', backgroundColor: '#fee2e2', color: '#dc2626',
+                            border: '1px solid #fca5a5', whiteSpace: 'nowrap'
+                          }}>
+                            🚨 Programa Vencido
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Responsáveis da Empresa */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', marginBottom: '0.75rem', fontSize: '0.72rem' }}>
+                        <span style={{
+                          padding: '0.2rem 0.5rem', borderRadius: '0.375rem',
+                          backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe',
+                          display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                        }}>
+                          <ShieldCheck size={12} /> Sup: {company.effSupervisor}
+                        </span>
+                        <span style={{
+                          padding: '0.2rem 0.5rem', borderRadius: '0.375rem',
+                          backgroundColor: '#f0fdfa', color: '#0f766e', border: '1px solid #99f6e4',
+                          display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                        }}>
+                          <UserCheck size={12} /> Téc: {company.effTecnico}
+                        </span>
+                      </div>
+
+                      {/* Lista de Itens Vencidos */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                          Itens Vencidos ({expiredItems.length}):
+                        </span>
+                        {expiredItems.map(item => {
+                          const date = item.validityDate || item.dueDate || item.dataEnvio;
+                          const isProg = item.type === 'programa';
+                          return (
+                            <div
+                              key={item.id}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '0.375rem 0.5rem', borderRadius: 'var(--radius-sm)',
+                                backgroundColor: isProg ? '#fff1f2' : '#fef2f2',
+                                border: isProg ? '1px solid #fecdd3' : '1px solid #fee2e2',
+                                fontSize: '0.75rem'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', minWidth: 0 }}>
+                                <AlertTriangle size={13} color="#dc2626" style={{ flexShrink: 0 }} />
+                                <span style={{ fontWeight: isProg ? '700' : '600', color: '#991b1b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {item.title}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: '600', flexShrink: 0, marginLeft: '0.5rem' }}>
+                                {item.validityDate ? `Exp: ${new Date(item.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : (date ? `Venc: ${new Date(date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : 'Vencido')}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Rodapé: Link para a empresa */}
+                    <div style={{ paddingTop: '0.75rem', borderTop: '1px solid #fecaca', display: 'flex', justifyContent: 'flex-end' }}>
+                      <Link
+                        to={`/company/${companyId}`}
+                        className="btn btn-secondary"
+                        style={{
+                          padding: '0.375rem 0.75rem', fontSize: '0.75rem', gap: '0.35rem',
+                          color: '#b91c1c', borderColor: '#fca5a5', backgroundColor: '#fff'
+                        }}
+                      >
+                        Regularizar Empresa <ChevronRight size={13} />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Duas Colunas: Entregáveis Pendentes e Treinamentos Globais */}
           <div className="grid-responsive-2">
             {/* Upcoming Deliverables Globais */}
@@ -1287,6 +1570,7 @@ const Dashboard = () => {
                     ✅ Nenhum entregável pendente!
                   </p>
                 ) : globalUpcomingDeliverables.map((item) => {
+                  const isExpired = isItemExpired(item, today);
                   const sc = statusColors[item.status] || statusColors.pendente;
                   const targetDate = item.validityDate || item.dueDate || item.dataEnvio;
                   const isExpiring30 = targetDate && new Date(targetDate) <= in30Days;
@@ -1295,29 +1579,35 @@ const Dashboard = () => {
                   return (
                     <div key={item.id} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '0.875rem', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)', backgroundColor: 'var(--background)'
+                      padding: '0.875rem',
+                      border: isExpired ? '1px solid #fca5a5' : '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: isExpired ? '#fff5f5' : 'var(--background)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        {statusIcons[item.status] || statusIcons.pendente}
+                        {isExpired ? <AlertTriangle size={18} color="#dc2626" /> : (statusIcons[item.status] || statusIcons.pendente)}
                         <div>
-                          <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.125rem', fontSize: '0.875rem' }}>{item.title}</h4>
+                          <h4 style={{ fontWeight: '600', color: isExpired ? '#991b1b' : 'var(--text-primary)', marginBottom: '0.125rem', fontSize: '0.875rem' }}>{item.title}</h4>
                           <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                             {item.companyName}
-                            {isExpiring30 && <span style={{ color: '#ef4444', fontWeight: '700', marginLeft: '6px' }}>🔴 A Vencer (≤30d)</span>}
-                            {isExpiring60 && <span style={{ color: '#f59e0b', fontWeight: '700', marginLeft: '6px' }}>🟡 A Vencer (≤60d)</span>}
+                            {isExpired && <span style={{ color: '#dc2626', fontWeight: '700', marginLeft: '6px' }}>⚠️ VENCIDO</span>}
+                            {!isExpired && isExpiring30 && <span style={{ color: '#ef4444', fontWeight: '700', marginLeft: '6px' }}>🔴 A Vencer (≤30d)</span>}
+                            {!isExpired && isExpiring60 && <span style={{ color: '#f59e0b', fontWeight: '700', marginLeft: '6px' }}>🟡 A Vencer (≤60d)</span>}
                           </p>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                        <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', marginBottom: '0.25rem' }}>
                           {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}
                         </p>
                         <span style={{
                           fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
-                          backgroundColor: sc.bg, color: sc.color, fontWeight: '500'
+                          backgroundColor: isExpired ? '#fee2e2' : sc.bg,
+                          color: isExpired ? '#dc2626' : sc.color,
+                          border: isExpired ? '1px solid #fca5a5' : 'none',
+                          fontWeight: '700'
                         }}>
-                          {statusLabels[item.status] || item.status}
+                          {isExpired ? 'Vencido' : (statusLabels[item.status] || item.status)}
                         </span>
                       </div>
                     </div>

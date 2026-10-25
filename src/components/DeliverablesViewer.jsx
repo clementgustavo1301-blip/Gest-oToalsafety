@@ -9,6 +9,7 @@ import {
   uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable,
   deleteDeliverables
 } from '../services/storageService';
+import { isItemExpired, isDelivered } from '../utils/deliverableTiming';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
 
@@ -22,6 +23,7 @@ const TYPE_CONFIG = {
 };
 
 const STATUS_CONFIG = {
+  vencido: { label: 'Vencido', icon: <AlertTriangle size={14} />, color: '#dc2626', bg: '#fee2e2' },
   entregue: { label: 'Entregue', icon: <CheckCircle size={14} />, color: 'var(--secondary-hover)', bg: 'var(--secondary-light)' },
   feito: { label: 'Feito', icon: <CheckCircle size={14} />, color: 'var(--secondary-hover)', bg: 'var(--secondary-light)' },
   pendente: { label: 'Pendente', icon: <Clock size={14} />, color: '#b45309', bg: '#fef3c7' },
@@ -170,13 +172,17 @@ const DeliverablesViewer = ({ companyId }) => {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando entregáveis...</div>;
   }
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const filtered = deliverables.filter(d => {
     const matchType = filterType === 'all' || d.type === filterType;
-    const isExpired = d.validityDate ? new Date(d.validityDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+    const isExpired = isItemExpired(d, today);
     
     let matchStatus = false;
     if (filterStatus === 'all') matchStatus = true;
     else if (filterStatus === 'vencido') matchStatus = isExpired;
+    else if (filterStatus === 'entregue') matchStatus = isDelivered(d) && !isExpired;
     else matchStatus = d.status === filterStatus;
 
     const matchContract = filterContract === 'all' || d.contractId === filterContract;
@@ -189,10 +195,10 @@ const DeliverablesViewer = ({ companyId }) => {
 
   const stats = {
     total: deliverables.length,
-    entregue: deliverables.filter(d => d.status === 'entregue').length,
-    pendente: deliverables.filter(d => d.status === 'pendente').length,
+    entregue: deliverables.filter(d => isDelivered(d) && !isItemExpired(d, today)).length,
+    pendente: deliverables.filter(d => !isDelivered(d) && !isItemExpired(d, today) && d.status !== 'cancelado').length,
     em_elaboracao: deliverables.filter(d => d.status === 'em_elaboracao').length,
-    vencidos: deliverables.filter(d => d.validityDate ? new Date(d.validityDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false).length,
+    vencidos: deliverables.filter(d => isItemExpired(d, today)).length,
   };
 
   return (
@@ -433,8 +439,8 @@ const DeliverablesViewer = ({ companyId }) => {
       }>
         {filtered.map(d => {
           const typeConf = TYPE_CONFIG[d.type] || TYPE_CONFIG.contrato;
-          const statusConf = STATUS_CONFIG[d.status] || STATUS_CONFIG.pendente;
-          const isExpired = d.validityDate ? new Date(d.validityDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+          const isExpired = isItemExpired(d, today);
+          const statusConf = isExpired ? STATUS_CONFIG.vencido : (STATUS_CONFIG[d.status] || STATUS_CONFIG.pendente);
 
           return (
             <div key={d.id} className="card" style={{ 
@@ -442,8 +448,9 @@ const DeliverablesViewer = ({ companyId }) => {
               flexDirection: viewMode === 'grid' ? 'column' : 'row', 
               gap: viewMode === 'grid' ? '0.75rem' : '1.5rem',
               alignItems: viewMode === 'grid' ? 'stretch' : 'center',
-              border: selectedIds.includes(d.id) ? '1.5px solid var(--primary)' : '1px solid var(--border)',
-              backgroundColor: selectedIds.includes(d.id) ? 'rgba(14, 165, 233, 0.04)' : 'var(--surface)',
+              border: selectedIds.includes(d.id) ? '1.5px solid var(--primary)' : isExpired ? '1px solid #fca5a5' : '1px solid var(--border)',
+              borderLeft: isExpired ? '4px solid #dc2626' : undefined,
+              backgroundColor: selectedIds.includes(d.id) ? 'rgba(14, 165, 233, 0.04)' : isExpired ? '#fffbfa' : 'var(--surface)',
               transition: 'all 0.2s ease'
             }}>
               {/* Header (Type & Status for Grid, Just Type for List) */}
@@ -477,7 +484,8 @@ const DeliverablesViewer = ({ companyId }) => {
                     display: 'flex', alignItems: 'center', gap: '0.375rem',
                     padding: '0.125rem 0.5rem', borderRadius: '1rem',
                     backgroundColor: statusConf.bg, color: statusConf.color,
-                    fontSize: '0.6875rem', fontWeight: '500'
+                    border: isExpired ? '1px solid #fca5a5' : 'none',
+                    fontSize: '0.6875rem', fontWeight: isExpired ? '700' : '500'
                   }}>
                     {statusConf.icon} {statusConf.label}
                   </div>
@@ -486,7 +494,7 @@ const DeliverablesViewer = ({ companyId }) => {
 
               {/* Title & Company */}
               <div style={{ flex: viewMode === 'list' ? 1 : 'none' }}>
-                <h4 style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9375rem', lineHeight: 1.4 }}>
+                <h4 style={{ fontWeight: '600', color: isExpired ? '#991b1b' : 'var(--text-primary)', fontSize: '0.9375rem', lineHeight: 1.4 }}>
                   {d.title}
                 </h4>
                 {!companyId && d.companyName && (
@@ -499,7 +507,7 @@ const DeliverablesViewer = ({ companyId }) => {
                   <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                     {(d.dataEmissao || d.dataEnvio || d.dueDate) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio || d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
                     {d.validityDate && (
-                      <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>
+                      <span style={{ color: isExpired ? '#dc2626' : 'inherit', fontWeight: isExpired ? '700' : 'normal' }}>
                         Validade: {new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} {isExpired && '⚠️ Vencido'}
                       </span>
                     )}
@@ -518,7 +526,8 @@ const DeliverablesViewer = ({ companyId }) => {
                   display: 'flex', alignItems: 'center', gap: '0.375rem',
                   padding: '0.125rem 0.5rem', borderRadius: '1rem',
                   backgroundColor: statusConf.bg, color: statusConf.color,
-                  fontSize: '0.75rem', fontWeight: '500', flexShrink: 0,
+                  border: isExpired ? '1px solid #fca5a5' : 'none',
+                  fontSize: '0.75rem', fontWeight: isExpired ? '700' : '500', flexShrink: 0,
                   width: '120px', justifyContent: 'center'
                 }}>
                   {statusConf.icon} {statusConf.label}

@@ -33,7 +33,6 @@ import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
 import { useTheme } from '../hooks/useTheme';
 import { supabase } from '../lib/supabase';
-import SectorIcon from './SectorIcon';
 
 const routeIsActive = (pathname, path) => {
   if (path === '/' || path === '/ipa') return pathname === path;
@@ -148,25 +147,22 @@ const Sidebar = ({ isOpen, onClose }) => {
   return (
     <aside className={`sidebar ${isCollapsed ? 'sidebar--collapsed' : ''} ${isOpen ? 'sidebar-open' : ''}`}>
       <div className="sidebar__brand">
-        <img className="sidebar__logo" src="/logo-totalsafety.png" alt="TotalSafety" />
+        <div className="sidebar__brand-wrapper">
+          <img className="sidebar__logo" src="/logo-totalsafety.png" alt="TotalSafety" />
+          {activeLink && (
+            <span className="sidebar__brand-meta" title={`${activeLink.sector} · ${activeLink.role}`}>
+              {activeLink.sector} • {activeLink.role}
+            </span>
+          )}
+        </div>
         <span className="sidebar__logo-mark" aria-hidden="true">TS</span>
         <button className="sidebar__collapse hide-on-mobile" onClick={() => setIsCollapsed(value => !value)} title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}>
-          {isCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+          {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
         <button className="sidebar__close hide-on-desktop" onClick={onClose} aria-label="Fechar menu">
-          <X size={19} />
+          <X size={16} />
         </button>
       </div>
-
-      {activeLink && (
-        <div className="sidebar__context" title={`${activeLink.sector} · ${activeLink.role}`}>
-          <SectorIcon sector={activeLink.sector} size={17} />
-          <div className="sidebar__context-copy">
-            <strong>{activeLink.sector}</strong>
-            <span>{activeLink.role}</span>
-          </div>
-        </div>
-      )}
 
       <div className="sidebar__section-label">Navegação</div>
       <nav className="sidebar__nav" aria-label="Navegação principal">
@@ -179,10 +175,10 @@ const Sidebar = ({ isOpen, onClose }) => {
             return (
               <div className="sidebar__group" key={item.name}>
                 <button className={`sidebar__item ${active ? 'is-active' : ''}`} onClick={() => toggleMenu(item.name, expanded)} title={isCollapsed ? item.name : undefined} aria-expanded={expanded}>
-                  <span className="sidebar__item-icon"><Icon size={18} /></span>
+                  <span className="sidebar__item-icon"><Icon size={15} /></span>
                   <span className="sidebar__item-label">{item.name}</span>
                   {item.badge && <span className="sidebar__badge sidebar__badge--soft">{item.badge}</span>}
-                  <ChevronDown className={`sidebar__chevron ${expanded ? 'is-open' : ''}`} size={15} />
+                  <ChevronDown className={`sidebar__chevron ${expanded ? 'is-open' : ''}`} size={13} />
                 </button>
 
                 {expanded && (
@@ -192,7 +188,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                       const subActive = routeIsActive(location.pathname, subItem.path);
                       return (
                         <Link className={`sidebar__subitem ${subActive ? 'is-active' : ''}`} key={subItem.name} to={subItem.path}>
-                          <SubIcon size={16} />
+                          <SubIcon size={13} />
                           <span>{subItem.name}</span>
                         </Link>
                       );
@@ -206,7 +202,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           const active = routeIsActive(location.pathname, item.path);
           return (
             <Link className={`sidebar__item ${active ? 'is-active' : ''}`} key={item.name} to={item.path} title={isCollapsed ? item.name : undefined}>
-              <span className="sidebar__item-icon"><Icon size={18} /></span>
+              <span className="sidebar__item-icon"><Icon size={15} /></span>
               <span className="sidebar__item-label">{item.name}</span>
               {item.count > 0 && <span className="sidebar__badge">{item.count > 99 ? '99+' : item.count}</span>}
             </Link>
@@ -215,20 +211,16 @@ const Sidebar = ({ isOpen, onClose }) => {
       </nav>
 
       <div className="sidebar__footer">
-        <div className="sidebar__online" title="Sistema online">
-          <span className="sidebar__online-dot" />
-          <span>Sistema online</span>
-        </div>
         <button className="sidebar__utility" onClick={toggleTheme} title={isDark ? 'Usar tema claro' : 'Usar tema escuro'}>
-          {isDark ? <Sun size={17} /> : <Moon size={17} />}
+          {isDark ? <Sun size={14} /> : <Moon size={14} />}
           <span>{isDark ? 'Modo claro' : 'Modo escuro'}</span>
         </button>
         <button className="sidebar__utility" onClick={() => setActiveLink(null)} title="Alterar vínculo">
-          <Users size={17} />
+          <Users size={14} />
           <span>Alterar vínculo</span>
         </button>
         <button className="sidebar__utility sidebar__utility--danger" onClick={signOut} title="Sair do sistema">
-          <LogOut size={17} />
+          <LogOut size={14} />
           <span>Sair do sistema</span>
         </button>
       </div>
