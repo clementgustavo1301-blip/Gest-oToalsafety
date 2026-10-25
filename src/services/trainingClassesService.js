@@ -259,6 +259,7 @@ export async function registerStudent(studentData) {
     turma_id: studentData.turma_id,
     nome: studentData.nome.trim(),
     cpf: normalizedCpf,
+    matricula: studentData.matricula ? String(studentData.matricula).trim() : null,
     data_nascimento: studentData.data_nascimento || null,
     telefone: studentData.telefone || null,
     empresa: studentData.empresa || null,
@@ -294,6 +295,7 @@ export async function importTrainingEnrollments(turmaId, participants = []) {
         turma_id: turmaId,
         nome: participant.nome,
         cpf: participant.cpf,
+        matricula: participant.matricula || null,
         status: 'Inscrito'
       });
       return {

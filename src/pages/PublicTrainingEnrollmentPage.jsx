@@ -13,9 +13,10 @@ export default function PublicTrainingEnrollmentPage() {
   const queryTurmaId = searchParams.get('turma');
   const targetTurmaId = paramTurmaId || queryTurmaId;
 
-  // Campos digitados pelo participante: CPF e Data de Nascimento
+  // Campos digitados pelo participante: CPF, Data de Nascimento e Matrícula (opcional)
   const [cpf, setCpf] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [matricula, setMatricula] = useState('');
 
   // Nome puxado da API após informar CPF e Data de Nascimento
   const [nome, setNome] = useState('');
@@ -154,6 +155,7 @@ export default function PublicTrainingEnrollmentPage() {
         turma_id: activeTurma.id,
         nome: nome.trim(),
         cpf: formatCpf(digits),
+        matricula: matricula.trim() || null,
         data_nascimento: birthDate,
         empresa: activeTurma?.company || null,
         status: 'Inscrito'
@@ -335,6 +337,12 @@ export default function PublicTrainingEnrollmentPage() {
                     <span style={{ color: '#64748b' }}>CPF: </span>
                     <strong style={{ color: '#0f172a' }}>{successData.cpf}</strong>
                   </div>
+                  {successData.matricula && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Matrícula: </span>
+                      <strong style={{ color: '#0f172a' }}>{successData.matricula}</strong>
+                    </div>
+                  )}
                   <div>
                     <span style={{ color: '#64748b' }}>Data de Nascimento: </span>
                     <strong style={{ color: '#0f172a' }}>
@@ -350,6 +358,7 @@ export default function PublicTrainingEnrollmentPage() {
                   setSuccessData(null);
                   setCpf('');
                   setBirthDate('');
+                  setMatricula('');
                   setNome('');
                   setSearched(false);
                 }}
@@ -426,6 +435,40 @@ export default function PublicTrainingEnrollmentPage() {
                   value={birthDate}
                   onChange={handleBirthDateChange}
                   required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 0.85rem',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    color: '#0f172a',
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* CAMPO 3: MATRÍCULA (OPCIONAL) */}
+              <div>
+                <label htmlFor="matricula-input" style={{ 
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '0.875rem', 
+                  fontWeight: '600', 
+                  color: '#334155',
+                  marginBottom: '0.35rem' 
+                }}>
+                  <span>Matrícula</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '400', color: '#64748b' }}>Opcional</span>
+                </label>
+                <input
+                  id="matricula-input"
+                  type="text"
+                  value={matricula}
+                  onChange={(e) => setMatricula(e.target.value)}
+                  placeholder="Número de matrícula (opcional)"
                   style={{
                     width: '100%',
                     padding: '0.75rem 0.85rem',

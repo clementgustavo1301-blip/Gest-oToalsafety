@@ -1102,7 +1102,8 @@ const TrainingCertificatesPage = () => {
     if (studentsInTurma.length > 0) {
       setColaboradores(studentsInTurma.map(s => ({
         nome: s.nome,
-        cpf: s.cpf
+        cpf: s.cpf,
+        matricula: s.matricula || ''
       })));
       setFeedback({ 
         type: 'success', 
@@ -1126,7 +1127,7 @@ const TrainingCertificatesPage = () => {
       setEnrollments(allStudents || []);
       const studentsInTurma = (allStudents || []).filter(e => String(e.turma_id) === String(selectedTurmaIdInGenerator));
       if (studentsInTurma.length > 0) {
-        setColaboradores(studentsInTurma.map(s => ({ nome: s.nome, cpf: s.cpf })));
+        setColaboradores(studentsInTurma.map(s => ({ nome: s.nome, cpf: s.cpf, matricula: s.matricula || '' })));
         setFeedback({ 
           type: 'success', 
           text: `Inscrições sincronizadas! (${studentsInTurma.length} participantes carregados)` 
@@ -1361,7 +1362,8 @@ const TrainingCertificatesPage = () => {
 
     const matchSearch = !searchQuery.trim() || 
       e.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.cpf.includes(searchQuery);
+      e.cpf.includes(searchQuery) ||
+      (e.matricula && String(e.matricula).toLowerCase().includes(searchQuery.toLowerCase()));
 
     return matchTurma && matchSearch;
   });
@@ -2724,11 +2726,11 @@ const TrainingCertificatesPage = () => {
                     <input
                       id="tc-enrollment-search"
                       type="text"
-                      placeholder="Buscar por nome ou CPF..."
+                      placeholder="Buscar por nome, CPF ou matrícula..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="tc-input"
-                      aria-label="Buscar participante por nome ou CPF"
+                      aria-label="Buscar participante por nome, CPF ou matrícula"
                     />
                   </div>
 
@@ -2797,6 +2799,7 @@ const TrainingCertificatesPage = () => {
                       <tr>
                         <th>Participante</th>
                         <th>CPF</th>
+                        <th>Matrícula</th>
                         <th>Nascimento</th>
                         <th>Turma vinculada</th>
                         <th>Inscrição</th>
@@ -2814,7 +2817,7 @@ const TrainingCertificatesPage = () => {
                               <div>
                                 <div className="tc-person-name">{student.nome}</div>
                                 {student.empresa && (
-                                  <div className="tc-person-sub">
+                                   <div className="tc-person-sub">
                                     {student.empresa} {student.telefone ? `• ${student.telefone}` : ''}
                                   </div>
                                 )}
@@ -2822,6 +2825,7 @@ const TrainingCertificatesPage = () => {
                             </div>
                           </td>
                           <td className="tc-cell-mono">{student.cpf}</td>
+                          <td className="tc-cell-mono">{student.matricula || '-'}</td>
                           <td className="tc-cell-muted">
                             {student.data_nascimento ? new Date(student.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
                           </td>
@@ -2895,7 +2899,7 @@ const TrainingCertificatesPage = () => {
               <div className="tc-import-guide">
                 <div>
                   <strong>1. Preencha o modelo</strong>
-                  <span>Mantenha as colunas Nome e CPF. O CPF pode estar com ou sem pontuação.</span>
+                  <span>Mantenha as colunas Nome e CPF (a coluna Matrícula é opcional). O CPF pode estar com ou sem pontuação.</span>
                 </div>
                 <a
                   href={spreadsheetTemplateUrl}
@@ -2954,6 +2958,7 @@ const TrainingCertificatesPage = () => {
                           <tr>
                             <th>Nome</th>
                             <th>CPF</th>
+                            <th>Matrícula</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2961,6 +2966,7 @@ const TrainingCertificatesPage = () => {
                             <tr key={participant.cpf}>
                               <td>{participant.nome}</td>
                               <td>{participant.cpf}</td>
+                              <td>{participant.matricula || '-'}</td>
                             </tr>
                           ))}
                         </tbody>

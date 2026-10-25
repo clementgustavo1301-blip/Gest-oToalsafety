@@ -26,16 +26,19 @@ export function parseTrainingParticipantRows(rows = []) {
   let headerRowIndex = -1;
   let nameColumnIndex = -1;
   let cpfColumnIndex = -1;
+  let matriculaColumnIndex = -1;
 
   for (let rowIndex = 0; rowIndex < headerSearchLimit; rowIndex += 1) {
     const normalizedCells = (rows[rowIndex] || []).map(normalizeHeader);
     const currentNameIndex = normalizedCells.findIndex(cell => cell === 'nome' || cell === 'nome completo');
     const currentCpfIndex = normalizedCells.findIndex(cell => cell === 'cpf');
+    const currentMatriculaIndex = normalizedCells.findIndex(cell => cell.startsWith('matricula') || cell === 'registro');
 
     if (currentNameIndex >= 0 && currentCpfIndex >= 0) {
       headerRowIndex = rowIndex;
       nameColumnIndex = currentNameIndex;
       cpfColumnIndex = currentCpfIndex;
+      matriculaColumnIndex = currentMatriculaIndex;
       break;
     }
   }
@@ -53,8 +56,12 @@ export function parseTrainingParticipantRows(rows = []) {
     const rowNumber = headerRowIndex + offset + 2;
     const rawName = row?.[nameColumnIndex];
     const rawCpf = row?.[cpfColumnIndex];
+    const rawMatricula = matriculaColumnIndex >= 0 ? row?.[matriculaColumnIndex] : null;
     const nome = normalizeName(rawName);
     const cpfDigits = normalizeCpfCell(rawCpf);
+    const matricula = rawMatricula !== null && rawMatricula !== undefined && String(rawMatricula).trim() !== ''
+      ? String(rawMatricula).trim()
+      : null;
 
     if (!nome && !cpfDigits) return;
     filledRowCount += 1;
@@ -77,7 +84,11 @@ export function parseTrainingParticipantRows(rows = []) {
     }
 
     seenCpfs.add(cpfDigits);
-    participants.push({ nome, cpf: formatCpf(cpfDigits) });
+    participants.push({
+      nome,
+      cpf: formatCpf(cpfDigits),
+      matricula: matricula || null
+    });
   });
 
   if (filledRowCount === 0) {
