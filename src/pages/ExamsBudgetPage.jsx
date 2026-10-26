@@ -121,7 +121,7 @@ const ECOCLINIC_EXAMS = [
   { id: '96', name: 'Anti-HAV IgM', category: 'Sorologia', price: 30.00 },
   { id: '97', name: 'Chagas (Machado Guerreiro)', category: 'Sorologia', price: 33.00 },
   { id: '98', name: 'COVID-19 - Testes', category: 'Sorologia', price: 58.00 },
-  { id: '99', name: 'IgE Específica (Abelhas/Vespas/Marimbondo)', category: 'Imunologia', price: 45.00 },
+  { id: '99', name: 'IgE Específica (Abelhas/Vespas/Marimbondo)', category: 'Imunologia', price: 135.00 },
   { id: '100', name: 'IgE Total', category: 'Imunologia', price: 22.00 },
 ];
 
