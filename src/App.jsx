@@ -25,6 +25,7 @@ import CertificatesPage from './pages/CertificatesPage';
 import TrainingCertificatesPage from './pages/TrainingCertificatesPage';
 import PublicTrainingEnrollmentPage from './pages/PublicTrainingEnrollmentPage';
 import PublicTrainingSignPage from './pages/PublicTrainingSignPage';
+import SstTvControlCenterPage from './pages/SstTvControlCenterPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -156,6 +157,11 @@ const AppLayout = () => {
             <Route path="/ipa/*" element={
               <ProtectedRoute allowedSectors={['IPA']}>
                 <IPASystem />
+              </ProtectedRoute>
+            } />
+            <Route path="/sst/tv" element={
+              <ProtectedRoute allowedSectors={['SST', 'Diretoria', 'Admin', 'IPA']}>
+                <SstTvControlCenterPage />
               </ProtectedRoute>
             } />
           </Routes>

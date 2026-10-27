@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { 
   CheckCircle2, AlertCircle, Loader2, ArrowRight,
-  RefreshCw, Copy, Check, Search
+  RefreshCw, Copy, Check, Search, Calendar, Clock,
+  Building, User, ChevronDown
 } from 'lucide-react';
 import { formatCpf, cleanCpf, searchCpfA } from '../services/cpfService';
-import { getTrainingClassById, registerStudent } from '../services/trainingClassesService';
+import { getTrainingClasses, getTrainingClassById, registerStudent } from '../services/trainingClassesService';
 
 export default function PublicTrainingEnrollmentPage() {
   const { turmaId: paramTurmaId } = useParams();
@@ -13,70 +14,115 @@ export default function PublicTrainingEnrollmentPage() {
   const queryTurmaId = searchParams.get('turma');
   const targetTurmaId = paramTurmaId || queryTurmaId;
 
-  // Campos digitados pelo participante: CPF, Data de Nascimento e Matrícula (opcional)
+  // Lista de turmas abertas disponíveis para escolha
+  const [openTurmas, setOpenTurmas] = useState([]);
+  const [selectedTurmaId, setSelectedTurmaId] = useState('');
+  const [activeTurma, setActiveTurma] = useState(null);
+
+  // Campos do formulário
   const [cpf, setCpf] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [matricula, setMatricula] = useState('');
-
-  // Nome puxado da API após informar CPF e Data de Nascimento
   const [nome, setNome] = useState('');
+  const [isManualNome, setIsManualNome] = useState(false);
 
-  // Informações da turma se vinculada
-  const [activeTurma, setActiveTurma] = useState(null);
-  const [turmaLoading, setTurmaLoading] = useState(true);
-  const [turmaError, setTurmaError] = useState('');
-
-  // Estados de controle
+  // Estados de controle e feedback
+  const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [generalError, setGeneralError] = useState('');
   const [successData, setSuccessData] = useState(null);
   const [copiedProtocol, setCopiedProtocol] = useState(false);
 
-  // O formulário público só funciona quando está vinculado a uma turma válida.
+  // Carrega as turmas abertas e a turma do link (se houver)
   useEffect(() => {
     let cancelled = false;
 
-    async function loadTurma() {
-      setActiveTurma(null);
-      setTurmaError('');
+    async function loadData() {
+      setLoading(true);
+      setGeneralError('');
 
-      if (!targetTurmaId) {
-        setTurmaLoading(false);
-        setTurmaError('Este link não está vinculado a uma turma. Solicite ao responsável o link correto.');
-        return;
-      }
-
-      setTurmaLoading(true);
       try {
-        const found = await getTrainingClassById(targetTurmaId);
+        const allClasses = await getTrainingClasses();
         if (cancelled) return;
 
-        if (!found) {
-          setTurmaError('Turma não encontrada. Confirme se o link recebido está completo.');
-          return;
-        }
+        // Filtra apenas as turmas ABERTAS
+        const abertas = (allClasses || []).filter(t => {
+          const st = String(t.status || 'Aberta').trim().toLowerCase();
+          return st === 'aberta';
+        });
 
-        setActiveTurma(found);
-      } catch (error) {
+        setOpenTurmas(abertas);
+
+        if (targetTurmaId) {
+          // Link específico de turma
+          let target = abertas.find(t => String(t.id) === String(targetTurmaId));
+          if (!target) {
+            try {
+              target = await getTrainingClassById(targetTurmaId);
+            } catch (e) {
+              console.warn('Erro ao carregar turma por ID:', e);
+            }
+          }
+
+          if (cancelled) return;
+
+          if (target) {
+            const isAberta = String(target.status || 'Aberta').trim().toLowerCase() === 'aberta';
+            if (!isAberta) {
+              setGeneralError(`Esta turma não está com inscrições abertas (Status: ${target.status || 'Concluída'}).`);
+            } else {
+              setActiveTurma(target);
+              setSelectedTurmaId(String(target.id));
+            }
+          } else {
+            setGeneralError('A turma informada no link não foi encontrada.');
+          }
+        } else {
+          // Link Geral (/inscricao)
+          if (abertas.length === 1) {
+            // Se só tiver uma aberta, já pré-seleciona
+            setActiveTurma(abertas[0]);
+            setSelectedTurmaId(String(abertas[0].id));
+          } else {
+            setActiveTurma(null);
+            setSelectedTurmaId('');
+          }
+        }
+      } catch (err) {
         if (!cancelled) {
-          setTurmaError(error.message || 'Não foi possível carregar esta turma.');
+          console.error('Erro ao inicializar página de inscrição:', err);
+          setGeneralError('Não foi possível carregar as turmas disponíveis.');
         }
       } finally {
-        if (!cancelled) setTurmaLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
-    loadTurma();
+    loadData();
     return () => { cancelled = true; };
   }, [targetTurmaId]);
+
+  // Troca de turma pelo dropdown
+  const handleTurmaSelectChange = (e) => {
+    const id = e.target.value;
+    setSelectedTurmaId(id);
+    setErrorMsg('');
+    if (!id) {
+      setActiveTurma(null);
+      return;
+    }
+    const found = openTurmas.find(t => String(t.id) === String(id));
+    setActiveTurma(found || null);
+  };
 
   const handleCpfChange = (e) => {
     const formatted = formatCpf(e.target.value);
     setCpf(formatted);
     setErrorMsg('');
-    if (searched) {
+    if (searched && !isManualNome) {
       setSearched(false);
       setNome('');
     }
@@ -85,18 +131,18 @@ export default function PublicTrainingEnrollmentPage() {
   const handleBirthDateChange = (e) => {
     setBirthDate(e.target.value);
     setErrorMsg('');
-    if (searched) {
+    if (searched && !isManualNome) {
       setSearched(false);
       setNome('');
     }
   };
 
-  // Etapa 1: Busca o nome na API após preencher CPF e Data de Nascimento
+  // Etapa 1: Busca o nome a partir do CPF e Data de Nascimento
   const handleBuscarNome = async (e) => {
     if (e) e.preventDefault();
 
     if (!activeTurma) {
-      setErrorMsg('Não foi possível identificar a turma deste link.');
+      setErrorMsg('Selecione a turma antes de continuar.');
       return;
     }
 
@@ -119,29 +165,31 @@ export default function PublicTrainingEnrollmentPage() {
       if (res.success && res.nome) {
         setNome(res.nome);
         setSearched(true);
+        setIsManualNome(false);
       } else {
-        setErrorMsg(res.error || 'Não foi possível localizar os dados do titular. Verifique os números informados.');
-        setSearched(false);
-        setNome('');
+        setErrorMsg(res.error || 'Nome não localizado automaticamente. Você pode preenchê-lo abaixo.');
+        setSearched(true);
+        setIsManualNome(true);
       }
     } catch (err) {
       console.error('Erro na consulta:', err);
-      setErrorMsg('Erro ao conectar ao serviço de consulta de CPF.');
-      setSearched(false);
+      setErrorMsg('Não foi possível consultar os dados automaticamente. Preencha seu nome abaixo.');
+      setSearched(true);
+      setIsManualNome(true);
     } finally {
       setSearching(false);
     }
   };
 
-  // Etapa 2: Confirma e envia para a lista de participação do sistema
+  // Etapa 2: Confirma e salva o registro
   const handleConfirmarEnvio = async () => {
     if (!activeTurma?.id) {
-      setErrorMsg('Não foi possível identificar a turma deste link.');
+      setErrorMsg('Selecione uma turma válida para realizar a inscrição.');
       return;
     }
 
-    if (!nome) {
-      setErrorMsg('Busque o nome antes de confirmar.');
+    if (!nome.trim()) {
+      setErrorMsg('Informe o nome do participante antes de confirmar.');
       return;
     }
 
@@ -167,8 +215,8 @@ export default function PublicTrainingEnrollmentPage() {
         turmaNome: activeTurma?.course_name || activeTurma?.name || 'Treinamento'
       });
     } catch (err) {
-      console.error('Erro ao enviar:', err);
-      setErrorMsg(err.message || 'Erro ao registrar participação no sistema. Tente novamente.');
+      console.error('Erro ao enviar inscrição:', err);
+      setErrorMsg(err.message || 'Erro ao registrar participação. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -197,15 +245,15 @@ export default function PublicTrainingEnrollmentPage() {
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '480px',
+        maxWidth: '520px',
         backgroundColor: '#ffffff',
         border: '1px solid #cbd5e1',
-        borderRadius: '8px',
+        borderRadius: '10px',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05)',
         overflow: 'hidden'
       }}>
         
-        {/* Cabeçalho Institucional Simples */}
+        {/* Cabeçalho */}
         <div style={{
           padding: '1.75rem 1.75rem 1.25rem',
           borderBottom: '1px solid #e2e8f0',
@@ -227,56 +275,16 @@ export default function PublicTrainingEnrollmentPage() {
             marginBottom: 0,
             lineHeight: '1.4'
           }}>
-            Preencha seu CPF e data de nascimento para registrar sua presença no treinamento.
+            Preencha seus dados para registrar sua presença no treinamento.
           </p>
-
-          {activeTurma && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '0.75rem',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px'
-            }}>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>
-                Treinamento:
-              </div>
-              <div style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: '600', marginTop: '2px' }}>
-                {activeTurma.course_name || activeTurma.name}
-              </div>
-              {activeTurma.company && (
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
-                  Empresa: {activeTurma.company}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Corpo do Formulário */}
+        {/* Conteúdo */}
         <div style={{ padding: '1.75rem' }}>
-          {turmaLoading ? (
-            <div style={{ padding: '1.5rem 0', textAlign: 'center', color: '#64748b' }}>
-              <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 0.75rem' }} />
-              <p style={{ margin: 0, fontSize: '0.875rem' }}>Carregando dados da turma...</p>
-            </div>
-          ) : turmaError ? (
-            <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: '#fef2f2',
-                color: '#dc2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 1rem'
-              }}>
-                <AlertCircle size={26} />
-              </div>
-              <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.45rem' }}>Link de inscrição inválido</h2>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>{turmaError}</p>
+          {loading ? (
+            <div style={{ padding: '2rem 0', textAlign: 'center', color: '#64748b' }}>
+              <Loader2 size={26} className="animate-spin" style={{ margin: '0 auto 0.75rem', color: '#0284c7' }} />
+              <p style={{ margin: 0, fontSize: '0.875rem' }}>Carregando turmas disponíveis...</p>
             </div>
           ) : successData ? (
             <div style={{ textAlign: 'center' }}>
@@ -303,11 +311,11 @@ export default function PublicTrainingEnrollmentPage() {
                   : 'Seu nome já foi incluído na lista de presença desta turma.'}
               </p>
 
-              {/* Tabela de Comprovante */}
+              {/* Comprovante */}
               <div style={{
                 backgroundColor: '#f8fafc',
                 border: '1px solid #e2e8f0',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 padding: '1rem',
                 textAlign: 'left',
                 marginBottom: '1.25rem',
@@ -329,6 +337,10 @@ export default function PublicTrainingEnrollmentPage() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Turma: </span>
+                    <strong style={{ color: '#0f172a' }}>{successData.turmaNome}</strong>
+                  </div>
                   <div>
                     <span style={{ color: '#64748b' }}>Participante: </span>
                     <strong style={{ color: '#0f172a' }}>{successData.nome}</strong>
@@ -361,6 +373,7 @@ export default function PublicTrainingEnrollmentPage() {
                   setMatricula('');
                   setNome('');
                   setSearched(false);
+                  setIsManualNome(false);
                 }}
                 style={{
                   backgroundColor: '#ffffff',
@@ -381,221 +394,390 @@ export default function PublicTrainingEnrollmentPage() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleBuscarNome} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
-              {/* CAMPO 1: CPF */}
-              <div>
-                <label htmlFor="cpf-input" style={{ 
-                  display: 'block',
-                  fontSize: '0.875rem', 
-                  fontWeight: '600', 
-                  color: '#334155',
-                  marginBottom: '0.35rem' 
-                }}>
-                  CPF
-                </label>
-                <input
-                  id="cpf-input"
-                  type="text"
-                  value={cpf}
-                  onChange={handleCpfChange}
-                  placeholder="000.000.000-00"
-                  maxLength={14}
-                  required
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 0.85rem',
-                    backgroundColor: '#ffffff',
-                    border: `1px solid ${searched ? '#16a34a' : '#cbd5e1'}`,
-                    borderRadius: '6px',
-                    color: '#0f172a',
-                    fontSize: '1rem',
-                    fontFamily: 'monospace',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {/* CAMPO 2: DATA DE NASCIMENTO */}
-              <div>
-                <label htmlFor="birthdate-input" style={{ 
-                  display: 'block',
-                  fontSize: '0.875rem', 
-                  fontWeight: '600', 
-                  color: '#334155',
-                  marginBottom: '0.35rem' 
-                }}>
-                  Data de Nascimento
-                </label>
-                <input
-                  id="birthdate-input"
-                  type="date"
-                  value={birthDate}
-                  onChange={handleBirthDateChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 0.85rem',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    color: '#0f172a',
-                    fontSize: '0.95rem',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {/* CAMPO 3: MATRÍCULA (OPCIONAL) */}
-              <div>
-                <label htmlFor="matricula-input" style={{ 
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '0.875rem', 
-                  fontWeight: '600', 
-                  color: '#334155',
-                  marginBottom: '0.35rem' 
-                }}>
-                  <span>Matrícula</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '400', color: '#64748b' }}>Opcional</span>
-                </label>
-                <input
-                  id="matricula-input"
-                  type="text"
-                  value={matricula}
-                  onChange={(e) => setMatricula(e.target.value)}
-                  placeholder="Número de matrícula (opcional)"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 0.85rem',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    color: '#0f172a',
-                    fontSize: '0.95rem',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {errorMsg && (
-                <div style={{ 
-                  padding: '0.65rem 0.75rem',
+            <div>
+              {/* Alerta Geral se turma informada for inválida ou não encontrada */}
+              {generalError && (
+                <div style={{
+                  padding: '0.75rem 0.85rem',
                   backgroundColor: '#fef2f2',
                   border: '1px solid #fecaca',
                   borderRadius: '6px',
                   color: '#b91c1c',
-                  fontSize: '0.8125rem',
+                  fontSize: '0.85rem',
+                  marginBottom: '1.25rem',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.4rem'
                 }}>
-                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                  <span>{errorMsg}</span>
+                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                  <span>{generalError}</span>
                 </div>
               )}
 
-              {/* NOME ENCONTRADO PELA API */}
-              {searched && nome && (
-                <div style={{
-                  padding: '0.85rem',
-                  backgroundColor: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '6px'
-                }}>
-                  <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: '700', textTransform: 'uppercase' }}>
-                    Nome Identificado:
+              {/* Se não houver turmas abertas */}
+              {openTurmas.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem' }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: '#f1f5f9',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1rem'
+                  }}>
+                    <Calendar size={24} />
                   </div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', marginTop: '2px' }}>
-                    {nome}
+                  <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.45rem', color: '#0f172a', fontWeight: '700' }}>
+                    Nenhuma turma aberta no momento
+                  </h2>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                    No momento não há turmas com inscrições abertas. Caso precise de assistência, entre em contato com a equipe organizadora.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleBuscarNome} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+                  
+                  {/* SELEÇÃO DE TURMA: Mostra apenas as turmas ABERTAS */}
+                  <div>
+                    <label htmlFor="turma-select" style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '700',
+                      color: '#1e293b',
+                      marginBottom: '0.4rem'
+                    }}>
+                      Selecione a Turma *
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        id="turma-select"
+                        value={selectedTurmaId}
+                        onChange={handleTurmaSelectChange}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 2.2rem 0.75rem 0.85rem',
+                          backgroundColor: '#ffffff',
+                          border: `1px solid ${!selectedTurmaId ? '#0284c7' : '#cbd5e1'}`,
+                          borderRadius: '6px',
+                          color: selectedTurmaId ? '#0f172a' : '#64748b',
+                          fontSize: '0.9rem',
+                          boxSizing: 'border-box',
+                          outline: 'none',
+                          appearance: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">-- Selecione qual turma deseja participar --</option>
+                        {openTurmas.map(t => {
+                          const dateStr = t.start_date ? new Date(t.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+                          const durationStr = t.duration || t.duracao || '';
+                          const extra = [dateStr, durationStr].filter(Boolean).join(' • ');
+                          const label = `${t.name ? `${t.name} — ` : ''}${t.course_name || t.curso || 'Treinamento'}${extra ? ` (${extra})` : ''}`;
+                          return (
+                            <option key={t.id} value={t.id}>
+                              {label}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <ChevronDown size={16} style={{
+                        position: 'absolute',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        color: '#64748b'
+                      }} />
+                    </div>
                   </div>
-                  {nome === 'Test Token' && (
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
-                      (Retorno fictício do token de testes)
+
+                  {/* CARTÃO DETALHADO DA TURMA SELECIONADA */}
+                  {activeTurma && (
+                    <div style={{
+                      padding: '0.85rem 1rem',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px'
+                    }}>
+                      <div style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Turma Selecionada
+                      </div>
+                      <div style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: '700', marginTop: '2px' }}>
+                        {activeTurma.name ? `${activeTurma.name}: ` : ''}{activeTurma.course_name || activeTurma.curso || activeTurma.name}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                        {activeTurma.start_date && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Calendar size={13} style={{ color: '#64748b' }} />
+                            {new Date(activeTurma.start_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                          </span>
+                        )}
+                        {(activeTurma.duration || activeTurma.duracao) && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Clock size={13} style={{ color: '#64748b' }} />
+                            {activeTurma.duration || activeTurma.duracao}
+                          </span>
+                        )}
+                        {activeTurma.company && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Building size={13} style={{ color: '#64748b' }} />
+                            {activeTurma.company}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* BOTÕES DE AÇÃO */}
-              {!searched ? (
-                <button
-                  type="submit"
-                  disabled={!canSearch}
-                  style={{
-                    marginTop: '0.25rem',
-                    padding: '0.75rem 1rem',
-                    backgroundColor: canSearch ? '#0284c7' : '#94a3b8',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '0.925rem',
-                    fontWeight: '600',
-                    cursor: canSearch ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem',
-                    transition: 'background-color 0.15s'
-                  }}
-                >
-                  {searching ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Consultando...
-                    </>
-                  ) : (
-                    <>
-                      <Search size={16} />
-                      Buscar Nome
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleConfirmarEnvio}
-                  disabled={submitting}
-                  style={{
-                    marginTop: '0.25rem',
-                    padding: '0.75rem 1rem',
-                    backgroundColor: '#16a34a',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '0.925rem',
-                    fontWeight: '600',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem'
-                  }}
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      Confirmar Participação
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              )}
+                  {/* CAMPO 1: CPF */}
+                  <div>
+                    <label htmlFor="cpf-input" style={{ 
+                      display: 'block',
+                      fontSize: '0.875rem', 
+                      fontWeight: '600', 
+                      color: '#334155',
+                      marginBottom: '0.35rem' 
+                    }}>
+                      CPF *
+                    </label>
+                    <input
+                      id="cpf-input"
+                      type="text"
+                      value={cpf}
+                      onChange={handleCpfChange}
+                      placeholder="000.000.000-00"
+                      maxLength={14}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 0.85rem',
+                        backgroundColor: '#ffffff',
+                        border: `1px solid ${searched ? '#16a34a' : '#cbd5e1'}`,
+                        borderRadius: '6px',
+                        color: '#0f172a',
+                        fontSize: '1rem',
+                        fontFamily: 'monospace',
+                        boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
 
-            </form>
+                  {/* CAMPO 2: DATA DE NASCIMENTO */}
+                  <div>
+                    <label htmlFor="birthdate-input" style={{ 
+                      display: 'block',
+                      fontSize: '0.875rem', 
+                      fontWeight: '600', 
+                      color: '#334155',
+                      marginBottom: '0.35rem' 
+                    }}>
+                      Data de Nascimento *
+                    </label>
+                    <input
+                      id="birthdate-input"
+                      type="date"
+                      value={birthDate}
+                      onChange={handleBirthDateChange}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 0.85rem',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#0f172a',
+                        fontSize: '0.95rem',
+                        boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  {/* CAMPO 3: MATRÍCULA (OPCIONAL) */}
+                  <div>
+                    <label htmlFor="matricula-input" style={{ 
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.875rem', 
+                      fontWeight: '600', 
+                      color: '#334155',
+                      marginBottom: '0.35rem' 
+                    }}>
+                      <span>Matrícula</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '400', color: '#64748b' }}>Opcional</span>
+                    </label>
+                    <input
+                      id="matricula-input"
+                      type="text"
+                      value={matricula}
+                      onChange={(e) => setMatricula(e.target.value)}
+                      placeholder="Número de matrícula (opcional)"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 0.85rem',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#0f172a',
+                        fontSize: '0.95rem',
+                        boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  {errorMsg && (
+                    <div style={{ 
+                      padding: '0.65rem 0.75rem',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '6px',
+                      color: '#b91c1c',
+                      fontSize: '0.8125rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}>
+                      <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
+                  {/* NOME ENCONTRADO OU DIGITADO */}
+                  {searched && (
+                    <div>
+                      <label htmlFor="nome-input" style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#334155',
+                        marginBottom: '0.35rem'
+                      }}>
+                        <span>Nome Completo do Participante *</span>
+                        {nome && !isManualNome && (
+                          <button
+                            type="button"
+                            onClick={() => setIsManualNome(true)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#0284c7',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                              padding: 0,
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Corrigir nome
+                          </button>
+                        )}
+                      </label>
+                      <input
+                        id="nome-input"
+                        type="text"
+                        value={nome}
+                        onChange={(e) => setNome(e.target.value)}
+                        placeholder="Nome completo do participante"
+                        required
+                        disabled={!isManualNome}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 0.85rem',
+                          backgroundColor: isManualNome ? '#ffffff' : '#f0fdf4',
+                          border: `1px solid ${isManualNome ? '#cbd5e1' : '#bbf7d0'}`,
+                          borderRadius: '6px',
+                          color: '#0f172a',
+                          fontSize: '1rem',
+                          fontWeight: '600',
+                          boxSizing: 'border-box',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* BOTÕES DE AÇÃO */}
+                  {!searched ? (
+                    <button
+                      type="submit"
+                      disabled={!canSearch}
+                      style={{
+                        marginTop: '0.25rem',
+                        padding: '0.75rem 1rem',
+                        backgroundColor: canSearch ? '#0284c7' : '#94a3b8',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.925rem',
+                        fontWeight: '600',
+                        cursor: canSearch ? 'pointer' : 'not-allowed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        transition: 'background-color 0.15s'
+                      }}
+                    >
+                      {searching ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Consultando...
+                        </>
+                      ) : (
+                        <>
+                          <Search size={16} />
+                          Continuar
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleConfirmarEnvio}
+                      disabled={submitting || !nome.trim()}
+                      style={{
+                        marginTop: '0.25rem',
+                        padding: '0.75rem 1rem',
+                        backgroundColor: submitting || !nome.trim() ? '#94a3b8' : '#16a34a',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.925rem',
+                        fontWeight: '600',
+                        cursor: submitting || !nome.trim() ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          Confirmar Participação
+                          <ArrowRight size={16} />
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                </form>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Rodapé Simples */}
+        {/* Rodapé */}
         <div style={{
           padding: '0.75rem 1.75rem',
           backgroundColor: '#f8fafc',
@@ -604,7 +786,7 @@ export default function PublicTrainingEnrollmentPage() {
           fontSize: '0.75rem',
           color: '#64748b'
         }}>
-          Registro de Presença • Dados protegidos
+          Registro de Presença • TotalSafety
         </div>
 
       </div>

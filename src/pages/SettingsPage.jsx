@@ -10,7 +10,13 @@ const SettingsPage = () => {
   // Real state for form
   const [profileName, setProfileName] = useState(userProfile?.name || '');
   const [profileRole, setProfileRole] = useState(userProfile?.role || '');
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('ecoia_api_key') || localStorage.getItem('gemini_api_key') || localStorage.getItem('openai_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -36,6 +42,25 @@ const SettingsPage = () => {
         setTimeout(() => setSaved(false), 3000);
       }
       setSaving(false);
+    } else if (activeTab === 'ai') {
+      try {
+        if (apiKey && apiKey.trim()) {
+          localStorage.setItem('ecoia_api_key', apiKey.trim());
+          if (apiKey.trim().startsWith('sk-')) {
+            localStorage.setItem('openai_api_key', apiKey.trim());
+          } else {
+            localStorage.setItem('gemini_api_key', apiKey.trim());
+          }
+        } else {
+          localStorage.removeItem('ecoia_api_key');
+          localStorage.removeItem('gemini_api_key');
+          localStorage.removeItem('openai_api_key');
+        }
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } catch (err) {
+        console.error('Erro ao salvar chave da IA:', err);
+      }
     } else {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

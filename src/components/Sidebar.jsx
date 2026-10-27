@@ -95,6 +95,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Treinamentos & Turmas', path: '/training-certificates', icon: GraduationCap }
   ] : [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    ...(isSSTOrAdmin ? [{
+      name: 'TV / War Room SST',
+      path: '/sst/tv',
+      icon: Tv,
+      badge: 'TV'
+    }] : []),
     ...(activeLink?.sector === 'IPA' ? [{
       name: 'Painel IPA',
       icon: Tv,
@@ -204,6 +210,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             <Link className={`sidebar__item ${active ? 'is-active' : ''}`} key={item.name} to={item.path} title={isCollapsed ? item.name : undefined}>
               <span className="sidebar__item-icon"><Icon size={15} /></span>
               <span className="sidebar__item-label">{item.name}</span>
+              {item.badge && <span className="sidebar__badge sidebar__badge--soft">{item.badge}</span>}
               {item.count > 0 && <span className="sidebar__badge">{item.count > 99 ? '99+' : item.count}</span>}
             </Link>
           );

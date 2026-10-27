@@ -1,7 +1,7 @@
 import {
   ArrowRight, CheckCircle, Clock, AlertTriangle, FileText,
   Users, Building2, PauseCircle, XCircle, ShieldCheck, UserCheck,
-  CheckCircle2, ChevronRight, Filter
+  CheckCircle2, ChevronRight, Filter, Tv
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import React, { useState, useEffect, useMemo } from 'react';
@@ -329,6 +329,10 @@ const Dashboard = () => {
         const expB = isItemExpired(b, today);
         if (expA && !expB) return -1;
         if (!expA && expB) return 1;
+        const critA = isItemExpiring30(a, today, in30Days) || isItemExpiring60(a, today, in30Days, in60Days);
+        const critB = isItemExpiring30(b, today, in30Days) || isItemExpiring60(b, today, in30Days, in60Days);
+        if (critA && !critB) return -1;
+        if (!critA && critB) return 1;
         const dateA = a.validityDate || a.dueDate || a.dataEnvio || '9999-12-31';
         const dateB = b.validityDate || b.dueDate || b.dataEnvio || '9999-12-31';
         return dateA.localeCompare(dateB);
@@ -433,12 +437,21 @@ const Dashboard = () => {
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
 
   const globalUpcomingDeliverables = deliverables
-    .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && (isItemExpired(d, today) || !isDelivered(d)))
+    .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && (
+      isItemExpired(d, today) ||
+      isItemExpiring30(d, today, in30Days) ||
+      isItemExpiring60(d, today, in30Days, in60Days) ||
+      !isDelivered(d)
+    ))
     .sort((a, b) => {
       const expA = isItemExpired(a, today);
       const expB = isItemExpired(b, today);
       if (expA && !expB) return -1;
       if (!expA && expB) return 1;
+      const critA = isItemExpiring30(a, today, in30Days) || isItemExpiring60(a, today, in30Days, in60Days);
+      const critB = isItemExpiring30(b, today, in30Days) || isItemExpiring60(b, today, in30Days, in60Days);
+      if (critA && !critB) return -1;
+      if (!critA && critB) return 1;
       const dateA = a.validityDate || a.dueDate || a.dataEnvio || '9999-12-31';
       const dateB = b.validityDate || b.dueDate || b.dataEnvio || '9999-12-31';
       return dateA.localeCompare(dateB);
@@ -505,12 +518,30 @@ const Dashboard = () => {
           <h1 className="text-h1">Dashboard</h1>
           <p className="text-subtitle">Gestão TotalSafety — Supervisor ou Técnico Responsável e Visão Geral</p>
         </div>
-        <Link to="/companies" className="btn btn-primary" style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem' }}>
-          <Building2 size={14} /> Ver Empresas
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Link
+            to="/sst/tv"
+            className="btn btn-secondary"
+            style={{
+              padding: '0.28rem 0.75rem',
+              fontSize: '0.74rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              borderColor: 'var(--primary)',
+              color: 'var(--primary)',
+              fontWeight: 700
+            }}
+          >
+            <Tv size={14} /> Central de Controle (TV)
+          </Link>
+          <Link to="/companies" className="btn btn-primary" style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem' }}>
+            <Building2 size={14} /> Ver Empresas
+          </Link>
+        </div>
       </header>
 
-      {/* Tabs Principais: #1 SUPERVISOR OU TÉCNICO RESPONSÁVEL | #2 VISÃO GERAL */}
+      {/* Tabs Principais: #1 SUPERVISOR OU TÉCNICO RESPONSÁVEL | #2 VISÃO GERAL | #3 PAINEL TV */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -520,7 +551,8 @@ const Dashboard = () => {
         borderRadius: 'var(--radius-md, 8px)',
         border: '1px solid var(--border, #e2e8f0)',
         marginBottom: '1rem',
-        width: 'fit-content'
+        width: 'fit-content',
+        flexWrap: 'wrap'
       }}>
         <button
           type="button"
@@ -565,6 +597,25 @@ const Dashboard = () => {
         >
           <Building2 size={14} /> #2 Visão Geral
         </button>
+
+        <Link
+          to="/sst/tv"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0.35rem 0.85rem',
+            borderRadius: 'var(--radius-sm, 6px)',
+            textDecoration: 'none',
+            fontSize: '0.78rem',
+            fontWeight: '700',
+            backgroundColor: 'transparent',
+            color: 'var(--primary, #0ea5e9)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Tv size={14} /> Painel TV (Panorama &amp; Vencimentos)
+        </Link>
       </div>
 
       {/* ========================================================================= */}

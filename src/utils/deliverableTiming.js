@@ -35,10 +35,40 @@ export function isDelivered(d) {
   return ['entregue', 'feito', 'concluido'].includes(d.status);
 }
 
+// Identifica itens padrão gerados em lote (seed) que ainda não tiveram validade ou emissão real configurada
+export function isUnconfiguredSeedItem(d) {
+  if (!d) return false;
+  const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+  return !d.validityDate && d.status === 'pendente' && target === '2026-11-15' && !d.deliveredDate && !d.fileName && !d.ultimaRevisao;
+}
+
+export function getExpirationTargetDate(d) {
+  if (!d) return null;
+  if (d.validityDate) {
+    return parseSafeDate(d.validityDate);
+  }
+  if (!isDelivered(d) && !isUnconfiguredSeedItem(d)) {
+    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+    return parseSafeDate(target);
+  }
+  return null;
+}
+
+export function getDaysUntilExpiration(d, refDate = new Date()) {
+  const targetDate = getExpirationTargetDate(d);
+  if (!targetDate) return null;
+  const today = new Date(refDate);
+  today.setHours(0, 0, 0, 0);
+  const t = new Date(targetDate);
+  t.setHours(0, 0, 0, 0);
+  return Math.round((t.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 export function isItemExpired(d, refDate = new Date()) {
   if (!d) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (d.status === 'vencido') return true;
+  if (isUnconfiguredSeedItem(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
@@ -65,6 +95,7 @@ export function isItemExpired(d, refDate = new Date()) {
 export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
   if (!d) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
+  if (isUnconfiguredSeedItem(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
@@ -91,6 +122,7 @@ export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
 export function isItemExpiring60(d, refDate = new Date(), in30 = null, in60 = null) {
   if (!d) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
+  if (isUnconfiguredSeedItem(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);

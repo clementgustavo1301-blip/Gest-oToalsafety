@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertCircle, Users, Sparkles,
   HelpCircle, ClipboardCopy, RefreshCw, Layers, Link as LinkIcon,
   Copy, Check, ExternalLink, Calendar, Search, Filter,
-  Edit, Key, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
+  Edit, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
   CheckCircle, Clock, Briefcase, MapPin, Building,
   Smartphone, QrCode, PenTool, Share2, FileSpreadsheet, Upload
 } from 'lucide-react';
@@ -28,8 +28,6 @@ import {
 } from '../services/turmaSignatureService';
 
 import { OFFICIAL_TRAINING_MODELS, OFFICIAL_INSTRUCTORS, getInstructorSignatureUrl } from '../data/officialTrainingModels';
-
-const DEFAULT_API_TOKEN = '5ae973d7a997af13f0aaf2bf60e65803';
 
 // Catálogo Oficial de Modelos de Treinamentos e Certificados TotalSafety / EcoSafety
 const COURSE_PRESETS = OFFICIAL_TRAINING_MODELS;
@@ -410,12 +408,6 @@ const TrainingCertificatesPage = () => {
     cert_model: 'modelo1',
     content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
     status: 'Aberta'
-  });
-
-  // Modal de Configuração do Token de Testes da API
-  const [showTokenModal, setShowTokenModal] = useState(false);
-  const [apiToken, setApiToken] = useState(() => {
-    return localStorage.getItem('cpfcnpj_api_token') || DEFAULT_API_TOKEN;
   });
 
   // Feedback de Cópia
@@ -1016,6 +1008,31 @@ const TrainingCertificatesPage = () => {
   const getPublicEnrollmentUrl = (turmaId) =>
     `${window.location.origin}/inscricao/${encodeURIComponent(String(turmaId))}`;
 
+  const generalEnrollmentUrl = `${window.location.origin}/inscricao`;
+
+  const copyGeneralLink = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(generalEnrollmentUrl);
+      } else {
+        const temporaryInput = document.createElement('textarea');
+        temporaryInput.value = generalEnrollmentUrl;
+        temporaryInput.setAttribute('readonly', '');
+        temporaryInput.style.position = 'fixed';
+        temporaryInput.style.opacity = '0';
+        document.body.appendChild(temporaryInput);
+        temporaryInput.select();
+        const copied = document.execCommand('copy');
+        temporaryInput.remove();
+        if (!copied) throw new Error('Clipboard indisponível');
+      }
+      setCopiedKey('general_enrollment');
+      setTimeout(() => setCopiedKey(null), 2500);
+    } catch (err) {
+      console.warn('Erro ao copiar link geral:', err);
+    }
+  };
+
   // Cada link público pertence obrigatoriamente a uma turma.
   const copyPublicLink = async (turmaId, key) => {
     if (!turmaId) return;
@@ -1186,17 +1203,6 @@ const TrainingCertificatesPage = () => {
     if (!window.confirm(`Deseja remover ${studentName} da lista de presença?`)) return;
     await deleteStudent(studentId);
     loadData();
-  };
-
-  // Salva o Token da API CPF.CNPJ
-  const handleSaveApiToken = (e) => {
-    e.preventDefault();
-    const clean = apiToken.trim();
-    if (!clean) return;
-    localStorage.setItem('cpfcnpj_api_token', clean);
-    setShowTokenModal(false);
-    setFeedback({ type: 'success', text: 'Token da API CPF.CNPJ atualizado!' });
-    setTimeout(() => setFeedback(null), 3000);
   };
 
   // ----------------------------------------------------
@@ -2494,30 +2500,44 @@ const TrainingCertificatesPage = () => {
 
         return (
         <div className="tc-turmas">
-          {/* Orientação do fluxo de inscrição por turma */}
+          {/* Link Geral de Inscrição e Lista de Presença */}
           <section className="tc-portal" aria-labelledby="tc-portal-title">
             <div className="tc-portal-heading">
-              <h2 id="tc-portal-title">Inscrição vinculada à turma</h2>
-              <span className="tc-portal-verified" title="Os dados informados no formulário são validados pela API da Receita Federal">
+              <h2 id="tc-portal-title">Inscrições e Lista de Presença</h2>
+              <span className="tc-portal-verified" title="Validação segura dos dados por CPF e data de nascimento">
                 <ShieldCheck size={13} />
                 CPF validado
               </span>
             </div>
-            <div className="tc-portal-row">
-              <p className="tc-portal-description">
-                Crie a turma e compartilhe o link exibido no cartão dela. Ao confirmar CPF e data de nascimento,
-                o colaborador entra automaticamente na lista de presença daquela turma.
-              </p>
-              <button
-                id="btn-api-cpf-token"
-                type="button"
-                className="tc-icon-btn tc-icon-btn--sm"
-                onClick={() => setShowTokenModal(true)}
-                title="Configurar token da API CPF (Receita)"
-                aria-label="Configurar token da API CPF (Receita)"
+            <p className="tc-portal-description">
+              Compartilhe o <strong>Link Geral</strong> para que o colaborador selecione a turma desejada (são exibidas apenas as turmas abertas), ou utilize o link direto de cada turma nos cartões abaixo.
+            </p>
+            <div className="tc-portal-row" style={{ marginTop: '0.75rem' }}>
+              <div className="tc-url-field" style={{ maxWidth: '620px' }}>
+                <code title={generalEnrollmentUrl}>{generalEnrollmentUrl}</code>
+                <button
+                  id="btn-copy-general-link"
+                  type="button"
+                  className={copiedKey === 'general_enrollment' ? 'is-copied' : ''}
+                  onClick={copyGeneralLink}
+                  aria-live="polite"
+                  title="Copiar link geral de inscrição"
+                >
+                  {copiedKey === 'general_enrollment' ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedKey === 'general_enrollment' ? 'Copiado' : 'Copiar link geral'}
+                </button>
+              </div>
+              <a
+                id="btn-open-general-form"
+                href={generalEnrollmentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tc-btn"
+                title="Abrir formulário geral de inscrição"
               >
-                <Key size={16} />
-              </button>
+                <ExternalLink size={14} />
+                Abrir formulário
+              </a>
             </div>
           </section>
 
@@ -3312,66 +3332,7 @@ const TrainingCertificatesPage = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: TOKEN DA API CPF.CNPJ                                              */}
-      {/* ========================================================================= */}
-      {showTokenModal && (
-        <div className="modal-backdrop" onClick={() => setShowTokenModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', borderRadius: '1.25rem', padding: '1.75rem' }}>
-            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.15rem', fontWeight: '800' }}>
-                <Key size={18} style={{ color: '#0284c7' }} />
-                Configuração da API CPF A
-              </h2>
-              <button className="modal-close" onClick={() => setShowTokenModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
 
-            <form onSubmit={handleSaveApiToken} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                A página pública de inscrição utiliza a <strong>API CPF.CNPJ (Pacote 1: CPF A)</strong> para consultar a Receita Federal e validar em tempo real o nome completo do participante ao digitar o CPF.
-              </div>
-
-              <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Base URL da API</label>
-                <input
-                  type="text"
-                  disabled
-                  className="input"
-                  value="https://api.cpfcnpj.com.br"
-                  style={{ opacity: 0.8, marginTop: '0.35rem', width: '100%' }}
-                />
-              </div>
-
-              <div>
-                <label className="modal-label" style={{ fontWeight: '700', fontSize: '0.8125rem' }}>Token de Acesso (Teste ou Produção)</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  placeholder="Cole aqui seu token de integração"
-                  value={apiToken}
-                  onChange={e => setApiToken(e.target.value)}
-                  style={{ fontFamily: 'monospace', fontSize: '0.85rem', marginTop: '0.35rem', width: '100%' }}
-                />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.35rem', display: 'block' }}>
-                  Token padrão: <code>5ae973d7a997af13f0aaf2bf60e65803</code>
-                </span>
-              </div>
-
-              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '0.75rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowTokenModal(false)}>
-                  Fechar
-                </button>
-                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#0284c7', fontWeight: '700' }}>
-                  Salvar Token
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL: COLAR EM LOTE (TEXTO)                                              */}
