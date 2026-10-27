@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2, CheckCircle2, AlertTriangle, Maximize2, Minimize2,
-  ArrowLeft, BarChart3, Clock, Users, RefreshCw, Play, Pause,
-  Award, Flame, CalendarDays
+  ArrowLeft, BarChart3, Clock, Users, Play, Pause,
+  Award, Flame, CalendarDays, ArrowLeftRight
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -92,7 +92,6 @@ const SstTvControlCenterPage = () => {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   // Dados do banco
   const [contracts, setContracts] = useState([]);
@@ -103,14 +102,15 @@ const SstTvControlCenterPage = () => {
   const [trainings, setTrainings] = useState([]);
 
   // Controles de Navegação e Alternância de Telas TV (15 segundos)
-  const [currentScreen, setCurrentScreen] = useState(1); // 1: Panorama & Validades, 2: Próximos a Vencer, 3: Carteira & Agendamentos
+  const [currentScreen, setCurrentScreen] = useState(2); // 1: Panorama & Validades, 2: 3 Tabelas de Prazos, 3: Carteira & Agendamentos
   const [isAutoRotate, setIsAutoRotate] = useState(true);
   const [timerProgress, setTimerProgress] = useState(0);
 
-  // Filtros internos de visualização
+  // Filtros e ordenação da Tela 2
+  const [tableOrder, setTableOrder] = useState('60_30_venc'); // '60_30_venc' | 'venc_30_60'
+  const [view60dFilter, setView60dFilter] = useState('60d'); // '60d' (31-60 dias) | 'allOver30' (todos >30 dias)
   const [selectedResponsible, setSelectedResponsible] = useState('all');
   const [chartMode, setChartMode] = useState('documentos'); // 'documentos' | 'equipe'
-  const [expiringFilter, setExpiringFilter] = useState('proximos'); // 'proximos' | 'criticos' | 'vencidos' | 'todos'
 
   // Rotação Automática de 15 em 15 segundos entre as 3 telas
   useEffect(() => {
@@ -144,7 +144,6 @@ const SstTvControlCenterPage = () => {
 
   const loadData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
-    else setRefreshing(true);
     try {
       const [c, d, comp, g, profs, trains] = await Promise.all([
         getContracts(),
@@ -164,7 +163,6 @@ const SstTvControlCenterPage = () => {
       console.error('Erro ao carregar dados do Painel TV SST:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -372,6 +370,41 @@ const SstTvControlCenterPage = () => {
     };
   }, [activeDeliverables, filteredCompanies.length]);
 
+  // 3 Listas Dedicadas para a Tela 2: Até 60 Dias, Até 30 Dias e Vencidos
+  const listVencidos = useMemo(() => {
+    return activeDeliverables
+      .filter(d => d.isExpired || (d.daysLeft !== null && d.daysLeft < 0))
+      .sort((a, b) => {
+        // Ordena dos mais atrasados para os mais recentes
+        return (a.daysLeft ?? -9999) - (b.daysLeft ?? -9999);
+      });
+  }, [activeDeliverables]);
+
+  const listAte30d = useMemo(() => {
+    return activeDeliverables
+      .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft >= 0 && d.daysLeft <= 30)
+      .sort((a, b) => {
+        // Ordena dos que vencem primeiro (hoje, amanhã, 5 dias...)
+        return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
+      });
+  }, [activeDeliverables]);
+
+  const listAte60d = useMemo(() => {
+    return activeDeliverables
+      .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 30 && d.daysLeft <= 60)
+      .sort((a, b) => {
+        return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
+      });
+  }, [activeDeliverables]);
+
+  const listOver60d = useMemo(() => {
+    return activeDeliverables
+      .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 60)
+      .sort((a, b) => {
+        return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
+      });
+  }, [activeDeliverables]);
+
   // Gráfico 1: Panorama Geral por Programa / Documento SST
   const documentChartData = useMemo(() => {
     const categories = [
@@ -452,7 +485,7 @@ const SstTvControlCenterPage = () => {
     });
   }, [responsiblesList, companiesWithHeritage, deliverables, today, in30Days, in60Days]);
 
-  // Distribuição de Validades (dados para o Donut + detalhamento sem ruído)
+  // Distribuição de Validades (dados para o Donut)
   const validityBreakdown = useMemo(() => {
     const expiredCount = metrics.expired.length;
     const exp30Count = metrics.exp30.length;
@@ -476,28 +509,6 @@ const SstTvControlCenterPage = () => {
       totalMonitored: safeDeliveredCount + validOver30Count + exp30Count + expiredCount
     };
   }, [metrics]);
-
-  // Lista dos Próximos a Vencer & Prazos
-  const displayedExpirationsList = useMemo(() => {
-    const upcoming = [...metrics.allUpcomingValidities].sort((a, b) => {
-      if ((a.daysLeft ?? 9999) !== (b.daysLeft ?? 9999)) {
-        return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
-      }
-      return a.companyName.localeCompare(b.companyName);
-    });
-
-    const expired = [...metrics.expired].sort((a, b) => {
-      return (b.daysLeft ?? -9999) - (a.daysLeft ?? -9999);
-    });
-
-    if (expiringFilter === 'proximos') return upcoming;
-    if (expiringFilter === 'criticos') {
-      const crit = upcoming.filter(d => (d.daysLeft ?? 999) <= 30);
-      return [...crit, ...expired];
-    }
-    if (expiringFilter === 'vencidos') return expired;
-    return [...upcoming, ...expired];
-  }, [metrics, expiringFilter]);
 
   // Agendamentos dos Próximos 7 Dias (Treinamentos, Visitas Técnicas, DDS e Inspeções)
   const upcomingScheduledItems = useMemo(() => {
@@ -577,6 +588,130 @@ const SstTvControlCenterPage = () => {
 
   const secondsRemaining = Math.max(1, Math.ceil(15 - (timerProgress / 100) * 15));
   const totalBarRef = Math.max(1, validityBreakdown.totalMonitored);
+
+  // Helper para renderizar linhas das tabelas com estilo uniforme e de alta densidade
+  const renderDeliverableRows = (items, categoryType) => {
+    if (!items || items.length === 0) {
+      return (
+        <tr>
+          <td colSpan={4} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-secondary)' }}>
+            <CheckCircle2 size={32} style={{ color: '#10b981', margin: '0 auto 6px auto' }} />
+            <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.82rem' }}>
+              Nenhum documento nesta faixa!
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    return items.map((item, idx) => {
+      const days = item.daysLeft;
+      const isExpired = categoryType === 'vencidos' || item.isExpired || (days !== null && days < 0);
+      const isToday = !isExpired && days === 0;
+      const isTomorrow = !isExpired && days === 1;
+      const isUrgent15 = !isExpired && days !== null && days <= 15;
+
+      let dotColor = '#3b82f6';
+      let badgeBg = 'rgba(59, 130, 246, 0.14)';
+      let badgeColor = '#3b82f6';
+      let countdownText = days !== null ? `${days}d` : '—';
+
+      if (isExpired) {
+        dotColor = '#dc2626';
+        badgeBg = '#dc2626';
+        badgeColor = '#ffffff';
+        countdownText = days !== null ? `-${Math.abs(days)}d VENCIDO` : 'VENCIDO';
+      } else if (isToday) {
+        dotColor = '#dc2626';
+        badgeBg = '#dc2626';
+        badgeColor = '#ffffff';
+        countdownText = '🚨 HOJE!';
+      } else if (isTomorrow) {
+        dotColor = '#ea580c';
+        badgeBg = '#ea580c';
+        badgeColor = '#ffffff';
+        countdownText = '⚠️ AMANHÃ';
+      } else if (isUrgent15) {
+        dotColor = '#ef4444';
+        badgeBg = 'rgba(239, 68, 68, 0.16)';
+        badgeColor = '#ef4444';
+        countdownText = `${days} dias`;
+      } else if (categoryType === 'ate30d') {
+        dotColor = '#f59e0b';
+        badgeBg = 'rgba(245, 158, 11, 0.16)';
+        badgeColor = '#d97706';
+        countdownText = `${days} dias`;
+      } else {
+        dotColor = '#2563eb';
+        badgeBg = 'rgba(37, 99, 235, 0.14)';
+        badgeColor = '#2563eb';
+        countdownText = `${days} dias`;
+      }
+
+      return (
+        <tr
+          key={item.id || idx}
+          onClick={() => navigate(`/company/${item.companyId}`)}
+          title={`${item.title} — ${item.companyName} (Téc: ${item.tecnico})`}
+          style={{
+            borderBottom: '1px solid var(--border)',
+            backgroundColor: isToday || isExpired ? 'rgba(220, 38, 38, 0.04)' : (idx % 2 === 0 ? 'transparent' : 'var(--background)'),
+            cursor: 'pointer',
+            transition: 'background 0.15s'
+          }}
+        >
+          {/* Col 1: Documento */}
+          <td style={{ padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0 }} />
+              <span style={{ fontWeight: 800, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {shortenDocTitle(item.title)}
+              </span>
+            </div>
+          </td>
+
+          {/* Col 2: Empresa & Técnico */}
+          <td style={{ padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: 700, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
+              {item.companyName}
+            </div>
+            <div style={{ fontSize: '0.58rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1 }}>
+              {item.tecnico !== 'Não definido' ? item.tecnico : item.supervisor}
+            </div>
+          </td>
+
+          {/* Col 3: Data de Validade */}
+          <td style={{
+            padding: '6px 6px',
+            textAlign: 'center',
+            fontWeight: 800,
+            color: isExpired || isToday ? '#dc2626' : 'var(--text-primary)',
+            fontVariantNumeric: 'tabular-nums',
+            whiteSpace: 'nowrap',
+            fontSize: '0.72rem'
+          }}>
+            {formatDateBR(item.targetDateStr, true)}
+          </td>
+
+          {/* Col 4: Prazo Restante */}
+          <td style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+            <span style={{
+              display: 'inline-block',
+              fontSize: '0.62rem',
+              fontWeight: 800,
+              padding: '2px 7px',
+              borderRadius: '5px',
+              backgroundColor: badgeBg,
+              color: badgeColor,
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              {countdownText}
+            </span>
+          </td>
+        </tr>
+      );
+    });
+  };
 
   return (
     <div className="tv-fullscreen-wrapper">
@@ -665,7 +800,7 @@ const SstTvControlCenterPage = () => {
             {/* KPI 3: Próximos a Vencer */}
             <div
               className={`tv2-kpi-card ${metrics.exp30.length > 0 ? 'tv2-kpi-warn' : ''}`}
-              onClick={() => { handleSelectScreen(2); setExpiringFilter('criticos'); }}
+              onClick={() => handleSelectScreen(2)}
               style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
@@ -692,7 +827,7 @@ const SstTvControlCenterPage = () => {
             {/* KPI 4: Vencidos */}
             <div
               className={`tv2-kpi-card ${metrics.expired.length > 0 ? 'tv2-kpi-danger' : ''}`}
-              onClick={() => { handleSelectScreen(2); setExpiringFilter('vencidos'); }}
+              onClick={() => handleSelectScreen(2)}
               style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
@@ -717,7 +852,7 @@ const SstTvControlCenterPage = () => {
             {/* KPI 5: Agendamentos 7 Dias */}
             <div
               className="tv2-kpi-card"
-              onClick={() => { handleSelectScreen(3); }}
+              onClick={() => handleSelectScreen(3)}
               style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
@@ -1061,206 +1196,284 @@ const SstTvControlCenterPage = () => {
           )}
 
           {/* ══════════════════════════════════════════════════════════════════
-              TELA 2: PRÓXIMOS A VENCER & CONTROLE DE PRAZOS (TELA DEDICADA DE ALTA DENSIDADE)
+              TELA 2: 3 TABELAS DEDICADAS (ATÉ 60 DIAS, ATÉ 30 DIAS E VENCIDOS)
               ══════════════════════════════════════════════════════════════════ */}
           {currentScreen === 2 && (
-            <div className="tv2-chart-card card" style={{ height: '100%', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-              {/* Cabeçalho da Tela 2 */}
-              <div className="tv2-chart-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', padding: '10px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Clock size={18} style={{ color: '#ef4444' }} />
-                  <span style={{ fontSize: '0.9rem', fontWeight: 900 }}>
-                    PRÓXIMOS A VENCER &amp; CONTROLE DE PRAZOS ({displayedExpirationsList.length})
-                  </span>
-                </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '8px',
+              height: '100%',
+              flex: 1,
+              minHeight: 0
+            }}>
 
-                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                  {[
-                    { id: 'proximos', label: `A Vencer (${metrics.allUpcomingValidities.length})` },
-                    { id: 'criticos', label: `Críticos ≤30d (${metrics.exp30.length})` },
-                    { id: 'vencidos', label: `Vencidos (${metrics.expired.length})` },
-                    { id: 'todos', label: 'Todos os Prazos' }
-                  ].map(tab => {
-                    const active = expiringFilter === tab.id;
-                    return (
+              {/* ── CARD 1: ATÉ 60 DIAS (OU VENCIDOS CONFORME ORDEM) ── */}
+              {tableOrder === '60_30_venc' ? (
+                /* TABELA ATÉ 60 DIAS */
+                <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
+                  <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                      <Clock size={16} style={{ color: '#2563eb' }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900 }}>ATÉ 60 DIAS</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <button
-                        key={tab.id}
                         type="button"
-                        onClick={() => setExpiringFilter(tab.id)}
+                        onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
+                        title={view60dFilter === '60d' ? 'Exibindo 31 a 60 dias (clique para ver todos >30d)' : 'Exibindo todos >30 dias (clique para filtrar até 60d)'}
                         style={{
-                          fontSize: '0.66rem',
-                          padding: '4px 11px',
-                          borderRadius: '5px',
-                          border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
-                          background: active ? 'var(--primary)' : 'var(--background)',
-                          color: active ? '#fff' : 'var(--text-secondary)',
+                          fontSize: '0.58rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border)',
+                          backgroundColor: 'var(--background)',
+                          color: 'var(--text-secondary)',
                           fontWeight: 700,
                           cursor: 'pointer'
                         }}
                       >
-                        {tab.label}
+                        {view60dFilter === '60d' ? '31–60d' : 'Todos >30d'}
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* Tabela de Largura Total e Alta Densidade */}
-              <div
-                className="tv2-chart-area"
-                style={{
-                  padding: 0,
-                  overflowY: 'auto',
-                  flex: 1,
-                  minHeight: 0
-                }}
-              >
-                {loading ? (
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '5rem 1rem', fontSize: '0.9rem' }}>
-                    Carregando cronograma completo de vencimentos SST...
-                  </div>
-                ) : displayedExpirationsList.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '5rem 1rem' }}>
-                    <CheckCircle2 size={40} style={{ color: '#10b981', margin: '0 auto 8px auto' }} />
-                    <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-                      Nenhum documento com vencimento crítico nesta categoria!
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 900,
+                        color: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                        padding: '2px 8px',
+                        borderRadius: '10px'
+                      }}>
+                        {view60dFilter === '60d' ? listAte60d.length : (listAte60d.length + listOver60d.length)}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setTableOrder('venc_30_60')}
+                        title="Inverter ordem das tabelas"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <ArrowLeftRight size={13} />
+                      </button>
                     </div>
                   </div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.75rem' }}>
+
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
+                        <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
+                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
+                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
+                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {renderDeliverableRows(view60dFilter === '60d' ? listAte60d : [...listAte60d, ...listOver60d], 'ate60d')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                /* TABELA VENCIDOS (QUANDO INVERTIDO) */
+                <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
+                  <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                      <AlertTriangle size={16} style={{ color: '#dc2626' }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#dc2626' }}>VENCIDOS</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 900,
+                        color: '#dc2626',
+                        backgroundColor: 'rgba(220, 38, 38, 0.12)',
+                        padding: '2px 8px',
+                        borderRadius: '10px'
+                      }}>
+                        {listVencidos.length} expirados
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setTableOrder('60_30_venc')}
+                        title="Inverter ordem das tabelas"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <ArrowLeftRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
+                        <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
+                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
+                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
+                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {renderDeliverableRows(listVencidos, 'vencidos')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ── CARD 2 (CENTRAL): ATÉ 30 DIAS ── */}
+              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
+                <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <Flame size={16} style={{ color: '#ea580c' }} />
+                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#ea580c' }}>ATÉ 30 DIAS</span>
+                  </div>
+
+                  <span style={{
+                    fontSize: '0.66rem',
+                    fontWeight: 900,
+                    color: '#ea580c',
+                    backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                    padding: '2px 8px',
+                    borderRadius: '10px'
+                  }}>
+                    {listAte30d.length} críticos
+                  </span>
+                </div>
+
+                <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
                     <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
-                      <tr style={{ color: 'var(--text-secondary)', fontSize: '0.64rem', textTransform: 'uppercase', textAlign: 'left' }}>
-                        <th style={{ padding: '8px 14px', width: '26%', fontWeight: 800 }}>Documento / Programa SST</th>
-                        <th style={{ padding: '8px 12px', width: '28%', fontWeight: 800 }}>Empresa &amp; Grupo</th>
-                        <th style={{ padding: '8px 12px', width: '20%', fontWeight: 800 }}>Técnico / Supervisor</th>
-                        <th style={{ padding: '8px 10px', width: '12%', fontWeight: 800, textAlign: 'center' }}>Data Validade</th>
-                        <th style={{ padding: '8px 14px', width: '14%', fontWeight: 800, textAlign: 'right' }}>Prazo Restante</th>
+                      <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
+                        <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
+                        <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
+                        <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {displayedExpirationsList.map((item, idx) => {
-                        const days = item.daysLeft;
-                        const isExpired = item.isExpired || (days !== null && days < 0);
-                        const isToday = !isExpired && days === 0;
-                        const isTomorrow = !isExpired && days === 1;
-                        const isUrgent15 = !isExpired && days !== null && days <= 15;
-                        const isCrit30 = !isExpired && days !== null && days <= 30;
-                        const isWarn60 = !isExpired && days !== null && days > 30 && days <= 60;
-
-                        let dotColor = '#3b82f6';
-                        let badgeBg = 'rgba(59, 130, 246, 0.14)';
-                        let badgeColor = '#3b82f6';
-                        let countdownText = days !== null ? `${days}d restantes` : '—';
-
-                        if (isExpired) {
-                          dotColor = '#dc2626';
-                          badgeBg = '#dc2626';
-                          badgeColor = '#ffffff';
-                          countdownText = days !== null ? `-${Math.abs(days)}d VENCIDO` : 'VENCIDO';
-                        } else if (isToday) {
-                          dotColor = '#dc2626';
-                          badgeBg = '#dc2626';
-                          badgeColor = '#ffffff';
-                          countdownText = '🚨 VENCE HOJE!';
-                        } else if (isTomorrow) {
-                          dotColor = '#ea580c';
-                          badgeBg = '#ea580c';
-                          badgeColor = '#ffffff';
-                          countdownText = '⚠️ AMANHÃ';
-                        } else if (isUrgent15) {
-                          dotColor = '#ef4444';
-                          badgeBg = 'rgba(239, 68, 68, 0.16)';
-                          badgeColor = '#ef4444';
-                          countdownText = `${days} dias`;
-                        } else if (isCrit30) {
-                          dotColor = '#f59e0b';
-                          badgeBg = 'rgba(245, 158, 11, 0.16)';
-                          badgeColor = '#d97706';
-                          countdownText = `${days} dias`;
-                        } else if (isWarn60) {
-                          dotColor = '#eab308';
-                          badgeBg = 'rgba(234, 179, 8, 0.15)';
-                          badgeColor = '#ca8a04';
-                          countdownText = `${days} dias`;
-                        }
-
-                        return (
-                          <tr
-                            key={item.id || idx}
-                            onClick={() => navigate(`/company/${item.companyId}`)}
-                            title={`${item.title} — ${item.companyName}`}
-                            style={{
-                              borderBottom: '1px solid var(--border)',
-                              backgroundColor: isToday || isExpired ? 'rgba(220, 38, 38, 0.04)' : (idx % 2 === 0 ? 'transparent' : 'var(--background)'),
-                              cursor: 'pointer',
-                              transition: 'background 0.15s'
-                            }}
-                          >
-                            {/* Col 1: Documento */}
-                            <td style={{ padding: '7px 14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0 }} />
-                                <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
-                                  {shortenDocTitle(item.title)}
-                                </span>
-                              </div>
-                            </td>
-
-                            {/* Col 2: Empresa & Grupo */}
-                            <td style={{ padding: '7px 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <div style={{ fontWeight: 700, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {item.companyName}
-                              </div>
-                              <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {item.groupName}
-                              </div>
-                            </td>
-
-                            {/* Col 3: Técnico e Supervisor */}
-                            <td style={{ padding: '7px 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <div style={{ fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {item.tecnico !== 'Não definido' ? item.tecnico : item.supervisor}
-                              </div>
-                              <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                Sup: {item.supervisor}
-                              </div>
-                            </td>
-
-                            {/* Col 4: Data de Validade */}
-                            <td style={{
-                              padding: '7px 10px',
-                              textAlign: 'center',
-                              fontWeight: 800,
-                              color: isExpired || isToday ? '#dc2626' : 'var(--text-primary)',
-                              fontVariantNumeric: 'tabular-nums',
-                              whiteSpace: 'nowrap',
-                              fontSize: '0.76rem'
-                            }}>
-                              {formatDateBR(item.targetDateStr)}
-                            </td>
-
-                            {/* Col 5: Prazo Restante */}
-                            <td style={{ padding: '7px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                              <span style={{
-                                display: 'inline-block',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                padding: '3px 9px',
-                                borderRadius: '5px',
-                                backgroundColor: badgeBg,
-                                color: badgeColor,
-                                fontVariantNumeric: 'tabular-nums'
-                              }}>
-                                {countdownText}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {renderDeliverableRows(listAte30d, 'ate30d')}
                     </tbody>
                   </table>
-                )}
+                </div>
               </div>
+
+              {/* ── CARD 3 (DIREITA): VENCIDOS (OU ATÉ 60 DIAS CONFORME ORDEM) ── */}
+              {tableOrder === '60_30_venc' ? (
+                /* TABELA VENCIDOS */
+                <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
+                  <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                      <AlertTriangle size={16} style={{ color: '#dc2626' }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#dc2626' }}>VENCIDOS</span>
+                    </div>
+
+                    <span style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 900,
+                      color: '#dc2626',
+                      backgroundColor: 'rgba(220, 38, 38, 0.12)',
+                      padding: '2px 8px',
+                      borderRadius: '10px'
+                    }}>
+                      {listVencidos.length} expirados
+                    </span>
+                  </div>
+
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
+                        <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
+                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
+                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
+                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {renderDeliverableRows(listVencidos, 'vencidos')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                /* TABELA ATÉ 60 DIAS (QUANDO INVERTIDO) */
+                <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
+                  <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                      <Clock size={16} style={{ color: '#2563eb' }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900 }}>ATÉ 60 DIAS</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
+                        style={{
+                          fontSize: '0.58rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border)',
+                          backgroundColor: 'var(--background)',
+                          color: 'var(--text-secondary)',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {view60dFilter === '60d' ? '31–60d' : 'Todos >30d'}
+                      </button>
+
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 900,
+                        color: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                        padding: '2px 8px',
+                        borderRadius: '10px'
+                      }}>
+                        {view60dFilter === '60d' ? listAte60d.length : (listAte60d.length + listOver60d.length)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
+                        <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
+                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
+                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
+                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {renderDeliverableRows(view60dFilter === '60d' ? listAte60d : [...listAte60d, ...listOver60d], 'ate60d')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
