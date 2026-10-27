@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2, CheckCircle2, AlertTriangle, Maximize2, Minimize2,
-  ArrowLeft, BarChart3, Clock, Users, Play, Pause,
-  Award, Flame, CalendarDays, ArrowLeftRight
+  Building2, CheckCircle2, AlertTriangle, ArrowLeft, BarChart3,
+  Clock, Users, Award, Flame, CalendarDays, ArrowLeftRight
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import {
   getContracts, getDeliverables, getCompanies, getGroups, getProfiles, getTrainings
@@ -90,7 +88,6 @@ function shortenDocTitle(title) {
 const SstTvControlCenterPage = () => {
   const navigate = useNavigate();
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Dados do banco
@@ -101,45 +98,34 @@ const SstTvControlCenterPage = () => {
   const [profiles, setProfiles] = useState([]);
   const [trainings, setTrainings] = useState([]);
 
-  // Controles de Navegação e Alternância de Telas TV (15 segundos)
-  const [currentScreen, setCurrentScreen] = useState(2); // 1: Panorama & Validades, 2: 3 Tabelas de Prazos, 3: Carteira & Agendamentos
-  const [isAutoRotate, setIsAutoRotate] = useState(true);
-  const [timerProgress, setTimerProgress] = useState(0);
+  // Alternância automática de telas a cada 15 segundos
+  const [currentScreen, setCurrentScreen] = useState(1); // 1: Panorama & Validades, 2: 3 Tabelas Prazos, 3: Carteira & Agenda
 
-  // Filtros e ordenação da Tela 2
+  // Controles internos
   const [tableOrder, setTableOrder] = useState('60_30_venc'); // '60_30_venc' | 'venc_30_60'
-  const [view60dFilter, setView60dFilter] = useState('60d'); // '60d' (31-60 dias) | 'allOver30' (todos >30 dias)
+  const [view60dFilter, setView60dFilter] = useState('60d'); // '60d' (31-60d) | 'allOver30' (>30d)
   const [selectedResponsible, setSelectedResponsible] = useState('all');
   const [chartMode, setChartMode] = useState('documentos'); // 'documentos' | 'equipe'
 
-  // Rotação Automática de 15 em 15 segundos entre as 3 telas
+  // Rotação silenciosa a cada 15 segundos
   useEffect(() => {
-    if (!isAutoRotate) return undefined;
+    const timer = setInterval(() => {
+      setCurrentScreen(curr => (curr === 3 ? 1 : curr + 1));
+    }, 15000);
 
-    const stepMs = 100;
-    const totalMs = 15000; // 15 segundos exatos
-    const increment = (stepMs / totalMs) * 100;
-
-    const interval = setInterval(() => {
-      setTimerProgress(prev => {
-        if (prev + increment >= 100) {
-          setCurrentScreen(curr => (curr === 3 ? 1 : curr + 1));
-          return 0;
-        }
-        return prev + increment;
-      });
-    }, stepMs);
-
-    return () => clearInterval(interval);
-  }, [isAutoRotate]);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleSelectScreen = (screenIndex) => {
     setCurrentScreen(screenIndex);
-    setTimerProgress(0); // Reinicia os 15s na tela selecionada
   };
 
-  const toggleAutoRotate = () => {
-    setIsAutoRotate(prev => !prev);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
   };
 
   const loadData = useCallback(async (isSilent = false) => {
@@ -182,16 +168,6 @@ const SstTvControlCenterPage = () => {
       supabase.removeChannel(channel);
     };
   }, [loadData]);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
-    }
-  };
 
   // Resolução de herança de grupo (Supervisor, Técnico Responsável e Visitas)
   const companiesWithHeritage = useMemo(() => {
@@ -374,35 +350,25 @@ const SstTvControlCenterPage = () => {
   const listVencidos = useMemo(() => {
     return activeDeliverables
       .filter(d => d.isExpired || (d.daysLeft !== null && d.daysLeft < 0))
-      .sort((a, b) => {
-        // Ordena dos mais atrasados para os mais recentes
-        return (a.daysLeft ?? -9999) - (b.daysLeft ?? -9999);
-      });
+      .sort((a, b) => (a.daysLeft ?? -9999) - (b.daysLeft ?? -9999));
   }, [activeDeliverables]);
 
   const listAte30d = useMemo(() => {
     return activeDeliverables
       .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft >= 0 && d.daysLeft <= 30)
-      .sort((a, b) => {
-        // Ordena dos que vencem primeiro (hoje, amanhã, 5 dias...)
-        return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
-      });
+      .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
 
   const listAte60d = useMemo(() => {
     return activeDeliverables
       .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 30 && d.daysLeft <= 60)
-      .sort((a, b) => {
-        return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
-      });
+      .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
 
   const listOver60d = useMemo(() => {
     return activeDeliverables
       .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 60)
-      .sort((a, b) => {
-        return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
-      });
+      .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
 
   // Gráfico 1: Panorama Geral por Programa / Documento SST
@@ -485,7 +451,7 @@ const SstTvControlCenterPage = () => {
     });
   }, [responsiblesList, companiesWithHeritage, deliverables, today, in30Days, in60Days]);
 
-  // Distribuição de Validades (dados para o Donut)
+  // Distribuição de Validades (dados limpos para os 4 cards da Tela 1)
   const validityBreakdown = useMemo(() => {
     const expiredCount = metrics.expired.length;
     const exp30Count = metrics.exp30.length;
@@ -496,16 +462,14 @@ const SstTvControlCenterPage = () => {
     );
 
     const items = [
-      { name: 'Entregues Vigentes', value: safeDeliveredCount, color: '#10b981', badgeBg: 'rgba(16,185,129,0.12)' },
-      { name: 'Validade > 30 Dias', value: validOver30Count, color: '#3b82f6', badgeBg: 'rgba(59,130,246,0.12)' },
-      { name: 'A Vencer (≤ 30 Dias)', value: exp30Count, color: '#f59e0b', badgeBg: 'rgba(245,158,11,0.14)' },
-      { name: 'Vencidos / Expirados', value: expiredCount, color: '#dc2626', badgeBg: 'rgba(220,38,38,0.14)' },
+      { name: 'Entregues Vigentes', value: safeDeliveredCount, desc: 'Programas válidos e atualizados', color: '#10b981', badgeBg: 'rgba(16,185,129,0.12)' },
+      { name: 'Validade > 30 Dias', value: validOver30Count, desc: 'Prazos regulares a médio prazo', color: '#3b82f6', badgeBg: 'rgba(59,130,246,0.12)' },
+      { name: 'A Vencer (≤ 30 Dias)', value: exp30Count, desc: 'Ação imediata de renovação', color: '#f59e0b', badgeBg: 'rgba(245,158,11,0.14)' },
+      { name: 'Vencidos / Expirados', value: expiredCount, desc: 'Expirados · Risco trabalhista', color: '#dc2626', badgeBg: 'rgba(220,38,38,0.14)' },
     ];
 
-    const chartSlices = items.filter(i => i.value > 0);
     return {
       items,
-      chartSlices: chartSlices.length > 0 ? chartSlices : [{ name: 'Em Dia', value: 1, color: '#10b981' }],
       totalMonitored: safeDeliveredCount + validOver30Count + exp30Count + expiredCount
     };
   }, [metrics]);
@@ -586,7 +550,6 @@ const SstTvControlCenterPage = () => {
     });
   }, [trainings, activeDeliverables, companiesMap, today, in7Days]);
 
-  const secondsRemaining = Math.max(1, Math.ceil(15 - (timerProgress / 100) * 15));
   const totalBarRef = Math.max(1, validityBreakdown.totalMonitored);
 
   // Helper para renderizar linhas das tabelas com estilo uniforme e de alta densidade
@@ -717,21 +680,25 @@ const SstTvControlCenterPage = () => {
     <div className="tv-fullscreen-wrapper">
       <div className="tv2" style={{ padding: '8px', gap: '8px', height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
 
-        {/* ── BARRA ÚNICA SUPERIOR: APENAS O BOTÃO DE VOLTAR + INFORMAÇÕES (KPIS) + CONTROLE DISCRETO 15S ── */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          flexShrink: 0,
-          width: '100%'
-        }}>
+        {/* ── BARRA ÚNICA SUPERIOR: APENAS O BOTÃO DE VOLTAR + INFORMAÇÕES (KPIS) ── */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexShrink: 0,
+            width: '100%'
+          }}
+          onDoubleClick={toggleFullscreen}
+          title="Dê dois cliques para alternar Tela Cheia"
+        >
           {/* Botão de Voltar */}
           <button
             onClick={() => navigate('/')}
             title="Voltar ao Painel Geral"
             style={{
               height: '46px',
-              padding: '0 14px',
+              padding: '0 16px',
               borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
@@ -751,7 +718,7 @@ const SstTvControlCenterPage = () => {
             <span>Voltar</span>
           </button>
 
-          {/* Faixa de Informações (5 KPIs Compactos) */}
+          {/* Faixa de Informações (5 KPIs Preenchendo Toda a Barra) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(5, 1fr)',
@@ -760,7 +727,12 @@ const SstTvControlCenterPage = () => {
             minWidth: 0
           }}>
             {/* KPI 1: Empresas Monitoradas */}
-            <div className="tv2-kpi-card" style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center' }}>
+            <div
+              className="tv2-kpi-card"
+              onClick={() => handleSelectScreen(1)}
+              style={{ padding: '5px 12px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              title="Clique para Tela 1 (Panorama)"
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                   <div className="tv2-kpi-icon bg-blue-dim" style={{ width: 26, height: 26 }}><Building2 size={13} /></div>
@@ -779,7 +751,12 @@ const SstTvControlCenterPage = () => {
             </div>
 
             {/* KPI 2: Programas Vigentes */}
-            <div className="tv2-kpi-card" style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center' }}>
+            <div
+              className="tv2-kpi-card"
+              onClick={() => handleSelectScreen(1)}
+              style={{ padding: '5px 12px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              title="Clique para Tela 1 (Panorama)"
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                   <div className="tv2-kpi-icon bg-emerald-dim" style={{ width: 26, height: 26 }}><CheckCircle2 size={13} /></div>
@@ -801,7 +778,8 @@ const SstTvControlCenterPage = () => {
             <div
               className={`tv2-kpi-card ${metrics.exp30.length > 0 ? 'tv2-kpi-warn' : ''}`}
               onClick={() => handleSelectScreen(2)}
-              style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              style={{ padding: '5px 12px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              title="Clique para Tela 2 (Prazos)"
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -828,7 +806,8 @@ const SstTvControlCenterPage = () => {
             <div
               className={`tv2-kpi-card ${metrics.expired.length > 0 ? 'tv2-kpi-danger' : ''}`}
               onClick={() => handleSelectScreen(2)}
-              style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              style={{ padding: '5px 12px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              title="Clique para Tela 2 (Prazos)"
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -853,7 +832,8 @@ const SstTvControlCenterPage = () => {
             <div
               className="tv2-kpi-card"
               onClick={() => handleSelectScreen(3)}
-              style={{ padding: '5px 10px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              style={{ padding: '5px 12px', gap: '2px', height: '46px', justifyContent: 'center', cursor: 'pointer' }}
+              title="Clique para Tela 3 (Agenda)"
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -872,123 +852,18 @@ const SstTvControlCenterPage = () => {
               </div>
             </div>
           </div>
-
-          {/* Controle Discreto da Alternância de Telas (15s) */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            padding: '4px 10px',
-            height: '46px',
-            flexShrink: 0,
-            boxShadow: 'var(--shadow-sm)'
-          }}>
-            {/* Pontos Indicadores de Tela 1, 2, 3 com animação de progresso */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {[
-                { id: 1, label: '1' },
-                { id: 2, label: '2' },
-                { id: 3, label: '3' }
-              ].map(s => {
-                const active = currentScreen === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => handleSelectScreen(s.id)}
-                    title={`Tela ${s.id}`}
-                    style={{
-                      width: active ? '32px' : '18px',
-                      height: '24px',
-                      borderRadius: '6px',
-                      border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
-                      backgroundColor: active ? 'var(--primary)' : 'var(--background)',
-                      color: active ? '#fff' : 'var(--text-secondary)',
-                      fontSize: '0.66rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <span>{s.label}</span>
-                    {active && isAutoRotate && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        height: '3px',
-                        backgroundColor: '#fff',
-                        width: `${timerProgress}%`,
-                        opacity: 0.9,
-                        transition: 'width 0.1s linear'
-                      }} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Botão Pausar / Play de 15s */}
-            <button
-              onClick={toggleAutoRotate}
-              title={isAutoRotate ? 'Pausar rotação' : 'Ativar rotação automática de 15s'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                border: 'none',
-                background: isAutoRotate ? 'var(--primary-light)' : 'var(--background)',
-                color: isAutoRotate ? 'var(--primary)' : 'var(--text-secondary)',
-                cursor: 'pointer'
-              }}
-            >
-              {isAutoRotate ? <Pause size={11} /> : <Play size={11} />}
-              <span>{isAutoRotate ? `${secondsRemaining}s` : 'PAUSA'}</span>
-            </button>
-
-            {/* Tela Cheia */}
-            <button
-              onClick={toggleFullscreen}
-              title={isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia (TV)'}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: '6px',
-                border: '1px solid var(--border)',
-                background: 'var(--background)',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            </button>
-          </div>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            CORPO PRINCIPAL EXPANDIDO — APROVEITANDO O ESPAÇO MÁXIMO DA TELA
+            CORPO PRINCIPAL EXPANDIDO — 100% LIMPO
             ══════════════════════════════════════════════════════════════════════════ */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
 
           {/* ══════════════════════════════════════════════════════════════════
-              TELA 1: PANORAMA GERAL POR PROGRAMA/DOCUMENTO SST & DISTRIBUIÇÃO DE VALIDADES
+              TELA 1: PANORAMA GERAL SST & DISTRIBUIÇÃO DE VALIDADES (SEM ROSCA, APENAS OS 4 CARDS + BARRA)
               ══════════════════════════════════════════════════════════════════ */}
           {currentScreen === 1 && (
-            <div className="tv2-body" style={{ gridTemplateColumns: '1.35fr 1fr', gap: '8px', height: '100%', flex: 1, minHeight: 0 }}>
+            <div className="tv2-body" style={{ gridTemplateColumns: '1.4fr 1fr', gap: '8px', height: '100%', flex: 1, minHeight: 0 }}>
 
               {/* CARD ESQUERDA: Panorama Geral por Programa / Documento SST */}
               <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0 }}>
@@ -1073,7 +948,7 @@ const SstTvControlCenterPage = () => {
                 </div>
               </div>
 
-              {/* CARD DIREITA: Distribuição de Validades (Amplo, Limpo e Sem Ruído) */}
+              {/* CARD DIREITA: Distribuição de Validades (SEM ROSCA — 4 CARDS AMPLOS + BARRA SEGMENTADA) */}
               <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0 }}>
                 <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '10px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1085,55 +960,9 @@ const SstTvControlCenterPage = () => {
                   </span>
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '14px 16px' }}>
-                  {/* Gráfico Donut de Destaque */}
-                  <div style={{ width: '100%', height: '190px', position: 'relative', margin: '0 auto' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={validityBreakdown.chartSlices}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={55}
-                          outerRadius={82}
-                          paddingAngle={4}
-                          dataKey="value"
-                        >
-                          {validityBreakdown.chartSlices.map((entry, idx) => (
-                            <Cell key={`slice-${idx}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip
-                          contentStyle={{
-                            backgroundColor: 'var(--surface)',
-                            borderColor: 'var(--border)',
-                            borderRadius: '8px',
-                            fontSize: '0.76rem',
-                            color: 'var(--text-primary)'
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      pointerEvents: 'none'
-                    }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>
-                        {metrics.pctConformity}%
-                      </span>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: 4 }}>
-                        Regularidade
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 4 Linhas Limpas de Validade */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '10px 0' }}>
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 18px', gap: '12px' }}>
+                  {/* Os 4 Cards de Validade Mantidos (com V verde) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-around' }}>
                     {validityBreakdown.items.map((item) => (
                       <div
                         key={item.name}
@@ -1141,26 +970,40 @@ const SstTvControlCenterPage = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '8px 12px',
-                          borderRadius: '8px',
+                          padding: '14px 18px',
+                          borderRadius: '10px',
                           backgroundColor: 'var(--background)',
-                          border: '1px solid var(--border)'
+                          border: '1px solid var(--border)',
+                          boxShadow: 'var(--shadow-sm)'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: item.color, flexShrink: 0 }} />
-                          <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.82rem' }}>
-                            {item.name}
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: '50%',
+                            backgroundColor: item.color,
+                            flexShrink: 0
+                          }} />
+                          <div>
+                            <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                              {item.name}
+                            </div>
+                            <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              {item.desc}
+                            </div>
+                          </div>
                         </div>
                         <span style={{
                           fontWeight: 900,
-                          fontSize: '0.92rem',
+                          fontSize: '1.25rem',
                           color: item.color,
                           backgroundColor: item.badgeBg,
-                          padding: '3px 12px',
-                          borderRadius: '6px',
-                          fontVariantNumeric: 'tabular-nums'
+                          padding: '4px 16px',
+                          borderRadius: '8px',
+                          fontVariantNumeric: 'tabular-nums',
+                          minWidth: '55px',
+                          textAlign: 'center'
                         }}>
                           {item.value}
                         </span>
@@ -1168,9 +1011,9 @@ const SstTvControlCenterPage = () => {
                     ))}
                   </div>
 
-                  {/* Barra Segmentada e Resumo no Rodapé */}
-                  <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ height: '9px', width: '100%', borderRadius: '5px', display: 'flex', overflow: 'hidden', backgroundColor: 'var(--border)', marginBottom: '8px' }}>
+                  {/* Barra Segmentada e Resumo no Rodapé Mantidos (com V verde) */}
+                  <div style={{ paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ height: '10px', width: '100%', borderRadius: '5px', display: 'flex', overflow: 'hidden', backgroundColor: 'var(--border)', marginBottom: '8px' }}>
                       {metrics.deliveredSafe.length > 0 && (
                         <div title={`Entregues Vigentes: ${metrics.deliveredSafe.length}`} style={{ width: `${Math.round((metrics.deliveredSafe.length / totalBarRef) * 100)}%`, backgroundColor: '#10b981' }} />
                       )}
@@ -1184,7 +1027,7 @@ const SstTvControlCenterPage = () => {
                         <div title={`Vencidos: ${metrics.expired.length}`} style={{ width: `${Math.round((metrics.expired.length / totalBarRef) * 100)}%`, backgroundColor: '#dc2626' }} />
                       )}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
                       <span>Empresas 100% Regulares: <strong style={{ color: 'var(--text-primary)' }}>{metrics.regularCompaniesCount} / {filteredCompanies.length}</strong></span>
                       <span>Itens Monitorados: <strong style={{ color: 'var(--primary)' }}>{metrics.allUpcomingValidities.length + metrics.expired.length}</strong></span>
                     </div>
@@ -1484,7 +1327,7 @@ const SstTvControlCenterPage = () => {
             <div className="tv2-body" style={{ gridTemplateColumns: '1.05fr 1fr', gap: '8px', height: '100%', flex: 1, minHeight: 0 }}>
 
               {/* CARD ESQUERDA: Carteira por Técnico / Supervisor */}
-              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', padding: 0 }}>
+              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                 <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '10px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Users size={17} className="text-blue" />
@@ -1626,7 +1469,7 @@ const SstTvControlCenterPage = () => {
               </div>
 
               {/* CARD DIREITA: Agendamentos dos Próximos 7 Dias */}
-              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', padding: 0 }}>
+              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                 <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '10px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CalendarDays size={17} className="text-emerald" />
