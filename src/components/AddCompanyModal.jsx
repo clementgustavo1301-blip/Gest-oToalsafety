@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X, Building2, Loader2, MapPin, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Building2, Loader2, MapPin, CheckCircle2, UserCheck } from 'lucide-react';
+import { getProfiles } from '../services/storageService';
 
 function formatCNPJ(value) {
   const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -41,18 +42,24 @@ const AddCompanyModal = ({ onClose, onSave, group = null }) => {
 
   useEffect(() => {
     async function loadProfiles() {
-      const profs = await getProfiles();
-      setProfiles(profs || []);
-      if (group) {
-        if (group.supervisor) {
-          const sp = profs?.find(p => p.name === group.supervisor);
-          if (sp) setSupportResponsibleId(sp.id);
+      try {
+        const profs = await getProfiles();
+        setProfiles(profs || []);
+        if (group) {
+          if (group.supervisor) {
+            setSupportResponsible(prev => prev || group.supervisor);
+            const sp = profs?.find(p => p.name === group.supervisor);
+            if (sp) setSupportResponsibleId(sp.id);
+          }
+          const tecName = group.tecnicoResponsavel || group.tecnico_responsavel;
+          if (tecName) {
+            setResponsible(prev => prev || tecName);
+            const tp = profs?.find(p => p.name === tecName);
+            if (tp) setResponsibleId(tp.id);
+          }
         }
-        const tecName = group.tecnicoResponsavel || group.tecnico_responsavel;
-        if (tecName) {
-          const tp = profs?.find(p => p.name === tecName);
-          if (tp) setResponsibleId(tp.id);
-        }
+      } catch (err) {
+        console.error('Erro ao carregar perfis:', err);
       }
     }
     loadProfiles();
@@ -68,6 +75,12 @@ const AddCompanyModal = ({ onClose, onSave, group = null }) => {
       if (res.ok) {
         const data = await res.json();
         
+        // Preenche Razão Social / Nome Fantasia se o campo estiver vazio
+        if (!name.trim()) {
+          const compName = data.razao_social || data.nome_fantasia || '';
+          if (compName) setName(compName);
+        }
+
         // Preenche campos manuais com os dados do CNPJ se estiverem vazios
         if (!phone && data.ddd_telefone_1) setPhone(data.ddd_telefone_1);
         

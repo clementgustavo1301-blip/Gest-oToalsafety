@@ -64,6 +64,8 @@ const CompaniesPage = () => {
     if (success) {
       await loadData();
       setShowCompanyModal(false);
+      setSelectedGroupId(null);
+      setSelectedGroup(null);
     }
   };
 
@@ -237,7 +239,19 @@ const CompaniesPage = () => {
                 }}>
                   {companiesInGroup.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      Nenhuma empresa cadastrada neste grupo.
+                      <p style={{ margin: '0 0 1rem 0' }}>Nenhuma empresa cadastrada neste grupo.</p>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', margin: '0 auto', fontSize: '0.875rem' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedGroupId(group.id);
+                          setSelectedGroup(group);
+                          setShowCompanyModal(true);
+                        }}
+                      >
+                        <Plus size={16} /> Cadastrar Empresa neste Grupo
+                      </button>
                     </div>
                   ) : (
                     companiesInGroup.map((company, idx) => {
@@ -366,6 +380,7 @@ const CompaniesPage = () => {
           group={selectedGroup}
           onClose={() => {
             setShowCompanyModal(false);
+            setSelectedGroupId(null);
             setSelectedGroup(null);
           }} 
           onSave={handleAddCompany} 
