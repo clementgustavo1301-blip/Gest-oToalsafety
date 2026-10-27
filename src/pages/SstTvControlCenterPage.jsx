@@ -371,12 +371,12 @@ const SstTvControlCenterPage = () => {
       .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
 
-  // Itens para a Tabela 1: se houver itens de 31 a 60d e o filtro pedir '60d', mostra eles; senão mostra todos os 47 itens futuros
+  // Itens para a Tabela 1: apenas os 10 mais próximos a vencer conforme solicitado
   const table1Items = useMemo(() => {
-    if (view60dFilter === '60d' && listAte60d.length > 0) {
-      return listAte60d;
-    }
-    return listAllUpcomingOver30;
+    const baseList = (view60dFilter === '60d' && listAte60d.length > 0)
+      ? listAte60d
+      : listAllUpcomingOver30;
+    return baseList.slice(0, 10);
   }, [view60dFilter, listAte60d, listAllUpcomingOver30]);
 
   // Gráfico 1: Panorama Geral por Programa / Documento SST
@@ -1096,7 +1096,7 @@ const SstTvControlCenterPage = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                       <Clock size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
                       <span style={{ fontSize: '0.84rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
-                        {listAte60d.length > 0 ? 'ATÉ 60 DIAS' : 'PRÓXIMOS A VENCER'}
+                        PRÓXIMOS A VENCER
                       </span>
                     </div>
 
@@ -1309,7 +1309,7 @@ const SstTvControlCenterPage = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                       <Clock size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
                       <span style={{ fontSize: '0.84rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
-                        {listAte60d.length > 0 ? 'ATÉ 60 DIAS' : 'PRÓXIMOS A VENCER'}
+                        PRÓXIMOS A VENCER
                       </span>
                     </div>
 
