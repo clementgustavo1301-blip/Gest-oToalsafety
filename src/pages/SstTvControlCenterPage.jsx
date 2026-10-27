@@ -67,7 +67,7 @@ function isCompanyAssignedTo(company, personName) {
   return isCompanySupervisor(company, personName) || isCompanyTecnico(company, personName);
 }
 
-function formatDateBR(val, shortYear = false) {
+function formatDateBR(val, shortYear = true) {
   const d = parseSafeDate(val);
   if (!d) return '—';
   const day = String(d.getDate()).padStart(2, '0');
@@ -99,11 +99,11 @@ const SstTvControlCenterPage = () => {
   const [trainings, setTrainings] = useState([]);
 
   // Alternância automática de telas a cada 15 segundos
-  const [currentScreen, setCurrentScreen] = useState(1); // 1: Panorama & Validades, 2: 3 Tabelas Prazos, 3: Carteira & Agenda
+  const [currentScreen, setCurrentScreen] = useState(2); // Inicia na Tela 2 (3 Tabelas)
 
   // Controles internos
   const [tableOrder, setTableOrder] = useState('60_30_venc'); // '60_30_venc' | 'venc_30_60'
-  const [view60dFilter, setView60dFilter] = useState('60d'); // '60d' (31-60d) | 'allOver30' (>30d)
+  const [view60dFilter, setView60dFilter] = useState('allOver30'); // 'allOver30' (todos >30d) | '60d' (31-60d)
   const [selectedResponsible, setSelectedResponsible] = useState('all');
   const [chartMode, setChartMode] = useState('documentos'); // 'documentos' | 'equipe'
 
@@ -346,7 +346,7 @@ const SstTvControlCenterPage = () => {
     };
   }, [activeDeliverables, filteredCompanies.length]);
 
-  // 3 Listas Dedicadas para a Tela 2: Até 60 Dias, Até 30 Dias e Vencidos
+  // 3 Listas Dedicadas para a Tela 2: Vencidos, Até 30 Dias e Próximos (>30d / Até 60d)
   const listVencidos = useMemo(() => {
     return activeDeliverables
       .filter(d => d.isExpired || (d.daysLeft !== null && d.daysLeft < 0))
@@ -365,11 +365,19 @@ const SstTvControlCenterPage = () => {
       .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
 
-  const listOver60d = useMemo(() => {
+  const listAllUpcomingOver30 = useMemo(() => {
     return activeDeliverables
-      .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 60)
+      .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 30)
       .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
+
+  // Itens para a Tabela 1: se houver itens de 31 a 60d e o filtro pedir '60d', mostra eles; senão mostra todos os 47 itens futuros
+  const table1Items = useMemo(() => {
+    if (view60dFilter === '60d' && listAte60d.length > 0) {
+      return listAte60d;
+    }
+    return listAllUpcomingOver30;
+  }, [view60dFilter, listAte60d, listAllUpcomingOver30]);
 
   // Gráfico 1: Panorama Geral por Programa / Documento SST
   const documentChartData = useMemo(() => {
@@ -552,7 +560,7 @@ const SstTvControlCenterPage = () => {
 
   const totalBarRef = Math.max(1, validityBreakdown.totalMonitored);
 
-  // Helper para renderizar linhas das tabelas com estilo uniforme e de alta densidade
+  // Helper para renderizar linhas das tabelas SEM SCROLL LATERAL e em alta legibilidade
   const renderDeliverableRows = (items, categoryType) => {
     if (!items || items.length === 0) {
       return (
@@ -583,32 +591,33 @@ const SstTvControlCenterPage = () => {
         dotColor = '#dc2626';
         badgeBg = '#dc2626';
         badgeColor = '#ffffff';
-        countdownText = days !== null ? `-${Math.abs(days)}d VENCIDO` : 'VENCIDO';
+        // Texto ultra-compacto para nunca estourar a coluna nem gerar scroll horizontal
+        countdownText = days !== null ? `-${Math.abs(days)}d` : 'VENCIDO';
       } else if (isToday) {
         dotColor = '#dc2626';
         badgeBg = '#dc2626';
         badgeColor = '#ffffff';
-        countdownText = '🚨 HOJE!';
+        countdownText = 'HOJE';
       } else if (isTomorrow) {
         dotColor = '#ea580c';
         badgeBg = '#ea580c';
         badgeColor = '#ffffff';
-        countdownText = '⚠️ AMANHÃ';
+        countdownText = 'AMANHÃ';
       } else if (isUrgent15) {
         dotColor = '#ef4444';
         badgeBg = 'rgba(239, 68, 68, 0.16)';
         badgeColor = '#ef4444';
-        countdownText = `${days} dias`;
+        countdownText = `${days}d`;
       } else if (categoryType === 'ate30d') {
         dotColor = '#f59e0b';
         badgeBg = 'rgba(245, 158, 11, 0.16)';
         badgeColor = '#d97706';
-        countdownText = `${days} dias`;
+        countdownText = `${days}d`;
       } else {
         dotColor = '#2563eb';
         badgeBg = 'rgba(37, 99, 235, 0.14)';
         badgeColor = '#2563eb';
-        countdownText = `${days} dias`;
+        countdownText = `${days}d`;
       }
 
       return (
@@ -623,10 +632,18 @@ const SstTvControlCenterPage = () => {
             transition: 'background 0.15s'
           }}
         >
-          {/* Col 1: Documento */}
-          <td style={{ padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0 }} />
+          {/* Col 1: Documento (Truncado com elipse, sem estourar largura) */}
+          <td style={{
+            padding: '5px 6px',
+            width: '28%',
+            maxWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0 }} />
               <span style={{ fontWeight: 800, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {shortenDocTitle(item.title)}
               </span>
@@ -634,39 +651,58 @@ const SstTvControlCenterPage = () => {
           </td>
 
           {/* Col 2: Empresa & Técnico */}
-          <td style={{ padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <td style={{
+            padding: '5px 6px',
+            width: '38%',
+            maxWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box'
+          }}>
             <div style={{ fontWeight: 700, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
               {item.companyName}
             </div>
-            <div style={{ fontSize: '0.58rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1 }}>
+            <div style={{ fontSize: '0.57rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1 }}>
               {item.tecnico !== 'Não definido' ? item.tecnico : item.supervisor}
             </div>
           </td>
 
           {/* Col 3: Data de Validade */}
           <td style={{
-            padding: '6px 6px',
+            padding: '5px 4px',
+            width: '18%',
             textAlign: 'center',
             fontWeight: 800,
             color: isExpired || isToday ? '#dc2626' : 'var(--text-primary)',
             fontVariantNumeric: 'tabular-nums',
             whiteSpace: 'nowrap',
-            fontSize: '0.72rem'
+            fontSize: '0.7rem',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
           }}>
             {formatDateBR(item.targetDateStr, true)}
           </td>
 
-          {/* Col 4: Prazo Restante */}
-          <td style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          {/* Col 4: Prazo Restante (Compacto, alinhado e sem gerar overflow) */}
+          <td style={{
+            padding: '5px 6px',
+            width: '16%',
+            textAlign: 'right',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
+          }}>
             <span style={{
               display: 'inline-block',
               fontSize: '0.62rem',
               fontWeight: 800,
-              padding: '2px 7px',
-              borderRadius: '5px',
+              padding: '2px 5px',
+              borderRadius: '4px',
               backgroundColor: badgeBg,
               color: badgeColor,
-              fontVariantNumeric: 'tabular-nums'
+              fontVariantNumeric: 'tabular-nums',
+              textAlign: 'center'
             }}>
               {countdownText}
             </span>
@@ -855,18 +891,18 @@ const SstTvControlCenterPage = () => {
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            CORPO PRINCIPAL EXPANDIDO — 100% LIMPO
+            CORPO PRINCIPAL EXPANDIDO — 100% LIMPO E SEM SCROLL HORIZONTAL
             ══════════════════════════════════════════════════════════════════════════ */}
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
           {/* ══════════════════════════════════════════════════════════════════
-              TELA 1: PANORAMA GERAL SST & DISTRIBUIÇÃO DE VALIDADES (SEM ROSCA, APENAS OS 4 CARDS + BARRA)
+              TELA 1: PANORAMA GERAL SST & DISTRIBUIÇÃO DE VALIDADES (4 CARDS AMPLOS + BARRA)
               ══════════════════════════════════════════════════════════════════ */}
           {currentScreen === 1 && (
-            <div className="tv2-body" style={{ gridTemplateColumns: '1.4fr 1fr', gap: '8px', height: '100%', flex: 1, minHeight: 0 }}>
+            <div className="tv2-body" style={{ gridTemplateColumns: '1.4fr 1fr', gap: '8px', height: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
               {/* CARD ESQUERDA: Panorama Geral por Programa / Documento SST */}
-              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0 }}>
+              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                 <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '10px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <BarChart3 size={17} className="text-blue" />
@@ -910,7 +946,7 @@ const SstTvControlCenterPage = () => {
                   </div>
                 </div>
 
-                <div className="tv2-chart-area" style={{ flex: 1, minHeight: 0, padding: '12px 14px 10px 4px' }}>
+                <div className="tv2-chart-area" style={{ flex: 1, minHeight: 0, padding: '12px 14px 10px 4px', overflowX: 'hidden' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartMode === 'documentos' ? documentChartData : teamChartData}
@@ -948,8 +984,8 @@ const SstTvControlCenterPage = () => {
                 </div>
               </div>
 
-              {/* CARD DIREITA: Distribuição de Validades (SEM ROSCA — 4 CARDS AMPLOS + BARRA SEGMENTADA) */}
-              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0 }}>
+              {/* CARD DIREITA: Distribuição de Validades (4 CARDS AMPLOS + BARRA SEGMENTADA) */}
+              <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                 <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '10px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Award size={17} className="text-emerald" />
@@ -961,7 +997,7 @@ const SstTvControlCenterPage = () => {
                 </div>
 
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 18px', gap: '12px' }}>
-                  {/* Os 4 Cards de Validade Mantidos (com V verde) */}
+                  {/* Os 4 Cards de Validade Mantidos com layout limpo e amplo */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-around' }}>
                     {validityBreakdown.items.map((item) => (
                       <div
@@ -1011,7 +1047,7 @@ const SstTvControlCenterPage = () => {
                     ))}
                   </div>
 
-                  {/* Barra Segmentada e Resumo no Rodapé Mantidos (com V verde) */}
+                  {/* Barra Segmentada e Resumo no Rodapé */}
                   <div style={{ paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
                     <div style={{ height: '10px', width: '100%', borderRadius: '5px', display: 'flex', overflow: 'hidden', backgroundColor: 'var(--border)', marginBottom: '8px' }}>
                       {metrics.deliveredSafe.length > 0 && (
@@ -1039,7 +1075,7 @@ const SstTvControlCenterPage = () => {
           )}
 
           {/* ══════════════════════════════════════════════════════════════════
-              TELA 2: 3 TABELAS DEDICADAS (ATÉ 60 DIAS, ATÉ 30 DIAS E VENCIDOS)
+              TELA 2: 3 TABELAS DEDICADAS (ZERO SCROLL LATERAL, AJUSTE PERFEITO EM 100%)
               ══════════════════════════════════════════════════════════════════ */}
           {currentScreen === 2 && (
             <div style={{
@@ -1048,47 +1084,52 @@ const SstTvControlCenterPage = () => {
               gap: '8px',
               height: '100%',
               flex: 1,
-              minHeight: 0
+              minHeight: 0,
+              overflow: 'hidden'
             }}>
 
-              {/* ── CARD 1: ATÉ 60 DIAS (OU VENCIDOS CONFORME ORDEM) ── */}
+              {/* ── CARD 1: PRÓXIMOS A VENCER / ATÉ 60 DIAS (OU VENCIDOS CONFORME ORDEM) ── */}
               {tableOrder === '60_30_venc' ? (
-                /* TABELA ATÉ 60 DIAS */
+                /* TABELA 1: PRÓXIMOS A VENCER / ATÉ 60 DIAS */
                 <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                   <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <Clock size={16} style={{ color: '#2563eb' }} />
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900 }}>ATÉ 60 DIAS</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <Clock size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                        {listAte60d.length > 0 ? 'ATÉ 60 DIAS' : 'PRÓXIMOS A VENCER'}
+                      </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
-                        title={view60dFilter === '60d' ? 'Exibindo 31 a 60 dias (clique para ver todos >30d)' : 'Exibindo todos >30 dias (clique para filtrar até 60d)'}
-                        style={{
-                          fontSize: '0.58rem',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          border: '1px solid var(--border)',
-                          backgroundColor: 'var(--background)',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {view60dFilter === '60d' ? '31–60d' : 'Todos >30d'}
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      {listAte60d.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
+                          title={view60dFilter === '60d' ? 'Exibindo 31 a 60 dias (clique para ver todos >30d)' : 'Exibindo todos >30 dias (clique para filtrar até 60d)'}
+                          style={{
+                            fontSize: '0.58rem',
+                            padding: '2px 5px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border)',
+                            backgroundColor: 'var(--background)',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {view60dFilter === '60d' ? '31–60d' : 'Todos'}
+                        </button>
+                      )}
 
                       <span style={{
                         fontSize: '0.66rem',
                         fontWeight: 900,
                         color: '#2563eb',
                         backgroundColor: 'rgba(37, 99, 235, 0.12)',
-                        padding: '2px 8px',
+                        padding: '2px 7px',
                         borderRadius: '10px'
                       }}>
-                        {view60dFilter === '60d' ? listAte60d.length : (listAte60d.length + listOver60d.length)}
+                        {table1Items.length}
                       </span>
 
                       <button
@@ -1110,18 +1151,18 @@ const SstTvControlCenterPage = () => {
                     </div>
                   </div>
 
-                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, minHeight: 0, width: '100%' }}>
+                    <table style={{ width: '100%', maxWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
                       <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
                         <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
-                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
-                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
-                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
-                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                          <th style={{ padding: '6px 6px', width: '28%', fontWeight: 800, boxSizing: 'border-box' }}>Documento</th>
+                          <th style={{ padding: '6px 6px', width: '38%', fontWeight: 800, boxSizing: 'border-box' }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 4px', width: '18%', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}>Validade</th>
+                          <th style={{ padding: '6px 6px', width: '16%', fontWeight: 800, textAlign: 'right', boxSizing: 'border-box' }}>Prazo</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {renderDeliverableRows(view60dFilter === '60d' ? listAte60d : [...listAte60d, ...listOver60d], 'ate60d')}
+                        {renderDeliverableRows(table1Items, 'ate60d')}
                       </tbody>
                     </table>
                   </div>
@@ -1130,21 +1171,21 @@ const SstTvControlCenterPage = () => {
                 /* TABELA VENCIDOS (QUANDO INVERTIDO) */
                 <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                   <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <AlertTriangle size={16} style={{ color: '#dc2626' }} />
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#dc2626' }}>VENCIDOS</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <AlertTriangle size={16} style={{ color: '#dc2626', flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#dc2626', whiteSpace: 'nowrap' }}>VENCIDOS</span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                       <span style={{
                         fontSize: '0.66rem',
                         fontWeight: 900,
                         color: '#dc2626',
                         backgroundColor: 'rgba(220, 38, 38, 0.12)',
-                        padding: '2px 8px',
+                        padding: '2px 7px',
                         borderRadius: '10px'
                       }}>
-                        {listVencidos.length} expirados
+                        {listVencidos.length}
                       </span>
 
                       <button
@@ -1166,14 +1207,14 @@ const SstTvControlCenterPage = () => {
                     </div>
                   </div>
 
-                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, minHeight: 0, width: '100%' }}>
+                    <table style={{ width: '100%', maxWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
                       <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
                         <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
-                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
-                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
-                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
-                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                          <th style={{ padding: '6px 6px', width: '28%', fontWeight: 800, boxSizing: 'border-box' }}>Documento</th>
+                          <th style={{ padding: '6px 6px', width: '38%', fontWeight: 800, boxSizing: 'border-box' }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 4px', width: '18%', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}>Validade</th>
+                          <th style={{ padding: '6px 6px', width: '16%', fontWeight: 800, textAlign: 'right', boxSizing: 'border-box' }}>Prazo</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1187,9 +1228,9 @@ const SstTvControlCenterPage = () => {
               {/* ── CARD 2 (CENTRAL): ATÉ 30 DIAS ── */}
               <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                 <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <Flame size={16} style={{ color: '#ea580c' }} />
-                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#ea580c' }}>ATÉ 30 DIAS</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                    <Flame size={16} style={{ color: '#ea580c', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#ea580c', whiteSpace: 'nowrap' }}>ATÉ 30 DIAS</span>
                   </div>
 
                   <span style={{
@@ -1197,21 +1238,22 @@ const SstTvControlCenterPage = () => {
                     fontWeight: 900,
                     color: '#ea580c',
                     backgroundColor: 'rgba(234, 88, 12, 0.12)',
-                    padding: '2px 8px',
-                    borderRadius: '10px'
+                    padding: '2px 7px',
+                    borderRadius: '10px',
+                    flexShrink: 0
                   }}>
                     {listAte30d.length} críticos
                   </span>
                 </div>
 
-                <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, minHeight: 0, width: '100%' }}>
+                  <table style={{ width: '100%', maxWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
                     <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
                       <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
-                        <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
-                        <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
-                        <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
-                        <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                        <th style={{ padding: '6px 6px', width: '28%', fontWeight: 800, boxSizing: 'border-box' }}>Documento</th>
+                        <th style={{ padding: '6px 6px', width: '38%', fontWeight: 800, boxSizing: 'border-box' }}>Empresa / Téc.</th>
+                        <th style={{ padding: '6px 4px', width: '18%', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}>Validade</th>
+                        <th style={{ padding: '6px 6px', width: '16%', fontWeight: 800, textAlign: 'right', boxSizing: 'border-box' }}>Prazo</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1226,9 +1268,9 @@ const SstTvControlCenterPage = () => {
                 /* TABELA VENCIDOS */
                 <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                   <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <AlertTriangle size={16} style={{ color: '#dc2626' }} />
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#dc2626' }}>VENCIDOS</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <AlertTriangle size={16} style={{ color: '#dc2626', flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#dc2626', whiteSpace: 'nowrap' }}>VENCIDOS</span>
                     </div>
 
                     <span style={{
@@ -1236,21 +1278,22 @@ const SstTvControlCenterPage = () => {
                       fontWeight: 900,
                       color: '#dc2626',
                       backgroundColor: 'rgba(220, 38, 38, 0.12)',
-                      padding: '2px 8px',
-                      borderRadius: '10px'
+                      padding: '2px 7px',
+                      borderRadius: '10px',
+                      flexShrink: 0
                     }}>
                       {listVencidos.length} expirados
                     </span>
                   </div>
 
-                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, minHeight: 0, width: '100%' }}>
+                    <table style={{ width: '100%', maxWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
                       <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
                         <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
-                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
-                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
-                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
-                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                          <th style={{ padding: '6px 6px', width: '28%', fontWeight: 800, boxSizing: 'border-box' }}>Documento</th>
+                          <th style={{ padding: '6px 6px', width: '38%', fontWeight: 800, boxSizing: 'border-box' }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 4px', width: '18%', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}>Validade</th>
+                          <th style={{ padding: '6px 6px', width: '16%', fontWeight: 800, textAlign: 'right', boxSizing: 'border-box' }}>Prazo</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1263,54 +1306,59 @@ const SstTvControlCenterPage = () => {
                 /* TABELA ATÉ 60 DIAS (QUANDO INVERTIDO) */
                 <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
                   <div className="tv2-chart-head" style={{ justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <Clock size={16} style={{ color: '#2563eb' }} />
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900 }}>ATÉ 60 DIAS</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <Clock size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                        {listAte60d.length > 0 ? 'ATÉ 60 DIAS' : 'PRÓXIMOS A VENCER'}
+                      </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
-                        style={{
-                          fontSize: '0.58rem',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          border: '1px solid var(--border)',
-                          backgroundColor: 'var(--background)',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {view60dFilter === '60d' ? '31–60d' : 'Todos >30d'}
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      {listAte60d.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
+                          title={view60dFilter === '60d' ? 'Exibindo 31 a 60 dias (clique para ver todos >30d)' : 'Exibindo todos >30 dias (clique para filtrar até 60d)'}
+                          style={{
+                            fontSize: '0.58rem',
+                            padding: '2px 5px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border)',
+                            backgroundColor: 'var(--background)',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {view60dFilter === '60d' ? '31–60d' : 'Todos'}
+                        </button>
+                      )}
 
                       <span style={{
                         fontSize: '0.66rem',
                         fontWeight: 900,
                         color: '#2563eb',
                         backgroundColor: 'rgba(37, 99, 235, 0.12)',
-                        padding: '2px 8px',
+                        padding: '2px 7px',
                         borderRadius: '10px'
                       }}>
-                        {view60dFilter === '60d' ? listAte60d.length : (listAte60d.length + listOver60d.length)}
+                        {table1Items.length}
                       </span>
                     </div>
                   </div>
 
-                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
+                  <div className="tv2-chart-area" style={{ padding: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, minHeight: 0, width: '100%' }}>
+                    <table style={{ width: '100%', maxWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.7rem' }}>
                       <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
                         <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', textTransform: 'uppercase', textAlign: 'left' }}>
-                          <th style={{ padding: '6px 8px', width: '31%', fontWeight: 800 }}>Documento</th>
-                          <th style={{ padding: '6px 8px', width: '37%', fontWeight: 800 }}>Empresa / Téc.</th>
-                          <th style={{ padding: '6px 6px', width: '17%', fontWeight: 800, textAlign: 'center' }}>Validade</th>
-                          <th style={{ padding: '6px 8px', width: '15%', fontWeight: 800, textAlign: 'right' }}>Prazo</th>
+                          <th style={{ padding: '6px 6px', width: '28%', fontWeight: 800, boxSizing: 'border-box' }}>Documento</th>
+                          <th style={{ padding: '6px 6px', width: '38%', fontWeight: 800, boxSizing: 'border-box' }}>Empresa / Téc.</th>
+                          <th style={{ padding: '6px 4px', width: '18%', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}>Validade</th>
+                          <th style={{ padding: '6px 6px', width: '16%', fontWeight: 800, textAlign: 'right', boxSizing: 'border-box' }}>Prazo</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {renderDeliverableRows(view60dFilter === '60d' ? listAte60d : [...listAte60d, ...listOver60d], 'ate60d')}
+                        {renderDeliverableRows(table1Items, 'ate60d')}
                       </tbody>
                     </table>
                   </div>
@@ -1324,7 +1372,7 @@ const SstTvControlCenterPage = () => {
               TELA 3: CARTEIRA POR TÉCNICO/SUPERVISOR & AGENDAMENTOS DOS PRÓXIMOS 7 DIAS
               ══════════════════════════════════════════════════════════════════ */}
           {currentScreen === 3 && (
-            <div className="tv2-body" style={{ gridTemplateColumns: '1.05fr 1fr', gap: '8px', height: '100%', flex: 1, minHeight: 0 }}>
+            <div className="tv2-body" style={{ gridTemplateColumns: '1.05fr 1fr', gap: '8px', height: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
               {/* CARD ESQUERDA: Carteira por Técnico / Supervisor */}
               <div className="tv2-chart-card card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, overflow: 'hidden' }}>
@@ -1358,17 +1406,16 @@ const SstTvControlCenterPage = () => {
                   </div>
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, padding: 0, overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                <div style={{ flex: 1, minHeight: 0, padding: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+                  <table style={{ width: '100%', maxWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.75rem' }}>
                     <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 2, boxShadow: '0 1px 0 var(--border)' }}>
                       <tr style={{ color: 'var(--text-secondary)', fontSize: '0.64rem', textTransform: 'uppercase', textAlign: 'left' }}>
-                        <th style={{ padding: '8px 12px', fontWeight: 800 }}>Profissional</th>
-                        <th style={{ padding: '8px 8px', fontWeight: 800, textAlign: 'center' }}>Função</th>
-                        <th style={{ padding: '8px 8px', fontWeight: 800, textAlign: 'center' }}>Emp.</th>
-                        <th style={{ padding: '8px 8px', fontWeight: 800, textAlign: 'center', color: '#10b981' }}>Em Dia</th>
-                        <th style={{ padding: '8px 8px', fontWeight: 800, textAlign: 'center', color: '#d97706' }}>≤ 30d</th>
-                        <th style={{ padding: '8px 8px', fontWeight: 800, textAlign: 'center', color: '#dc2626' }}>Venc.</th>
-                        <th style={{ padding: '8px 12px', fontWeight: 800, textAlign: 'right' }}>Saúde</th>
+                        <th style={{ padding: '8px 10px', width: '38%', fontWeight: 800, boxSizing: 'border-box' }}>Profissional</th>
+                        <th style={{ padding: '8px 4px', width: '16%', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}>Função</th>
+                        <th style={{ padding: '8px 4px', width: '11%', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}>Emp.</th>
+                        <th style={{ padding: '8px 4px', width: '11%', fontWeight: 800, textAlign: 'center', color: '#10b981', boxSizing: 'border-box' }}>Em Dia</th>
+                        <th style={{ padding: '8px 4px', width: '12%', fontWeight: 800, textAlign: 'center', color: '#d97706', boxSizing: 'border-box' }}>≤ 30d</th>
+                        <th style={{ padding: '8px 4px', width: '12%', fontWeight: 800, textAlign: 'center', color: '#dc2626', boxSizing: 'border-box' }}>Venc.</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1386,25 +1433,25 @@ const SstTvControlCenterPage = () => {
                               transition: 'background 0.15s'
                             }}
                           >
-                            <td style={{ padding: '9px 12px', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <td style={{ padding: '8px 10px', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', overflow: 'hidden' }}>
                                 <div style={{
-                                  width: 26, height: 26, borderRadius: '50%',
+                                  width: 24, height: 24, borderRadius: '50%',
                                   backgroundColor: resp.roleLabel === 'Supervisor' ? 'rgba(37,99,235,0.15)' : 'rgba(16,185,129,0.15)',
                                   color: resp.roleLabel === 'Supervisor' ? '#2563eb' : '#059669',
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  fontSize: '0.64rem', fontWeight: 800
+                                  fontSize: '0.62rem', fontWeight: 800, flexShrink: 0
                                 }}>
                                   {resp.fullName.slice(0, 2).toUpperCase()}
                                 </div>
-                                <span>{resp.fullName}</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{resp.fullName}</span>
                               </div>
                             </td>
-                            <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                            <td style={{ padding: '8px 4px', textAlign: 'center', overflow: 'hidden' }}>
                               <span style={{
-                                fontSize: '0.62rem',
+                                fontSize: '0.58rem',
                                 fontWeight: 700,
-                                padding: '2px 7px',
+                                padding: '2px 5px',
                                 borderRadius: '4px',
                                 backgroundColor: resp.roleLabel === 'Supervisor' ? 'rgba(37,99,235,0.12)' : 'rgba(16,185,129,0.12)',
                                 color: resp.roleLabel === 'Supervisor' ? '#2563eb' : '#059669'
@@ -1412,38 +1459,29 @@ const SstTvControlCenterPage = () => {
                                 {resp.roleLabel}
                               </span>
                             </td>
-                            <td style={{ padding: '9px 8px', textAlign: 'center', fontWeight: 800, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                            <td style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 800, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                               {resp.empresas}
                             </td>
-                            <td style={{ padding: '9px 8px', textAlign: 'center', fontWeight: 900, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>
+                            <td style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 900, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>
                               {resp.Vigentes}
                             </td>
-                            <td style={{ padding: '9px 8px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                            <td style={{ padding: '8px 4px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
                               {resp['A Vencer (≤30d)'] > 0 ? (
-                                <span style={{ background: 'rgba(245,158,11,0.16)', color: '#d97706', padding: '2px 8px', borderRadius: '4px', fontWeight: 800, fontSize: '0.72rem' }}>
+                                <span style={{ background: 'rgba(245,158,11,0.16)', color: '#d97706', padding: '2px 6px', borderRadius: '4px', fontWeight: 800, fontSize: '0.68rem' }}>
                                   {resp['A Vencer (≤30d)']}
                                 </span>
                               ) : (
                                 <span style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>0</span>
                               )}
                             </td>
-                            <td style={{ padding: '9px 8px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                            <td style={{ padding: '8px 4px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
                               {resp.Vencidos > 0 ? (
-                                <span style={{ background: 'rgba(220,38,38,0.15)', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontWeight: 800, fontSize: '0.72rem' }}>
+                                <span style={{ background: 'rgba(220,38,38,0.15)', color: '#dc2626', padding: '2px 6px', borderRadius: '4px', fontWeight: 800, fontSize: '0.68rem' }}>
                                   {resp.Vencidos}
                                 </span>
                               ) : (
-                                <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.72rem' }}>✓ 0</span>
+                                <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.68rem' }}>✓ 0</span>
                               )}
-                            </td>
-                            <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                              <span style={{
-                                fontSize: '0.72rem',
-                                fontWeight: 800,
-                                color: resp.pctConformidade >= 85 ? '#10b981' : (resp.pctConformidade >= 70 ? '#f59e0b' : '#dc2626')
-                              }}>
-                                {resp.pctConformidade}%
-                              </span>
                             </td>
                           </tr>
                         );
@@ -1480,7 +1518,7 @@ const SstTvControlCenterPage = () => {
                   </span>
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, padding: '10px 12px', overflowY: 'auto' }}>
+                <div style={{ flex: 1, minHeight: 0, padding: '10px 12px', overflowY: 'auto', overflowX: 'hidden' }}>
                   {upcomingScheduledItems.length === 0 ? (
                     <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '4rem 1rem' }}>
                       <CheckCircle2 size={40} style={{ color: '#10b981', margin: '0 auto 8px auto' }} />
