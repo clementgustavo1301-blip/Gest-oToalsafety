@@ -103,7 +103,6 @@ const SstTvControlCenterPage = () => {
 
   // Controles internos
   const [tableOrder, setTableOrder] = useState('60_30_venc'); // '60_30_venc' | 'venc_30_60'
-  const [view60dFilter, setView60dFilter] = useState('allOver30'); // 'allOver30' (todos >30d) | '60d' (31-60d)
   const [selectedResponsible, setSelectedResponsible] = useState('all');
   const [chartMode, setChartMode] = useState('documentos'); // 'documentos' | 'equipe'
 
@@ -359,25 +358,12 @@ const SstTvControlCenterPage = () => {
       .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
 
+  // Tabela 1: Documentos a vencer de 31 a 60 dias (Até 60 dias)
   const listAte60d = useMemo(() => {
     return activeDeliverables
       .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 30 && d.daysLeft <= 60)
       .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
   }, [activeDeliverables]);
-
-  const listAllUpcomingOver30 = useMemo(() => {
-    return activeDeliverables
-      .filter(d => !d.isExpired && d.daysLeft !== null && d.daysLeft > 30)
-      .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
-  }, [activeDeliverables]);
-
-  // Itens para a Tabela 1: apenas os 10 mais próximos a vencer conforme solicitado
-  const table1Items = useMemo(() => {
-    const baseList = (view60dFilter === '60d' && listAte60d.length > 0)
-      ? listAte60d
-      : listAllUpcomingOver30;
-    return baseList.slice(0, 10);
-  }, [view60dFilter, listAte60d, listAllUpcomingOver30]);
 
   // Gráfico 1: Panorama Geral por Programa / Documento SST
   const documentChartData = useMemo(() => {
@@ -1096,31 +1082,11 @@ const SstTvControlCenterPage = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                       <Clock size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
                       <span style={{ fontSize: '0.84rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
-                        PRÓXIMOS A VENCER
+                        ATÉ 60 DIAS
                       </span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                      {listAte60d.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
-                          title={view60dFilter === '60d' ? 'Exibindo 31 a 60 dias (clique para ver todos >30d)' : 'Exibindo todos >30 dias (clique para filtrar até 60d)'}
-                          style={{
-                            fontSize: '0.58rem',
-                            padding: '2px 5px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border)',
-                            backgroundColor: 'var(--background)',
-                            color: 'var(--text-secondary)',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {view60dFilter === '60d' ? '31–60d' : 'Todos'}
-                        </button>
-                      )}
-
                       <span style={{
                         fontSize: '0.66rem',
                         fontWeight: 900,
@@ -1129,7 +1095,7 @@ const SstTvControlCenterPage = () => {
                         padding: '2px 7px',
                         borderRadius: '10px'
                       }}>
-                        {table1Items.length}
+                        {listAte60d.length}
                       </span>
 
                       <button
@@ -1162,7 +1128,7 @@ const SstTvControlCenterPage = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {renderDeliverableRows(table1Items, 'ate60d')}
+                        {renderDeliverableRows(listAte60d, 'ate60d')}
                       </tbody>
                     </table>
                   </div>
@@ -1309,31 +1275,11 @@ const SstTvControlCenterPage = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                       <Clock size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
                       <span style={{ fontSize: '0.84rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
-                        PRÓXIMOS A VENCER
+                        ATÉ 60 DIAS
                       </span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                      {listAte60d.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setView60dFilter(f => (f === '60d' ? 'allOver30' : '60d'))}
-                          title={view60dFilter === '60d' ? 'Exibindo 31 a 60 dias (clique para ver todos >30d)' : 'Exibindo todos >30 dias (clique para filtrar até 60d)'}
-                          style={{
-                            fontSize: '0.58rem',
-                            padding: '2px 5px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border)',
-                            backgroundColor: 'var(--background)',
-                            color: 'var(--text-secondary)',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {view60dFilter === '60d' ? '31–60d' : 'Todos'}
-                        </button>
-                      )}
-
                       <span style={{
                         fontSize: '0.66rem',
                         fontWeight: 900,
@@ -1342,7 +1288,7 @@ const SstTvControlCenterPage = () => {
                         padding: '2px 7px',
                         borderRadius: '10px'
                       }}>
-                        {table1Items.length}
+                        {listAte60d.length}
                       </span>
                     </div>
                   </div>
@@ -1358,7 +1304,7 @@ const SstTvControlCenterPage = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {renderDeliverableRows(table1Items, 'ate60d')}
+                        {renderDeliverableRows(listAte60d, 'ate60d')}
                       </tbody>
                     </table>
                   </div>
