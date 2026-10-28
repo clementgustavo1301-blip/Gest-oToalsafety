@@ -2072,6 +2072,7 @@ const TrainingCertificatesPage = () => {
                       ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                       onChange={(e) => handleToggleSelectAllColaboradores(e.target.checked)}
                       aria-label="Selecionar todos os participantes para emissão de certificado"
+                      style={{ cursor: 'pointer', width: '18px', height: '18px', margin: 0 }}
                     />
                   </div>
                   <span>#</span>
@@ -2094,6 +2095,7 @@ const TrainingCertificatesPage = () => {
                             onChange={() => handleToggleSelectColaborador(idx)}
                             title={isSelected ? "Participante selecionado para gerar certificado (clique para desmarcar)" : "Clique para incluir este participante na emissão"}
                             aria-label={`Selecionar ${colab.nome || `Participante #${idx + 1}`} para emissão`}
+                            style={{ cursor: 'pointer', width: '18px', height: '18px', margin: 0 }}
                           />
                         </div>
                         <span className="tc-student-idx">{idx + 1}</span>

@@ -581,14 +581,19 @@ textarea.tc-input {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  min-width: 28px;
 }
 
 .tc-checkbox {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 4px;
   cursor: pointer;
-  accent-color: var(--tc-accent, #0284c7);
+  accent-color: #0284c7;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .tc-students-head {
