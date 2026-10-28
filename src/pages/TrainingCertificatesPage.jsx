@@ -8,12 +8,14 @@ import {
   Copy, Check, ExternalLink, Calendar, Search, Filter,
   Edit, ShieldCheck, ChevronRight, ChevronDown, UserCheck, X, User,
   CheckCircle, Clock, Briefcase, MapPin, Building,
-  Smartphone, QrCode, PenTool, Share2, FileSpreadsheet, Upload
+  Smartphone, QrCode, PenTool, Share2, FileSpreadsheet, Upload,
+  GraduationCap
 } from 'lucide-react';
 import { balanceSyllabusColumns, getCertificateFrontGeometry } from '../utils/trainingPptxGenerator';
 import { renderCertificateDomPage } from '../utils/domCertificatePdf';
 import { formatCpf } from '../services/cpfService';
 import { getProfiles, getCompanies, getGroups } from '../services/storageService';
+import { getCustomTrainings, saveCustomTraining } from '../services/customTrainingsService';
 import { 
   getTrainingClasses, saveTrainingClass, deleteTrainingClass,
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments,
@@ -361,6 +363,7 @@ const TrainingCertificatesPage = () => {
   const [enrollments, setEnrollments] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [customTrainings, setCustomTrainings] = useState([]);
   const [selectedTurmaIdInGenerator, setSelectedTurmaIdInGenerator] = useState('');
   const [isCustomCourse, setIsCustomCourse] = useState(false);
   const [isCustomCompany, setIsCustomCompany] = useState(false);
@@ -368,6 +371,45 @@ const TrainingCertificatesPage = () => {
   const [loadingData, setLoadingData] = useState(true);
   const [selectedTurmaFilter, setSelectedTurmaFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Modal para Criar Novo Curso
+  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
+  const [createCourseTarget, setCreateCourseTarget] = useState('generator'); // 'generator' | 'turma'
+  const [savingCourse, setSavingCourse] = useState(false);
+  const [newCourseData, setNewCourseData] = useState({
+    name: '',
+    duracao: '8 horas',
+    validade: '24 meses',
+    cert_model: 'modelo1',
+    descricao: '',
+    conteudo: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Técnicas\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
+    instrutorNome: '',
+    instrutorCargo: '',
+    instrutorRegistro: ''
+  });
+  const [courseFormErrors, setCourseFormErrors] = useState({});
+
+  // Catálogo unificado de cursos (Modelos Oficiais + Cursos Cadastrados pelo Usuário)
+  const allCoursePresets = React.useMemo(() => {
+    const customList = (customTrainings || []).map(t => ({
+      id: t.id ? `custom-${t.id}` : `custom-${t.name}`,
+      name: t.name,
+      title: t.name,
+      category: 'Cursos Cadastrados (Personalizados)',
+      duration: t.duracao || '8 horas',
+      validade: t.validade || '24 meses',
+      content: t.conteudo || '',
+      description: t.descricao || `Treinamento em conformidade com as diretrizes e requisitos de ${t.name}.`,
+      modelType: t.cert_model || 'modelo1',
+      defaultInstructor: {
+        name: t.instrutor_nome || '',
+        role: t.instrutor_cargo || '',
+        registration: t.instrutor_registro || ''
+      },
+      isCustom: true
+    }));
+    return [...OFFICIAL_TRAINING_MODELS, ...customList];
+  }, [customTrainings]);
 
   // Modais de Gestão
   const [showTurmaModal, setShowTurmaModal] = useState(false);
@@ -445,7 +487,7 @@ const TrainingCertificatesPage = () => {
   });
 
   const [colaboradores, setColaboradores] = useState([
-    { nome: '', cpf: '', matricula: '' }
+    { nome: '', cpf: '', matricula: '', selected: true }
   ]);
 
   const certificatePreviewRef = useRef(null);
@@ -463,15 +505,19 @@ const TrainingCertificatesPage = () => {
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [classList, studentList, profileList, companyList, groupList] = await Promise.all([
+      const [classList, studentList, profileList, companyList, groupList, customTrainingsResult] = await Promise.all([
         getTrainingClasses(),
         getTrainingEnrollments(),
         getProfiles(),
         getCompanies(),
-        getGroups()
+        getGroups(),
+        getCustomTrainings()
       ]);
       setTurmas(classList || []);
       setEnrollments(studentList || []);
+      if (customTrainingsResult?.trainings) {
+        setCustomTrainings(customTrainingsResult.trainings);
+      }
       if (profileList && profileList.length > 0) {
         const combined = [...OFFICIAL_INSTRUCTORS];
         profileList.forEach(p => {
@@ -623,6 +669,10 @@ const TrainingCertificatesPage = () => {
   // Ações de Turmas & Manipulação de Múltiplos Instrutores / Responsável Técnico
   // ----------------------------------------------------
   const handleCoursePresetChangeInTurma = (presetName) => {
+    if (presetName === '__create_new__') {
+      handleOpenCreateCourseModal('turma');
+      return;
+    }
     if (presetName === 'custom') {
       setTurmaFormData(prev => ({
         ...prev,
@@ -630,16 +680,16 @@ const TrainingCertificatesPage = () => {
       }));
       return;
     }
-    const preset = COURSE_PRESETS.find(p => p.name === presetName);
+    const preset = allCoursePresets.find(p => p.name === presetName);
     if (preset) {
       setTurmaFormData(prev => ({
         ...prev,
         selectedPresetKey: preset.name,
         course_name: preset.title || preset.name,
-        duration: preset.duration || prev.duration,
+        duration: preset.duration || preset.duracao || prev.duration,
         validade: preset.validade || prev.validade || '24 meses',
-        content: preset.content || prev.content,
-        cert_model: preset.modelType || prev.cert_model || 'modelo1',
+        content: preset.content || preset.conteudo || prev.content,
+        cert_model: preset.modelType || preset.cert_model || prev.cert_model || 'modelo1',
         coordinator: [DEFAULT_COORDINATOR.name, DEFAULT_APH_COORDINATOR.name].includes(prev.coordinator?.name)
           ? getDefaultCoordinator(preset.title || preset.name)
           : prev.coordinator
@@ -773,7 +823,7 @@ const TrainingCertificatesPage = () => {
 
     const nextFormData = {
       name: turma.name || '',
-      selectedPresetKey: COURSE_PRESETS.find(p => (p.title === turma.course_name || p.name === turma.course_name))?.name || 'custom',
+      selectedPresetKey: allCoursePresets.find(p => (p.title === turma.course_name || p.name === turma.course_name))?.name || 'custom',
       course_name: turma.course_name || '',
       duration: turma.duration || '8 horas',
       validade: turma.validade || '24 meses',
@@ -1115,16 +1165,17 @@ const TrainingCertificatesPage = () => {
       setCertModel(turma.cert_model);
     }
 
-    // Carrega a lista de colaboradores se houver inscritos
+    // Carrega a lista de colaboradores se houver inscritos (todos selecionados por padrão)
     if (studentsInTurma.length > 0) {
       setColaboradores(studentsInTurma.map(s => ({
         nome: s.nome,
         cpf: s.cpf,
-        matricula: s.matricula || ''
+        matricula: s.matricula || '',
+        selected: true
       })));
       setFeedback({ 
         type: 'success', 
-        text: `Turma "${turma.name}" carregada no gerador com ${studentsInTurma.length} participante(s)!` 
+        text: `Turma "${turma.name}" carregada no gerador com ${studentsInTurma.length} participante(s) selecionado(s)!` 
       });
     } else {
       setFeedback({ 
@@ -1144,7 +1195,12 @@ const TrainingCertificatesPage = () => {
       setEnrollments(allStudents || []);
       const studentsInTurma = (allStudents || []).filter(e => String(e.turma_id) === String(selectedTurmaIdInGenerator));
       if (studentsInTurma.length > 0) {
-        setColaboradores(studentsInTurma.map(s => ({ nome: s.nome, cpf: s.cpf, matricula: s.matricula || '' })));
+        setColaboradores(studentsInTurma.map(s => ({
+          nome: s.nome,
+          cpf: s.cpf,
+          matricula: s.matricula || '',
+          selected: true
+        })));
         setFeedback({ 
           type: 'success', 
           text: `Inscrições sincronizadas! (${studentsInTurma.length} participantes carregados)` 
@@ -1175,20 +1231,20 @@ const TrainingCertificatesPage = () => {
     setFormData(prev => ({
       ...prev,
       curso: preset.title || preset.name,
-      duracao: preset.duration,
-      conteudo: preset.content,
-      descricao: preset.description || `Projeto de treinamento com carga horária de ${preset.duration}, desenvolvido em conformidade com as diretrizes e requisitos técnicos da ${preset.name}.`,
-      validade: preset.validade || '24 meses',
-      instrutorNome: preset.defaultInstructor?.name || prev.instrutorNome,
-      instrutorCargo: preset.defaultInstructor?.role || prev.instrutorCargo,
-      instrutorRegistro: preset.defaultInstructor?.registration || prev.instrutorRegistro
+      duracao: preset.duration || preset.duracao || prev.duracao,
+      conteudo: preset.content || preset.conteudo || prev.conteudo,
+      descricao: preset.description || preset.descricao || `Projeto de treinamento com carga horária de ${preset.duration || preset.duracao || '8 horas'}, desenvolvido em conformidade com as diretrizes e requisitos técnicos de ${preset.name}.`,
+      validade: preset.validade || prev.validade || '24 meses',
+      instrutorNome: preset.defaultInstructor?.name || preset.instrutor_nome || prev.instrutorNome,
+      instrutorCargo: preset.defaultInstructor?.role || preset.instrutor_cargo || prev.instrutorCargo,
+      instrutorRegistro: preset.defaultInstructor?.registration || preset.instrutor_registro || prev.instrutorRegistro
     }));
-    if (preset.modelType) {
-      setCertModel(preset.modelType);
+    if (preset.modelType || preset.cert_model) {
+      setCertModel(preset.modelType || preset.cert_model);
     }
     setFeedback({
       type: 'success',
-      text: `Modelo oficial "${preset.name}" (${preset.modelType === 'modelo1' ? 'Modelo 1 - EcoCurvas' : 'Modelo 2 - Ondas & Colmeia'}) carregado com sucesso!`
+      text: `Curso "${preset.name}" carregado com sucesso!`
     });
     setTimeout(() => setFeedback(null), 3500);
   };
@@ -1222,12 +1278,12 @@ const TrainingCertificatesPage = () => {
   };
 
   const addColaborador = () => {
-    setColaboradores(prev => [...prev, { nome: '', cpf: '' }]);
+    setColaboradores(prev => [...prev, { nome: '', cpf: '', matricula: '', selected: true }]);
   };
 
   const removeColaborador = (index) => {
     if (colaboradores.length <= 1) {
-      setColaboradores([{ nome: '', cpf: '' }]);
+      setColaboradores([{ nome: '', cpf: '', matricula: '', selected: true }]);
       return;
     }
     setColaboradores(prev => prev.filter((_, i) => i !== index));
@@ -1235,8 +1291,25 @@ const TrainingCertificatesPage = () => {
 
   const clearAllColaboradores = () => {
     if (window.confirm('Deseja limpar todos os participantes da lista?')) {
-      setColaboradores([{ nome: '', cpf: '' }]);
+      setColaboradores([{ nome: '', cpf: '', matricula: '', selected: true }]);
     }
+  };
+
+  const handleToggleSelectColaborador = (index) => {
+    setColaboradores(prev => {
+      const copy = [...prev];
+      const isCurrentlySelected = copy[index].selected !== false;
+      copy[index] = { ...copy[index], selected: !isCurrentlySelected };
+      return copy;
+    });
+  };
+
+  const handleToggleSelectAllColaboradores = (forceSelect = null) => {
+    setColaboradores(prev => {
+      const allCurrentlySelected = prev.every(c => c.selected !== false);
+      const targetState = forceSelect !== null ? forceSelect : !allCurrentlySelected;
+      return prev.map(c => ({ ...c, selected: targetState }));
+    });
   };
 
   const handleProcessBatch = () => {
@@ -1262,7 +1335,7 @@ const TrainingCertificatesPage = () => {
       }
 
       if (nome) {
-        parsed.push({ nome, cpf: formatCpf(cpf) });
+        parsed.push({ nome, cpf: formatCpf(cpf), matricula: '', selected: true });
       }
     }
 
@@ -1282,6 +1355,12 @@ const TrainingCertificatesPage = () => {
     if (validColaboradores.length === 0) {
       setFeedback({ type: 'error', text: 'Informe o nome de ao menos um participante.' });
       requestAnimationFrame(() => document.getElementById('student-name-0')?.focus());
+      return;
+    }
+
+    const targetColaboradores = validColaboradores.filter(c => c.selected !== false);
+    if (targetColaboradores.length === 0) {
+      setFeedback({ type: 'error', text: 'Nenhum participante selecionado. Selecione ao menos um participante na lista para gerar.' });
       return;
     }
 
@@ -1311,7 +1390,7 @@ const TrainingCertificatesPage = () => {
         creator: 'EcoSafety'
       });
       let pageIndex = 0;
-      for (const participant of validColaboradores) {
+      for (const participant of targetColaboradores) {
         for (const side of ['frente', 'verso']) {
           flushSync(() => {
             setColaboradores([{ ...participant }]);
@@ -1338,11 +1417,11 @@ const TrainingCertificatesPage = () => {
       }
 
       const safeCourse = formData.curso.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
-      pdf.save(`Certificados_${safeCourse}_${validColaboradores.length}alunos.pdf`);
+      pdf.save(`Certificados_${safeCourse}_${targetColaboradores.length}alunos.pdf`);
 
       setFeedback({ 
         type: 'success', 
-        text: `PDF vetorial com ${validColaboradores.length} certificado(s) gerado em alta qualidade.`
+        text: `PDF vetorial com ${targetColaboradores.length} certificado(s) gerado em alta qualidade.`
       });
       setTimeout(() => setFeedback(null), 5000);
     } catch (err) {
@@ -1355,6 +1434,121 @@ const TrainingCertificatesPage = () => {
         setPreviewTab(originalPreviewTab);
         setGenerating(false);
       });
+    }
+  };
+
+  // Funções para Criação e Cadastro de Novos Cursos
+  const handleOpenCreateCourseModal = (target = 'generator') => {
+    setCreateCourseTarget(target);
+    setCourseFormErrors({});
+    const initialName = target === 'generator'
+      ? (isCustomCourse ? formData.curso : '')
+      : (turmaFormData.course_name || '');
+    setNewCourseData({
+      name: initialName || '',
+      duracao: '8 horas',
+      validade: '24 meses',
+      cert_model: 'modelo1',
+      descricao: initialName
+        ? `Projeto de treinamento com carga horária de 8 horas, desenvolvido em conformidade com as normas e requisitos técnicos aplicáveis.`
+        : '',
+      conteudo: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Técnicas\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
+      instrutorNome: profiles[0]?.name || 'Eider Gomes do Nascimento',
+      instrutorCargo: profiles[0]?.role || 'Instrutor e Responsável Técnico',
+      instrutorRegistro: profiles[0]?.registration || 'MTE 0009995/RN'
+    });
+    setShowCreateCourseModal(true);
+  };
+
+  const handleNewCourseNameChange = (name) => {
+    setNewCourseData(prev => {
+      const shouldUpdateDesc = !prev.descricao || prev.descricao.startsWith('Projeto de treinamento com carga horária');
+      return {
+        ...prev,
+        name,
+        descricao: shouldUpdateDesc
+          ? `Projeto de treinamento com carga horária de ${prev.duracao || '8 horas'}, desenvolvido em conformidade com as diretrizes e requisitos de ${name || 'capacitação profissional'}.`
+          : prev.descricao
+      };
+    });
+    if (courseFormErrors.name) {
+      setCourseFormErrors(prev => ({ ...prev, name: '' }));
+    }
+  };
+
+  const handleSaveNewCourse = async (e) => {
+    e?.preventDefault();
+    if (!newCourseData.name || !newCourseData.name.trim()) {
+      setCourseFormErrors({ name: 'Informe o nome oficial do curso.' });
+      requestAnimationFrame(() => document.getElementById('new-course-name')?.focus());
+      return;
+    }
+
+    setSavingCourse(true);
+    try {
+      const courseToSave = {
+        name: newCourseData.name.trim(),
+        duracao: newCourseData.duracao?.trim() || '8 horas',
+        validade: newCourseData.validade?.trim() || '24 meses',
+        descricao: newCourseData.descricao?.trim() || `Projeto de treinamento com carga horária de ${newCourseData.duracao || '8 horas'}, desenvolvido em conformidade com os requisitos de ${newCourseData.name.trim()}.`,
+        conteudo: newCourseData.conteudo?.trim() || '1. Introdução Geral\n2. Metodologia Prática',
+        instrutorNome: newCourseData.instrutorNome || '',
+        instrutorCargo: newCourseData.instrutorCargo || '',
+        instrutorRegistro: newCourseData.instrutorRegistro || '',
+        cert_model: newCourseData.cert_model || 'modelo1'
+      };
+
+      await saveCustomTraining(courseToSave);
+
+      const { trainings } = await getCustomTrainings();
+      if (trainings) {
+        setCustomTrainings(trainings);
+      }
+
+      if (createCourseTarget === 'generator') {
+        setIsCustomCourse(false);
+        setFormData(prev => ({
+          ...prev,
+          curso: courseToSave.name,
+          duracao: courseToSave.duracao,
+          validade: courseToSave.validade,
+          descricao: courseToSave.descricao,
+          conteudo: courseToSave.conteudo,
+          instrutorNome: courseToSave.instrutorNome || prev.instrutorNome,
+          instrutorCargo: courseToSave.instrutorCargo || prev.instrutorCargo,
+          instrutorRegistro: courseToSave.instrutorRegistro || prev.instrutorRegistro
+        }));
+        setCertModel(courseToSave.cert_model);
+      } else if (createCourseTarget === 'turma') {
+        setTurmaFormData(prev => ({
+          ...prev,
+          selectedPresetKey: courseToSave.name,
+          course_name: courseToSave.name,
+          duration: courseToSave.duracao,
+          validade: courseToSave.validade,
+          content: courseToSave.conteudo,
+          cert_model: courseToSave.cert_model,
+          instructor_name: courseToSave.instrutorNome || prev.instructor_name,
+          instructor_role: courseToSave.instrutorCargo || prev.instructor_role,
+          instructor_registration: courseToSave.instrutorRegistro || prev.instructor_registration
+        }));
+      }
+
+      setShowCreateCourseModal(false);
+      setFeedback({
+        type: 'success',
+        text: `Curso "${courseToSave.name}" cadastrado e selecionado com sucesso!`
+      });
+      setTimeout(() => setFeedback(null), 4500);
+    } catch (err) {
+      console.error('Erro ao cadastrar curso:', err);
+      setFeedback({
+        type: 'error',
+        text: `Erro ao cadastrar curso: ${err.message}`
+      });
+      setTimeout(() => setFeedback(null), 5000);
+    } finally {
+      setSavingCourse(false);
     }
   };
 
@@ -1374,8 +1568,14 @@ const TrainingCertificatesPage = () => {
     return matchTurma && matchSearch;
   });
 
-  const validCount = colaboradores.filter(c => c.nome.trim()).length;
-  const firstStudent = colaboradores.find(c => c.nome.trim());
+  const validColaboradores = colaboradores.filter(c => c.nome.trim());
+  const selectedColaboradores = validColaboradores.filter(c => c.selected !== false);
+  const validCount = validColaboradores.length;
+  const selectedCount = selectedColaboradores.length;
+  const isAllSelected = validCount > 0 && selectedCount === validCount;
+  const isIndeterminate = selectedCount > 0 && selectedCount < validCount;
+  const firstStudent = selectedColaboradores[0] || validColaboradores[0];
+  const activeTurma = turmas.find(t => String(t.id) === String(selectedTurmaIdInGenerator));
 
   // Estilos adaptativos dinâmicos para evitar cortes, rolagem ou sobreposição nos certificados
   const m2FrenteStyles = getModelo2FrenteStyles({
@@ -1402,7 +1602,7 @@ const TrainingCertificatesPage = () => {
     .trim();
 
   // Dados derivados para o layout do gerador
-  const selectedPreset = COURSE_PRESETS.find(p =>
+  const selectedPreset = allCoursePresets.find(p =>
     p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
     p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
   );
@@ -1572,13 +1772,24 @@ const TrainingCertificatesPage = () => {
               <div className="tc-field">
                 <div className="tc-label-row">
                   <label htmlFor="tc-curso">Curso *</label>
-                  <button
-                    type="button"
-                    className="tc-link"
-                    onClick={() => setIsCustomCourse(!isCustomCourse)}
-                  >
-                    {isCustomCourse ? 'Escolher da lista oficial' : 'Digitar outro curso'}
-                  </button>
+                  <div className="tc-label-actions">
+                    <button
+                      type="button"
+                      className="tc-link tc-link--primary"
+                      onClick={() => handleOpenCreateCourseModal('generator')}
+                      title="Cadastrar um novo curso no catálogo"
+                    >
+                      <Plus size={13} />
+                      Criar novo curso
+                    </button>
+                    <button
+                      type="button"
+                      className="tc-link"
+                      onClick={() => setIsCustomCourse(!isCustomCourse)}
+                    >
+                      {isCustomCourse ? 'Escolher da lista' : 'Digitar avulso'}
+                    </button>
+                  </div>
                 </div>
                 {!isCustomCourse ? (
                   <select
@@ -1587,17 +1798,31 @@ const TrainingCertificatesPage = () => {
                     value={selectedPreset ? selectedPreset.id : 'custom'}
                     onChange={(e) => {
                       const val = e.target.value;
+                      if (val === '__create_new__') {
+                        handleOpenCreateCourseModal('generator');
+                        return;
+                      }
                       if (val === 'custom') {
                         setIsCustomCourse(true);
                       } else {
-                        const found = COURSE_PRESETS.find(p => p.id === val);
+                        const found = allCoursePresets.find(p => p.id === val);
                         if (found) applyPreset(found);
                       }
                     }}
                   >
-                    {Array.from(new Set(COURSE_PRESETS.map(p => p.category))).map(cat => (
+                    <option value="__create_new__">➕ + Criar novo curso...</option>
+                    {customTrainings.length > 0 && (
+                      <optgroup label="⭐ Cursos Cadastrados (Personalizados)">
+                        {allCoursePresets.filter(p => p.isCustom).map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} · {p.duration}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {Array.from(new Set(OFFICIAL_TRAINING_MODELS.map(p => p.category))).map(cat => (
                       <optgroup key={cat} label={cat}>
-                        {COURSE_PRESETS.filter(p => p.category === cat).map(p => (
+                        {OFFICIAL_TRAINING_MODELS.filter(p => p.category === cat).map(p => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
@@ -1605,7 +1830,7 @@ const TrainingCertificatesPage = () => {
                       </optgroup>
                     ))}
                     <option value="custom">
-                      {selectedPreset ? 'Outro curso (digitar)...' : (formData.curso || 'Outro curso (digitar)...')}
+                      {selectedPreset ? 'Outro curso (digitar avulso)...' : (formData.curso || 'Outro curso (digitar avulso)...')}
                     </option>
                   </select>
                 ) : (
@@ -1755,8 +1980,34 @@ const TrainingCertificatesPage = () => {
             <section className="tc-card" aria-labelledby="tc-step2-title">
               <div className="tc-step-head tc-step-head--compact">
                 <h2 id="tc-step2-title">Participantes</h2>
-                <span className="tc-count" aria-label={`${validCount} participantes prontos`}>{validCount}</span>
+                <span
+                  className="tc-count"
+                  aria-label={`${selectedCount} de ${validCount} participantes selecionados`}
+                  title={`${selectedCount} de ${validCount} participantes selecionados para gerar certificado`}
+                >
+                  {selectedCount === validCount ? `${validCount} selecionados` : `${selectedCount}/${validCount}`}
+                </span>
                 <div className="tc-step-actions">
+                  {validCount > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        className="tc-link"
+                        onClick={() => handleToggleSelectAllColaboradores(true)}
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        Marcar todos
+                      </button>
+                      <button
+                        type="button"
+                        className="tc-link tc-link--muted"
+                        onClick={() => handleToggleSelectAllColaboradores(false)}
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        Desmarcar todos
+                      </button>
+                    </>
+                  )}
                   <button
                     id="btn-paste-students"
                     type="button"
@@ -1779,8 +2030,50 @@ const TrainingCertificatesPage = () => {
                 </div>
               </div>
 
+              {selectedTurmaIdInGenerator && (
+                <div className="tc-linked-turma-bar">
+                  <div className="tc-linked-turma-info">
+                    <Users size={15} className="tc-linked-turma-icon" />
+                    <span>
+                      Lista da turma: <strong>{activeTurma?.name || 'Turma Vinculada'}</strong>
+                    </span>
+                    <span className="tc-badge tc-badge--subtle">
+                      {selectedCount} de {validCount} selecionado(s) para certificado
+                    </span>
+                  </div>
+                  <div className="tc-linked-turma-actions">
+                    <button
+                      type="button"
+                      className="tc-link"
+                      onClick={() => handleToggleSelectAllColaboradores(true)}
+                    >
+                      Selecionar todos
+                    </button>
+                    <span className="tc-divider">·</span>
+                    <button
+                      type="button"
+                      className="tc-link tc-link--muted"
+                      onClick={() => handleToggleSelectAllColaboradores(false)}
+                    >
+                      Desmarcar todos
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="tc-students">
                 <div className="tc-students-head">
+                  <div className="tc-col-select" title={isAllSelected ? "Desmarcar todos os participantes" : "Selecionar todos os participantes"}>
+                    <input
+                      type="checkbox"
+                      id="select-all-students-cb"
+                      className="tc-checkbox"
+                      checked={isAllSelected}
+                      ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                      onChange={(e) => handleToggleSelectAllColaboradores(e.target.checked)}
+                      aria-label="Selecionar todos os participantes para emissão de certificado"
+                    />
+                  </div>
                   <span>#</span>
                   <span>Nome completo</span>
                   <span>CPF</span>
@@ -1788,9 +2081,21 @@ const TrainingCertificatesPage = () => {
                 </div>
                 <div className="tc-students-body">
                   {colaboradores.map((colab, idx) => {
+                    const isSelected = colab.selected !== false;
                     const isCpfValid = colab.cpf && colab.cpf.replace(/\D/g, '').length === 11;
                     return (
-                      <div key={idx} className="tc-student-row">
+                      <div key={idx} className={`tc-student-row ${!isSelected ? 'tc-student-row--unselected' : ''}`}>
+                        <div className="tc-col-select">
+                          <input
+                            type="checkbox"
+                            id={`student-select-${idx}`}
+                            className="tc-checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectColaborador(idx)}
+                            title={isSelected ? "Participante selecionado para gerar certificado (clique para desmarcar)" : "Clique para incluir este participante na emissão"}
+                            aria-label={`Selecionar ${colab.nome || `Participante #${idx + 1}`} para emissão`}
+                          />
+                        </div>
                         <span className="tc-student-idx">{idx + 1}</span>
                         <input
                           id={`student-name-${idx}`}
@@ -2440,11 +2745,16 @@ const TrainingCertificatesPage = () => {
               <div className="tc-generate">
                 <div className="tc-generate-summary">
                   <div className="tc-stat">
-                    <strong>{validCount}</strong>
-                    <span>certificado{validCount !== 1 ? 's' : ''}</span>
+                    <strong>{selectedCount}</strong>
+                    <span>{selectedCount === 1 ? 'certificado selecionado' : 'certificados selecionados'}</span>
+                    {validCount > selectedCount && (
+                      <span className="tc-stat-sub" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        ({validCount - selectedCount} desmarcado{validCount - selectedCount !== 1 ? 's' : ''})
+                      </span>
+                    )}
                   </div>
                   <div className="tc-stat">
-                    <strong>{validCount * 2}</strong>
+                    <strong>{selectedCount * 2}</strong>
                     <span>páginas no PDF (frente + verso)</span>
                   </div>
                   <div className="tc-stat">
@@ -2458,23 +2768,27 @@ const TrainingCertificatesPage = () => {
                   type="button"
                   className={`tc-btn tc-btn--primary tc-generate-btn ${generating ? 'is-loading' : ''}`}
                   onClick={handleGenerate}
-                  disabled={generating || validCount === 0}
+                  disabled={generating || selectedCount === 0}
                 >
                   {generating ? (
                     <>
                       <Loader size={19} className="animate-spin" />
-                      Gerando PDF...
+                      Gerando {selectedCount} PDF(s)...
                     </>
                   ) : (
                     <>
                       <Download size={19} />
-                      Baixar certificados em PDF
+                      Baixar {selectedCount} certificado{selectedCount !== 1 ? 's' : ''} em PDF
                     </>
                   )}
                 </button>
-                {validCount === 0 && (
+                {selectedCount === 0 && validCount > 0 ? (
+                  <p className="tc-hint tc-center" style={{ color: 'var(--warning, #d97706)' }}>
+                    Selecione ao menos um participante na lista para gerar.
+                  </p>
+                ) : validCount === 0 ? (
                   <p className="tc-hint tc-center">Adicione ao menos um participante para gerar.</p>
-                )}
+                ) : null}
               </div>
             </div>
           </aside>
@@ -3087,22 +3401,49 @@ const TrainingCertificatesPage = () => {
                   </div>
 
                   <div className="tc-modal-field">
-                    <label htmlFor="tc-turma-preset">Curso do catálogo oficial</label>
+                    <div className="tc-label-row">
+                      <label htmlFor="tc-turma-preset">Curso do catálogo</label>
+                      <button
+                        type="button"
+                        className="tc-link tc-link--primary"
+                        onClick={() => handleOpenCreateCourseModal('turma')}
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        <Plus size={13} /> Criar novo curso
+                      </button>
+                    </div>
                     <select
                       id="tc-turma-preset"
                       className="tc-input"
                       value={turmaFormData.selectedPresetKey || 'custom'}
                       onChange={(event) => {
-                        handleCoursePresetChangeInTurma(event.target.value);
+                        const val = event.target.value;
+                        if (val === '__create_new__') {
+                          handleOpenCreateCourseModal('turma');
+                          return;
+                        }
+                        handleCoursePresetChangeInTurma(val);
                         if (turmaFormErrors.course_name) setTurmaFormErrors(prev => ({ ...prev, course_name: '' }));
                       }}
                     >
-                      <option value="custom">Curso personalizado</option>
-                      {COURSE_PRESETS.map(preset => (
-                        <option key={preset.name} value={preset.name}>
-                          {preset.name} · {preset.duration}
-                        </option>
-                      ))}
+                      <option value="__create_new__">➕ + Criar novo curso...</option>
+                      <option value="custom">Curso personalizado / Digitação livre</option>
+                      {customTrainings.length > 0 && (
+                        <optgroup label="⭐ Cursos Cadastrados (Personalizados)">
+                          {allCoursePresets.filter(p => p.isCustom).map(preset => (
+                            <option key={preset.name} value={preset.name}>
+                              {preset.name} · {preset.duration}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Modelos Oficiais">
+                        {OFFICIAL_TRAINING_MODELS.map(preset => (
+                          <option key={preset.name} value={preset.name}>
+                            {preset.name} · {preset.duration}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                     <span
                       className={`tc-autofill-note ${turmaFormData.selectedPresetKey && turmaFormData.selectedPresetKey !== 'custom' ? '' : 'is-hidden'}`}
@@ -3333,6 +3674,232 @@ const TrainingCertificatesPage = () => {
       )}
 
 
+
+      {/* ========================================================================= */}
+      {/* MODAL: CADASTRAR NOVO CURSO DE TREINAMENTO                                */}
+      {/* ========================================================================= */}
+      {showCreateCourseModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !savingCourse && setShowCreateCourseModal(false)}
+        >
+          <div
+            className="modal-content"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '640px', borderRadius: '1.25rem', padding: '1.75rem' }}
+          >
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.15rem', fontWeight: '800' }}>
+                <GraduationCap size={22} style={{ color: 'var(--tc-accent, #0284c7)' }} />
+                Cadastrar Novo Curso
+              </h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => !savingCourse && setShowCreateCourseModal(false)}
+                disabled={savingCourse}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNewCourse}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  Cadastre um novo curso no catálogo. Ele ficará salvo no sistema e disponível na seleção de cursos para emissão de certificados e turmas.
+                </p>
+
+                <div className="tc-modal-field">
+                  <label htmlFor="new-course-name" style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '0.35rem', display: 'block' }}>
+                    Nome oficial do curso / treinamento <span style={{ color: 'var(--danger, #ef4444)' }}>*</span>
+                  </label>
+                  <input
+                    id="new-course-name"
+                    type="text"
+                    required
+                    className={`tc-input ${courseFormErrors.name ? 'is-invalid' : ''}`}
+                    placeholder="Ex: NR-12 – Segurança em Máquinas e Equipamentos"
+                    value={newCourseData.name}
+                    onChange={(e) => handleNewCourseNameChange(e.target.value)}
+                    autoFocus
+                  />
+                  {courseFormErrors.name && (
+                    <span className="tc-field-error" style={{ color: 'var(--danger, #ef4444)', fontSize: '0.78rem' }}>
+                      {courseFormErrors.name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="tc-grid-3">
+                  <div className="tc-modal-field">
+                    <label htmlFor="new-course-duration" style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '0.35rem', display: 'block' }}>
+                      Carga horária
+                    </label>
+                    <input
+                      id="new-course-duration"
+                      type="text"
+                      className="tc-input"
+                      placeholder="Ex: 8 horas"
+                      value={newCourseData.duracao}
+                      onChange={(e) => setNewCourseData(prev => ({ ...prev, duracao: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="tc-modal-field">
+                    <label htmlFor="new-course-validade" style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '0.35rem', display: 'block' }}>
+                      Validade
+                    </label>
+                    <input
+                      id="new-course-validade"
+                      type="text"
+                      className="tc-input"
+                      placeholder="Ex: 24 meses"
+                      value={newCourseData.validade}
+                      onChange={(e) => setNewCourseData(prev => ({ ...prev, validade: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="tc-modal-field">
+                    <label htmlFor="new-course-model" style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '0.35rem', display: 'block' }}>
+                      Modelo do certificado
+                    </label>
+                    <select
+                      id="new-course-model"
+                      className="tc-input"
+                      value={newCourseData.cert_model}
+                      onChange={(e) => setNewCourseData(prev => ({ ...prev, cert_model: e.target.value }))}
+                    >
+                      <option value="modelo1">EcoCurvas (Modelo 1)</option>
+                      <option value="modelo2">Ondas & Colmeia (Modelo 2)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="tc-modal-field">
+                  <label htmlFor="new-course-desc" style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '0.35rem', display: 'block' }}>
+                    Texto de certificação (Frente do certificado)
+                  </label>
+                  <textarea
+                    id="new-course-desc"
+                    rows={3}
+                    className="tc-input"
+                    placeholder="Descrição impressa na frente do certificado..."
+                    value={newCourseData.descricao}
+                    onChange={(e) => setNewCourseData(prev => ({ ...prev, descricao: e.target.value }))}
+                  />
+                </div>
+
+                <div className="tc-modal-field">
+                  <label htmlFor="new-course-content" style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '0.35rem', display: 'block' }}>
+                    Conteúdo programático (Verso do certificado)
+                  </label>
+                  <textarea
+                    id="new-course-content"
+                    rows={4}
+                    className="tc-input tc-mono"
+                    placeholder="1. Introdução e Requisitos Básicos&#10;2. Procedimentos Operacionais&#10;3. Medidas de Proteção e Prevenção&#10;4. Avaliação Teórica e Prática"
+                    value={newCourseData.conteudo}
+                    onChange={(e) => setNewCourseData(prev => ({ ...prev, conteudo: e.target.value }))}
+                  />
+                </div>
+
+                {/* Instrutor Padrão (Opcional) */}
+                <div className="tc-modal-field">
+                  <label htmlFor="new-course-instructor" style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '0.35rem', display: 'block' }}>
+                    Instrutor padrão (opcional)
+                  </label>
+                  <select
+                    id="new-course-instructor"
+                    className="tc-input"
+                    value={profiles.some(p => p.name === newCourseData.instrutorNome) ? newCourseData.instrutorNome : (newCourseData.instrutorNome ? 'custom' : '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setNewCourseData(prev => ({ ...prev, instrutorNome: '', instrutorCargo: '', instrutorRegistro: '' }));
+                      } else if (val === 'custom') {
+                        setNewCourseData(prev => ({ ...prev, instrutorNome: '' }));
+                      } else {
+                        const prof = profiles.find(p => p.name === val);
+                        if (prof) {
+                          setNewCourseData(prev => ({
+                            ...prev,
+                            instrutorNome: prof.name,
+                            instrutorCargo: prof.role || '',
+                            instrutorRegistro: prof.registration || ''
+                          }));
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">Selecione um instrutor do sistema (opcional)...</option>
+                    {profiles.map(p => (
+                      <option key={p.id || p.name} value={p.name}>
+                        {p.name} {p.role ? `(${p.role})` : ''}
+                      </option>
+                    ))}
+                    <option value="custom">Outro instrutor (digitar manualmente)...</option>
+                  </select>
+                  {(!profiles.some(p => p.name === newCourseData.instrutorNome) || !newCourseData.instrutorNome) && (
+                    <div className="tc-grid-3" style={{ marginTop: '0.5rem' }}>
+                      <input
+                        type="text"
+                        className="tc-input"
+                        placeholder="Nome do instrutor"
+                        value={newCourseData.instrutorNome}
+                        onChange={(e) => setNewCourseData(prev => ({ ...prev, instrutorNome: e.target.value }))}
+                      />
+                      <input
+                        type="text"
+                        className="tc-input"
+                        placeholder="Cargo do instrutor"
+                        value={newCourseData.instrutorCargo}
+                        onChange={(e) => setNewCourseData(prev => ({ ...prev, instrutorCargo: e.target.value }))}
+                      />
+                      <input
+                        type="text"
+                        className="tc-input"
+                        placeholder="Registro (SRTE / CREA)"
+                        value={newCourseData.instrutorRegistro}
+                        onChange={(e) => setNewCourseData(prev => ({ ...prev, instrutorRegistro: e.target.value }))}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowCreateCourseModal(false)}
+                    disabled={savingCourse}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    id="btn-save-new-course"
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={savingCourse}
+                    style={{ backgroundColor: '#0284c7', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    {savingCourse ? (
+                      <>
+                        <Loader size={16} className="animate-spin" />
+                        Salvando curso...
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={16} />
+                        Cadastrar Curso
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL: COLAR EM LOTE (TEXTO)                                              */}

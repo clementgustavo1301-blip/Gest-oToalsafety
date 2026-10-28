@@ -41,8 +41,17 @@ export async function getCustomTrainings() {
 
     if (!error && data) {
       dbTrainings = data;
-      safeSetLocal(data);
-      return { trainings: dbTrainings, tableMissing: false, error: null };
+      const localList = safeGetLocal();
+      const merged = data.map(item => {
+        const local = localList.find(l => (l.id && l.id === item.id) || (l.name && item.name && l.name.toLowerCase() === item.name.toLowerCase()));
+        return {
+          ...item,
+          validade: local?.validade || item.validade || '24 meses',
+          cert_model: local?.cert_model || item.cert_model || 'modelo1'
+        };
+      });
+      safeSetLocal(merged);
+      return { trainings: merged, tableMissing: false, error: null };
     } else if (error) {
       dbError = error;
       if (error.code === 'PGRST205') {
@@ -114,10 +123,13 @@ export async function saveCustomTraining(training) {
     const list = safeGetLocal();
     const index = list.findIndex(t => t.name.toLowerCase() === trimmedName.toLowerCase());
     
-    const localItem = savedData || {
-      id: training.id || `local-${Date.now()}`,
+    const localItem = {
+      ...(savedData || {}),
+      id: savedData?.id || training.id || `local-${Date.now()}`,
       ...payload,
-      created_at: new Date().toISOString()
+      validade: training.validade || '24 meses',
+      cert_model: training.cert_model || 'modelo1',
+      created_at: savedData?.created_at || new Date().toISOString()
     };
 
     if (index >= 0) {

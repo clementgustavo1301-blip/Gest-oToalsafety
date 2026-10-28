@@ -493,6 +493,73 @@ textarea.tc-input {
 
 .tc-link--danger { color: var(--text-secondary); margin-top: 0.65rem; }
 .tc-link--danger:hover { color: var(--danger); }
+.tc-link--primary {
+  color: var(--tc-accent, #0284c7);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.tc-link--primary:hover {
+  text-decoration: underline;
+  color: var(--tc-accent-strong, #0369a1);
+}
+.tc-link--muted {
+  color: var(--text-secondary);
+}
+
+.tc-label-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* ---------- Barra de Turma Vinculada e Seleção ---------- */
+.tc-linked-turma-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 0.85rem;
+  background: var(--tc-accent-soft, rgba(2, 132, 199, 0.08));
+  border: 1px solid rgba(2, 132, 199, 0.2);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+
+.tc-linked-turma-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: var(--text-primary);
+}
+
+.tc-linked-turma-icon {
+  color: var(--tc-accent, #0284c7);
+  flex-shrink: 0;
+}
+
+.tc-linked-turma-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tc-divider {
+  color: var(--border, #cbd5e1);
+}
+
+.tc-badge--subtle {
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  background: rgba(2, 132, 199, 0.12);
+  color: var(--tc-accent-strong, #0369a1);
+}
 
 /* ---------- Participantes ---------- */
 .tc-students {
@@ -504,10 +571,24 @@ textarea.tc-input {
 .tc-student-row,
 .tc-students-head {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 150px 30px;
+  grid-template-columns: 28px 24px minmax(0, 1fr) 150px 30px;
   gap: 0.5rem;
   align-items: center;
   padding: 0.4rem 0.55rem;
+}
+
+.tc-col-select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tc-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  accent-color: var(--tc-accent, #0284c7);
 }
 
 .tc-students-head {
@@ -531,6 +612,15 @@ textarea.tc-input {
 
 .tc-student-row:hover {
   background: var(--tc-muted-bg);
+}
+
+.tc-student-row--unselected {
+  opacity: 0.52;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.tc-student-row--unselected:hover {
+  opacity: 0.85;
 }
 
 .tc-student-idx {
@@ -578,7 +668,7 @@ textarea.tc-input {
 
 @media (max-width: 640px) {
   .tc-student-row,
-  .tc-students-head { grid-template-columns: 22px minmax(0, 1fr) 120px 28px; }
+  .tc-students-head { grid-template-columns: 24px 20px minmax(0, 1fr) 120px 28px; }
 }
 
 /* ---------- Assinaturas ---------- */
