@@ -9,7 +9,7 @@ import {
   uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable,
   deleteDeliverables
 } from '../services/storageService';
-import { isItemExpired, isDelivered } from '../utils/deliverableTiming';
+import { isItemExpired, isDelivered, getEffectiveValidityDate } from '../utils/deliverableTiming';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
 
@@ -505,12 +505,18 @@ const DeliverablesViewer = ({ companyId }) => {
                 {/* Meta details if in list mode to save space */}
                 {viewMode === 'list' && (
                   <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                    {(d.dataEmissao || d.dataEnvio || d.dueDate) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio || d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
-                    {d.validityDate && (
-                      <span style={{ color: isExpired ? '#dc2626' : 'inherit', fontWeight: isExpired ? '700' : 'normal' }}>
-                        Validade: {new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} {isExpired && '⚠️ Vencido'}
-                      </span>
-                    )}
+                    {(d.dataEmissao || d.dataEnvio) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
+                    {(() => {
+                      const effVal = getEffectiveValidityDate(d);
+                      if (effVal) {
+                        return (
+                          <span style={{ color: isExpired ? '#dc2626' : 'inherit', fontWeight: isExpired ? '700' : 'normal' }}>
+                            Validade: {new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} {isExpired && '⚠️ Vencido'}
+                          </span>
+                        );
+                      }
+                      return <span>Validade: <strong style={{ color: 'var(--text-secondary)' }}>Sem validade</strong></span>;
+                    })()}
                     {d.ultimaRevisao && (
                       <span>Revisão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.ultimaRevisao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>
                     )}
@@ -539,16 +545,20 @@ const DeliverablesViewer = ({ companyId }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>Data de Emissão:</span>
-                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{(d.dataEmissao || d.dataEnvio || d.dueDate) ? new Date(d.dataEmissao || d.dataEnvio || d.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}</span>
+                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{(d.dataEmissao || d.dataEnvio) ? new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}</span>
                   </div>
-                  {d.validityDate && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>Validade:</span>
-                      <span style={{ fontWeight: '600', color: isExpired ? 'var(--danger)' : 'var(--primary)' }}>
-                        {new Date(d.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} {isExpired && '⚠️'}
-                      </span>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>Validade:</span>
+                    <span style={{ fontWeight: '600', color: isExpired ? 'var(--danger)' : 'var(--primary)' }}>
+                      {(() => {
+                        const effVal = getEffectiveValidityDate(d);
+                        if (effVal) {
+                          return `${new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${isExpired ? '⚠️' : ''}`;
+                        }
+                        return 'Sem validade';
+                      })()}
+                    </span>
+                  </div>
                   {d.ultimaRevisao && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Última Revisão:</span>

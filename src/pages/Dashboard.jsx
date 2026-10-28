@@ -14,7 +14,9 @@ import {
   isItemExpired,
   isItemExpiring30,
   isItemExpiring60,
-  getDeliverableTimingInfo
+  getDeliverableTimingInfo,
+  getEffectiveValidityDate,
+  parseSafeDate
 } from '../utils/deliverableTiming';
 
 // Helpers de normalização e comparação de nomes
@@ -333,8 +335,10 @@ const Dashboard = () => {
         const critB = isItemExpiring30(b, today, in30Days) || isItemExpiring60(b, today, in30Days, in60Days);
         if (critA && !critB) return -1;
         if (!critA && critB) return 1;
-        const dateA = a.validityDate || a.dueDate || a.dataEnvio || '9999-12-31';
-        const dateB = b.validityDate || b.dueDate || b.dataEnvio || '9999-12-31';
+        const effA = getEffectiveValidityDate(a);
+        const effB = getEffectiveValidityDate(b);
+        const dateA = effA ? effA.toISOString().split('T')[0] : (!isDelivered(a) ? (a.dueDate || '9999-12-31') : '9999-12-31');
+        const dateB = effB ? effB.toISOString().split('T')[0] : (!isDelivered(b) ? (b.dueDate || '9999-12-31') : '9999-12-31');
         return dateA.localeCompare(dateB);
       })
       .slice(0, 6)
@@ -452,8 +456,10 @@ const Dashboard = () => {
       const critB = isItemExpiring30(b, today, in30Days) || isItemExpiring60(b, today, in30Days, in60Days);
       if (critA && !critB) return -1;
       if (!critA && critB) return 1;
-      const dateA = a.validityDate || a.dueDate || a.dataEnvio || '9999-12-31';
-      const dateB = b.validityDate || b.dueDate || b.dataEnvio || '9999-12-31';
+      const effA = getEffectiveValidityDate(a);
+      const effB = getEffectiveValidityDate(b);
+      const dateA = effA ? effA.toISOString().split('T')[0] : (!isDelivered(a) ? (a.dueDate || '9999-12-31') : '9999-12-31');
+      const dateB = effB ? effB.toISOString().split('T')[0] : (!isDelivered(b) ? (b.dueDate || '9999-12-31') : '9999-12-31');
       return dateA.localeCompare(dateB);
     })
     .slice(0, 6)
@@ -1123,7 +1129,8 @@ const Dashboard = () => {
                       ) : selectedPersonData.upcomingDeliverables.map((item) => {
                         const isExpired = isItemExpired(item, today);
                         const sc = statusColors[item.status] || statusColors.pendente;
-                        const targetDate = item.validityDate || item.dueDate || item.dataEnvio;
+                        const effVal = getEffectiveValidityDate(item);
+                        const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) ? item.dueDate : null);
                         const isExpiring30 = targetDate && new Date(targetDate) <= in30Days;
                         const isExpiring60 = targetDate && new Date(targetDate) > in30Days && new Date(targetDate) <= in60Days;
 
@@ -1151,7 +1158,7 @@ const Dashboard = () => {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', margin: '0 0 0.125rem 0' }}>
-                                {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}
+                                {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo')}
                               </p>
                               <span style={{
                                 fontSize: '0.65rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
@@ -1559,7 +1566,7 @@ const Dashboard = () => {
                           Itens Vencidos ({expiredItems.length}):
                         </span>
                         {expiredItems.map(item => {
-                          const date = item.validityDate || item.dueDate || item.dataEnvio;
+                          const effVal = getEffectiveValidityDate(item);
                           const isProg = item.type === 'programa';
                           return (
                             <div
@@ -1579,7 +1586,7 @@ const Dashboard = () => {
                                 </span>
                               </div>
                               <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: '600', flexShrink: 0, marginLeft: '0.5rem' }}>
-                                {item.validityDate ? `Exp: ${new Date(item.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : (date ? `Venc: ${new Date(date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : 'Vencido')}
+                                {effVal ? `Exp: ${new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : (item.dueDate ? `Prazo: ${new Date(item.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : 'Vencido')}
                               </span>
                             </div>
                           );
@@ -1623,7 +1630,8 @@ const Dashboard = () => {
                 ) : globalUpcomingDeliverables.map((item) => {
                   const isExpired = isItemExpired(item, today);
                   const sc = statusColors[item.status] || statusColors.pendente;
-                  const targetDate = item.validityDate || item.dueDate || item.dataEnvio;
+                  const effVal = getEffectiveValidityDate(item);
+                  const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) ? item.dueDate : null);
                   const isExpiring30 = targetDate && new Date(targetDate) <= in30Days;
                   const isExpiring60 = targetDate && new Date(targetDate) > in30Days && new Date(targetDate) <= in60Days;
 
@@ -1649,7 +1657,7 @@ const Dashboard = () => {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                          {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}
+                          {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo')}
                         </p>
                         <span style={{
                           fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',

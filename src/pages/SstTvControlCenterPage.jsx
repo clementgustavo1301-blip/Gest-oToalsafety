@@ -18,7 +18,8 @@ import {
   isItemExpiring30,
   isItemExpiring60,
   getExpirationTargetDate,
-  getDaysUntilExpiration
+  getDaysUntilExpiration,
+  getEffectiveValidityDate
 } from '../utils/deliverableTiming';
 import { supabase } from '../lib/supabase';
 import '../tv2.css';
@@ -281,6 +282,7 @@ const SstTvControlCenterPage = () => {
         const exp60 = isItemExpiring60(d, today, in30Days, in60Days);
         const exp90 = !expired && !exp30 && !exp60 && targetDateObj && targetDateObj > in60Days && targetDateObj <= in90Days;
         const delivered = isDelivered(d);
+        const effValidity = getEffectiveValidityDate(d);
 
         return {
           ...d,
@@ -289,7 +291,8 @@ const SstTvControlCenterPage = () => {
           supervisor: comp?.effSupervisor || '—',
           tecnico: comp?.effTecnico || '—',
           daysLeft,
-          targetDateStr: d.validityDate || (!delivered ? (d.dueDate || d.dataEnvio || d.dataEmissao) : null),
+          effectiveValidity: effValidity,
+          targetDateStr: effValidity ? effValidity.toISOString().split('T')[0] : (!delivered && d.dueDate ? d.dueDate : null),
           isExpired: expired,
           isExp30: exp30,
           isExp60: exp60,
@@ -667,7 +670,7 @@ const SstTvControlCenterPage = () => {
             overflow: 'hidden',
             boxSizing: 'border-box'
           }}>
-            {formatDateBR(item.targetDateStr, true)}
+            {item.effectiveValidity ? formatDateBR(item.effectiveValidity, true) : (item.isDeliveredItem ? 'Sem validade' : (item.targetDateStr ? formatDateBR(item.targetDateStr, true) : '—'))}
           </td>
 
           {/* Col 4: Prazo Restante (Compacto, alinhado e sem gerar overflow) */}

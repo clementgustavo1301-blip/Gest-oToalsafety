@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
+import { getDefaultValidityMonths, parseSafeDate } from '../utils/deliverableTiming';
 
 const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'programa' }) => {
   const [selectedDeliverable, setSelectedDeliverable] = useState('');
@@ -11,10 +12,24 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
   const [contractId, setContractId] = useState('');
   const [dataEnvio, setDataEnvio] = useState('');
   const [validityDate, setValidityDate] = useState('');
+  const [validityManuallyEdited, setValidityManuallyEdited] = useState(false);
   const [ultimaRevisao, setUltimaRevisao] = useState('');
   const [deliveredDate, setDeliveredDate] = useState('');
   const [responsibleId, setResponsibleId] = useState('');
   const [file, setFile] = useState(null);
+
+  const updateSuggestedValidity = (curTitle, curType, curDateEnvio) => {
+    if (validityManuallyEdited || !curDateEnvio) return;
+    const months = getDefaultValidityMonths({ title: curTitle, type: curType });
+    if (months) {
+      const base = parseSafeDate(curDateEnvio);
+      if (base) {
+        const calc = new Date(base.getTime());
+        calc.setMonth(calc.getMonth() + months);
+        setValidityDate(calc.toISOString().split('T')[0]);
+      }
+    }
+  };
 
   const [recurrence, setRecurrence] = useState('none');
   const [customDays, setCustomDays] = useState(7);
@@ -153,6 +168,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                         setTitle(found.label);
                         setType(found.defaultType);
                         if (found.description) setDescription(found.description);
+                        updateSuggestedValidity(found.label, found.defaultType, dataEnvio);
                       }
                     }
                   }}
@@ -174,7 +190,11 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                   id="dlv-title"
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTitle(val);
+                    updateSuggestedValidity(val, type, dataEnvio);
+                  }}
                   placeholder="Ex: PGR - Programa de Gerenciamento de Riscos"
                   className="modal-input"
                   required
@@ -204,7 +224,11 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                   <select
                     id="dlv-type"
                     value={type}
-                    onChange={(e) => setType(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setType(val);
+                      updateSuggestedValidity(title, val, dataEnvio);
+                    }}
                     className="modal-input"
                     disabled={saving}
                   >
@@ -251,7 +275,11 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                     id="dlv-envio"
                     type="date"
                     value={dataEnvio}
-                    onChange={(e) => setDataEnvio(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDataEnvio(val);
+                      updateSuggestedValidity(title, type, val);
+                    }}
                     className="modal-input"
                     required
                     disabled={saving}
@@ -263,19 +291,39 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
 
                 <div className="grid-responsive-2">
                   <div>
-                    <label className="modal-label" htmlFor="dlv-validity">
-                      Data de Validade (Opcional)
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="modal-label" htmlFor="dlv-validity">
+                        Data de Validade (Opcional)
+                      </label>
+                      {dataEnvio && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setValidityManuallyEdited(false);
+                            updateSuggestedValidity(title, type, dataEnvio);
+                          }}
+                          style={{
+                            background: 'none', border: 'none', color: 'var(--primary)',
+                            fontSize: '0.6875rem', cursor: 'pointer', padding: 0, textDecoration: 'underline'
+                          }}
+                        >
+                          Recalcular padrão
+                        </button>
+                      )}
+                    </div>
                     <input
                       id="dlv-validity"
                       type="date"
                       value={validityDate}
-                      onChange={(e) => setValidityDate(e.target.value)}
+                      onChange={(e) => {
+                        setValidityDate(e.target.value);
+                        setValidityManuallyEdited(true);
+                      }}
                       className="modal-input"
                       disabled={saving}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      Não obrigatório
+                      PGR: 2 anos | PCMSO/Laudos: 1 ano (ou livre)
                     </span>
                   </div>
 

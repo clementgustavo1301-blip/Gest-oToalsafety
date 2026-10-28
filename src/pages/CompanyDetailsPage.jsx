@@ -20,7 +20,8 @@ import {
   isItemExpired,
   isItemExpiring30,
   isItemExpiring60,
-  getDeliverableTimingInfo
+  getDeliverableTimingInfo,
+  getEffectiveValidityDate
 } from '../utils/deliverableTiming';
 
 const TABS = [
@@ -592,16 +593,20 @@ const CompanyDetailsPage = () => {
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                           <span>
                             Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>
-                              {(prog.dataEmissao || prog.dataEnvio || prog.dueDate) 
-                                ? new Date(prog.dataEmissao || prog.dataEnvio || prog.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) 
+                              {(prog.dataEmissao || prog.dataEnvio) 
+                                ? new Date(prog.dataEmissao || prog.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) 
                                 : 'Não informada'}
                             </strong>
                           </span>
                           <span>
                             Validade: <strong style={{ color: isExpired ? '#dc2626' : 'var(--text-primary)', fontWeight: isExpired ? '700' : '600' }}>
-                              {prog.validityDate 
-                                ? `${new Date(prog.validityDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}${isExpired ? ' (Expirada)' : ''}` 
-                                : (prog.dueDate ? new Date(prog.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não informada')}
+                              {(() => {
+                                const effVal = getEffectiveValidityDate(prog);
+                                if (effVal) {
+                                  return `${effVal.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}${isExpired ? ' (Expirada)' : ''}`;
+                                }
+                                return 'Sem validade';
+                              })()}
                             </strong>
                           </span>
                         </div>

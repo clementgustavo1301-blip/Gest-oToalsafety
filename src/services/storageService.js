@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getDefaultValidityMonths, parseSafeDate } from '../utils/deliverableTiming';
 
 // --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
 
@@ -128,8 +129,8 @@ function mapDeliverable(row) {
     title: row.title,
     type: row.type,
     status: row.status || 'pendente',
-    dueDate: row.data_emissao || row.data_envio || row.due_date,
-    dataEnvio: row.data_emissao || row.data_envio || row.due_date || row.delivered_date,
+    dueDate: row.due_date || row.data_envio || row.data_emissao,
+    dataEnvio: row.data_envio || row.data_emissao || row.due_date || row.delivered_date,
     dataEmissao: row.data_emissao || row.data_envio || row.due_date || row.delivered_date,
     validityDate: row.validity_date,
     deliveredDate: row.delivered_date,
@@ -790,7 +791,20 @@ export async function getDeliverablesByContract(contractId) {
 
 export async function addDeliverable(deliverable) {
   const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
-  const validityVal = deliverable.validityDate || null;
+  let validityVal = deliverable.validityDate || null;
+  if (!validityVal && emissaoVal) {
+    const months = getDefaultValidityMonths(deliverable);
+    if (months) {
+      const base = parseSafeDate(emissaoVal);
+      if (base) {
+        const c = new Date(base.getTime());
+        c.setMonth(c.getMonth() + months);
+        if (!isNaN(c.getTime())) {
+          validityVal = c.toISOString().split('T')[0];
+        }
+      }
+    }
+  }
   const revisaoVal = deliverable.ultimaRevisao || null;
 
   // 1. Get the company's group_id

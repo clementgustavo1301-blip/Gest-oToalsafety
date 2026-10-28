@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit3 } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
+import { getDefaultValidityMonths, parseSafeDate } from '../utils/deliverableTiming';
 
 const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const initialMatch = STANDARD_DELIVERABLES.find(
@@ -239,9 +240,33 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
 
                 <div className="grid-responsive-2">
                   <div>
-                    <label className="modal-label" htmlFor="dlv-validity">
-                      Data de Validade (Opcional)
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="modal-label" htmlFor="dlv-validity">
+                        Data de Validade (Opcional)
+                      </label>
+                      {dataEnvio && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const months = getDefaultValidityMonths({ title, type });
+                            if (months) {
+                              const base = parseSafeDate(dataEnvio);
+                              if (base) {
+                                const calc = new Date(base.getTime());
+                                calc.setMonth(calc.getMonth() + months);
+                                setValidityDate(calc.toISOString().split('T')[0]);
+                              }
+                            }
+                          }}
+                          style={{
+                            background: 'none', border: 'none', color: 'var(--primary)',
+                            fontSize: '0.6875rem', cursor: 'pointer', padding: 0, textDecoration: 'underline'
+                          }}
+                        >
+                          Calcular padrão
+                        </button>
+                      )}
+                    </div>
                     <input
                       id="dlv-validity"
                       type="date"
@@ -251,7 +276,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                       disabled={saving}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      Não obrigatório
+                      PGR: 2 anos | PCMSO/Laudos: 1 ano (ou livre)
                     </span>
                   </div>
 

@@ -42,15 +42,119 @@ export function isUnconfiguredSeedItem(d) {
   return !d.validityDate && d.status === 'pendente' && target === '2026-11-15' && !d.deliveredDate && !d.fileName && !d.ultimaRevisao;
 }
 
+/**
+ * Retorna a quantidade de meses padrão de validade conforme normas regulamentadoras de SST.
+ * Retorna null para documentos sem periodicidade normativa fixa (ex: Ordem de Serviço, eSocial, Contrato, Visitas).
+ */
+export function getDefaultValidityMonths(item) {
+  if (!item) return null;
+  const title = (item.title || '').trim().toLowerCase();
+  const type = (item.type || '').trim().toLowerCase();
+
+  // 1. Programas com validade bianual (24 meses / 2 anos)
+  // PGR (NR-01 item 1.5.7.2), GRO
+  if (title.includes('pgr') || title.includes('gerenciamento de risco') || title.includes('gro')) {
+    return 24;
+  }
+
+  // 2. Programas / Laudos com periodicidade anual (12 meses / 1 ano)
+  // PCMSO (NR-07), Relatório Analítico, LTCAT, LI, LP, AET, PCA, PPR, Mapeamento Psicossocial
+  if (
+    title.includes('pcmso') ||
+    title.includes('controle m') ||
+    title.includes('relat') ||
+    title.includes('ltcat') ||
+    title.includes('insalubridade') ||
+    title.includes('periculosidade') ||
+    title.includes('laudo') ||
+    title.includes('aet') ||
+    title.includes('ergon') ||
+    title.includes('psicossocial') ||
+    title.includes('pca') ||
+    title.includes('ppr')
+  ) {
+    return 12;
+  }
+
+  // 3. Treinamentos (NR-35, NR-10, etc. geralmente 24 meses; CIPA/Brigada 12 meses)
+  if (type === 'treinamento' || title.includes('treinamento') || title.includes('curso')) {
+    if (title.includes('cipa') || title.includes('primeiros socorros') || title.includes('brigada')) {
+      return 12;
+    }
+    return 24;
+  }
+
+  // 4. Programas em geral que não foram mapeados acima: 12 meses
+  if (type === 'programa') {
+    return 12;
+  }
+
+  // 5. Laudos em geral: 12 meses
+  if (type === 'laudo') {
+    return 12;
+  }
+
+  return null;
+}
+
+/**
+ * Retorna a data real de validade do documento.
+ * Prioridade:
+ * 1. Data de validade explícita (validityDate / validity_date).
+ * 2. Se não houver validade explícita, calcula a data real com base na Data de Emissão + periodicidade normativa (ex: PGR +2 anos, PCMSO +1 ano).
+ * 3. Se for um documento sem validade normativa (ex: Ordem de Serviço, Contrato), retorna null.
+ * ATENÇÃO: NUNCA retorna dueDate ou dataEmissao como se fossem a data de validade.
+ */
+export function getEffectiveValidityDate(d) {
+  if (!d) return null;
+
+  // 1. Data de validade explícita preenchida
+  if (d.validityDate) {
+    const parsed = parseSafeDate(d.validityDate);
+    if (parsed) return parsed;
+  }
+
+  // 2. Cálculo a partir da data de emissão
+  const baseDateStr = d.dataEmissao || d.dataEnvio || d.deliveredDate;
+  if (baseDateStr) {
+    const baseDate = parseSafeDate(baseDateStr);
+    if (baseDate) {
+      const months = getDefaultValidityMonths(d);
+      if (months) {
+        const calcDate = new Date(baseDate.getTime());
+        calcDate.setMonth(calcDate.getMonth() + months);
+        return isNaN(calcDate.getTime()) ? null : calcDate;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function formatEffectiveValidityDateBR(d) {
+  const vDate = getEffectiveValidityDate(d);
+  if (!vDate) return 'Sem validade';
+  const day = String(vDate.getUTCDate()).padStart(2, '0');
+  const month = String(vDate.getUTCMonth() + 1).padStart(2, '0');
+  const year = vDate.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 export function getExpirationTargetDate(d) {
   if (!d) return null;
-  if (d.validityDate) {
-    return parseSafeDate(d.validityDate);
+
+  // 1. Data de validade real (explícita ou calculada normativamente)
+  const effValidity = getEffectiveValidityDate(d);
+  if (effValidity) {
+    return effValidity;
   }
+
+  // 2. Se o documento ainda NÃO foi entregue e possui um prazo de envio/entrega pendente
   if (!isDelivered(d) && !isUnconfiguredSeedItem(d)) {
-    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
-    return parseSafeDate(target);
+    const target = d.dueDate;
+    if (target) return parseSafeDate(target);
   }
+
   return null;
 }
 
@@ -73,19 +177,25 @@ export function isItemExpired(d, refDate = new Date()) {
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
 
-  // 1. Validade (se preenchida): se a data de validade já passou, está vencido
-  // (independente de ter sido entregue anteriormente ou não)
-  if (d.validityDate) {
-    const vDate = parseSafeDate(d.validityDate);
-    if (vDate && vDate < today) return true;
+  // 1. Validade real do documento: se já passou, está vencido
+  const effValidity = getEffectiveValidityDate(d);
+  if (effValidity) {
+    const vDate = new Date(effValidity.getTime());
+    vDate.setHours(0, 0, 0, 0);
+    if (vDate < today) return true;
+    return false;
   }
 
-  // 2. Se não foi entregue, verifica a data limite / prazo de envio
+  // 2. Se o documento NÃO tem validade normativa nem configurada, ele NÃO vence por emissão.
+  // Apenas se for uma entrega ainda pendente com prazo limite (dueDate) que já expirou:
   if (!isDelivered(d)) {
-    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+    const target = d.dueDate;
     if (target) {
       const tDate = parseSafeDate(target);
-      if (tDate && tDate < today) return true;
+      if (tDate) {
+        tDate.setHours(0, 0, 0, 0);
+        if (tDate < today) return true;
+      }
     }
   }
 
@@ -103,16 +213,22 @@ export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
 
   if (isItemExpired(d, today)) return false;
 
-  if (d.validityDate) {
-    const vDate = parseSafeDate(d.validityDate);
-    if (vDate && vDate >= today && vDate <= in30Days) return true;
+  const effValidity = getEffectiveValidityDate(d);
+  if (effValidity) {
+    const vDate = new Date(effValidity.getTime());
+    vDate.setHours(0, 0, 0, 0);
+    if (vDate >= today && vDate <= in30Days) return true;
+    return false;
   }
 
   if (!isDelivered(d)) {
-    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+    const target = d.dueDate;
     if (target) {
       const tDate = parseSafeDate(target);
-      if (tDate && tDate >= today && tDate <= in30Days) return true;
+      if (tDate) {
+        tDate.setHours(0, 0, 0, 0);
+        if (tDate >= today && tDate <= in30Days) return true;
+      }
     }
   }
 
@@ -132,16 +248,22 @@ export function isItemExpiring60(d, refDate = new Date(), in30 = null, in60 = nu
   if (isItemExpired(d, today)) return false;
   if (isItemExpiring30(d, today, in30Days)) return false;
 
-  if (d.validityDate) {
-    const vDate = parseSafeDate(d.validityDate);
-    if (vDate && vDate > in30Days && vDate <= in60Days) return true;
+  const effValidity = getEffectiveValidityDate(d);
+  if (effValidity) {
+    const vDate = new Date(effValidity.getTime());
+    vDate.setHours(0, 0, 0, 0);
+    if (vDate > in30Days && vDate <= in60Days) return true;
+    return false;
   }
 
   if (!isDelivered(d)) {
-    const target = d.dueDate || d.dataEnvio || d.dataEmissao;
+    const target = d.dueDate;
     if (target) {
       const tDate = parseSafeDate(target);
-      if (tDate && tDate > in30Days && tDate <= in60Days) return true;
+      if (tDate) {
+        tDate.setHours(0, 0, 0, 0);
+        if (tDate > in30Days && tDate <= in60Days) return true;
+      }
     }
   }
 
