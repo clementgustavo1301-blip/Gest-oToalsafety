@@ -182,6 +182,7 @@ function App() {
           <Route path="/inscricao" element={<PublicTrainingEnrollmentPage />} />
           <Route path="/inscricao/:turmaId" element={<PublicTrainingEnrollmentPage />} />
           <Route path="/inscricao-treinamento" element={<PublicTrainingEnrollmentPage />} />
+          <Route path="/inscricao-treinamento/:turmaId" element={<PublicTrainingEnrollmentPage />} />
           <Route path="/assinar-turma" element={<PublicTrainingSignPage />} />
           <Route path="/assinar-turma/:turmaId" element={<PublicTrainingSignPage />} />
 
