@@ -26,7 +26,8 @@ import SignaturePadModal from '../components/SignaturePadModal';
 import './TrainingCertificatesPage.css';
 import { 
   getTurmaSignatures, saveRoleSignature, clearTurmaSignature, subscribeToTurmaSignatures,
-  createOrGetSigningToken, generateNewSigningToken, getTurmaTokens 
+  createOrGetSigningToken, generateNewSigningToken, getTurmaTokens,
+  initializeDefaultSignaturesForTurma
 } from '../services/turmaSignatureService';
 
 import { OFFICIAL_TRAINING_MODELS, OFFICIAL_INSTRUCTORS, getInstructorSignatureUrl } from '../data/officialTrainingModels';
@@ -899,6 +900,7 @@ const TrainingCertificatesPage = () => {
         },
         coordinator: turmaFormData.coordinator || getDefaultCoordinator(turmaFormData.course_name)
       });
+      initializeDefaultSignaturesForTurma(savedTurma);
       setShowTurmaModal(false);
       await loadData();
       setFeedback({ 
@@ -1114,6 +1116,7 @@ const TrainingCertificatesPage = () => {
 
   // Carrega alunos de uma turma direto no gerador de certificados
   const handleLoadTurmaIntoGenerator = (turma) => {
+    initializeDefaultSignaturesForTurma(turma);
     const studentsInTurma = enrollments.filter(e => String(e.turma_id) === String(turma.id));
 
     setSelectedTurmaIdInGenerator(turma.id);
@@ -2162,35 +2165,56 @@ const TrainingCertificatesPage = () => {
 
               <ul className="tc-sign-list">
                 {signatureRoles.map(role => {
-                  const sig = currentTurmaSignatures?.[role.key];
-                  const isSigned = Boolean(sig?.dataUrl);
+                  const manualSig = currentTurmaSignatures?.[role.key] || (role.key === 'instructor_0' ? currentTurmaSignatures?.instructor : null);
+                  const defaultUrl = getInstructorSignatureUrl(role.name);
+                  const isManual = Boolean(manualSig?.dataUrl && !manualSig?.isDefaultOfficial);
+                  const sigUrl = isManual ? manualSig.dataUrl : (manualSig?.dataUrl || defaultUrl);
+                  const isSigned = Boolean(sigUrl);
                   return (
                     <li key={role.key} className={`tc-sign-row ${isSigned ? 'is-signed' : ''}`}>
                       <div className="tc-sign-info">
                         <span className="tc-sign-role">{role.label}</span>
                         <span className="tc-sign-name" title={role.name}>{role.name}</span>
+                        <div style={{ marginTop: '3px' }}>
+                          {isManual ? (
+                            <span className="tc-badge tc-badge--success" style={{ fontSize: '0.68rem', padding: '1px 6px' }} title="Assinatura manual coletada pelo celular ou tela">
+                              ✍️ Assinatura manual (celular/tela)
+                            </span>
+                          ) : defaultUrl ? (
+                            <span className="tc-badge" style={{ fontSize: '0.68rem', padding: '1px 6px', color: '#0369a1', background: '#e0f2fe', borderColor: '#bae6fd' }} title="Assinatura oficial padrão carregada automaticamente">
+                              ✓ Assinatura padrão oficial
+                            </span>
+                          ) : (
+                            <span className="tc-badge tc-badge--muted" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                              Pendente
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="tc-sign-thumb">
-                        {isSigned
-                          ? <img src={sig.dataUrl} alt={`Assinatura de ${role.name}`} />
-                          : <span>Não assinado</span>}
+                      <div className="tc-sign-thumb" style={{ backgroundColor: '#ffffff', minHeight: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {sigUrl ? (
+                          <img src={sigUrl} alt={`Assinatura de ${role.name}`} style={{ maxHeight: '36px', maxWidth: '100%', objectFit: 'contain' }} />
+                        ) : (
+                          <span>Não assinado</span>
+                        )}
                       </div>
                       <div className="tc-sign-actions">
                         <button
                           id={`btn-sign-${role.key}`}
                           type="button"
-                          className={`tc-btn ${isSigned ? '' : 'tc-btn--primary'}`}
+                          className="tc-btn"
                           onClick={() => handleOpenSignatureModal(role.key)}
+                          title="Assinar com caneta na tela ou substituir assinatura"
                         >
                           <PenTool size={13} />
-                          {isSigned ? 'Refazer' : 'Assinar'}
+                          {isManual ? 'Refazer manual' : 'Assinar manual'}
                         </button>
-                        {isSigned && (
+                        {isManual && (
                           <button
                             type="button"
                             className="tc-icon-btn tc-icon-btn--sm tc-icon-btn--danger"
                             onClick={() => handleClearSignature(role.key)}
-                            title="Remover assinatura"
+                            title="Restaurar assinatura padrão oficial"
                           >
                             <Trash2 size={14} />
                           </button>

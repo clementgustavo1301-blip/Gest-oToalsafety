@@ -1,3 +1,5 @@
+import { getInstructorSignatureUrl } from '../data/officialTrainingModels.js';
+
 /**
  * Serviço de Gestão e Sincronização em Tempo Real das Assinaturas Manuais da Turma.
  * Suporta múltiplos instrutores e geração de links de uso único que expiram após a assinatura.
@@ -30,6 +32,102 @@ export function getTurmaSignatures(turmaId) {
     console.warn('[TurmaSignatureService] Erro ao ler assinaturas:', e);
   }
   return {};
+}
+
+/**
+ * Retorna objeto de assinatura padrão oficial correspondente a um nome
+ */
+export function getDefaultSignatureForName(name, roleTitle = '') {
+  if (!name) return null;
+  const url = getInstructorSignatureUrl(name);
+  if (!url) return null;
+  return {
+    dataUrl: url,
+    signerName: name,
+    roleTitle: roleTitle,
+    isDefaultOfficial: true
+  };
+}
+
+/**
+ * Inicializa ou preenche as assinaturas oficiais padrão de uma turma com base nos instrutores/responsáveis configurados
+ */
+export function initializeDefaultSignaturesForTurma(turma) {
+  if (!turma || !turma.id) return {};
+  const current = getTurmaSignatures(turma.id);
+  const updated = { ...current };
+  let changed = false;
+
+  // 1. Instrutor principal / lista de instrutores
+  const instructors = Array.isArray(turma.instructors) && turma.instructors.length > 0
+    ? turma.instructors
+    : (turma.instructor_name ? [{ name: turma.instructor_name, role: turma.instructor_role }] : []);
+
+  instructors.forEach((inst, idx) => {
+    const key = idx === 0 ? 'instructor' : `instructor_${idx}`;
+    if (!updated[key]?.dataUrl && inst.name) {
+      const sigUrl = getInstructorSignatureUrl(inst.name);
+      if (sigUrl) {
+        updated[key] = {
+          dataUrl: sigUrl,
+          signerName: inst.name,
+          roleTitle: inst.role || 'Instrutor',
+          isDefaultOfficial: true
+        };
+        if (key === 'instructor') {
+          updated.instructor_0 = updated[key];
+        }
+        changed = true;
+      }
+    }
+  });
+
+  // 2. Responsável Técnico
+  const techLeadName = turma.tech_lead?.name || turma.tech_lead_name || 'Eider Gomes do Nascimento';
+  if (!updated.tech_lead?.dataUrl && techLeadName) {
+    const sigUrl = getInstructorSignatureUrl(techLeadName);
+    if (sigUrl) {
+      updated.tech_lead = {
+        dataUrl: sigUrl,
+        signerName: techLeadName,
+        roleTitle: turma.tech_lead?.role || turma.tech_lead_role || 'Responsável Técnico',
+        isDefaultOfficial: true
+      };
+      changed = true;
+    }
+  }
+
+  // 3. Coordenação Técnica
+  const coordName = turma.coordinator?.name || turma.tech_lead?.coordinator?.name || (turma.cert_model === 'modelo2' ? 'Cezar Augusto Galvão De P. Camêlo' : null);
+  if (!updated.coordinator?.dataUrl && coordName) {
+    const sigUrl = getInstructorSignatureUrl(coordName);
+    if (sigUrl) {
+      updated.coordinator = {
+        dataUrl: sigUrl,
+        signerName: coordName,
+        roleTitle: turma.coordinator?.role || 'Coordenação Técnica',
+        isDefaultOfficial: true
+      };
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}${turma.id}`, JSON.stringify(updated));
+      if (broadcastChannel) {
+        broadcastChannel.postMessage({
+          type: 'SIGNATURE_UPDATED',
+          turmaId: String(turma.id),
+          signatures: updated
+        });
+      }
+    } catch (e) {
+      console.warn('Erro ao persistir assinaturas padrão:', e);
+    }
+  }
+
+  return updated;
 }
 
 /**
