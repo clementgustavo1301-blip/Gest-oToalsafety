@@ -599,20 +599,19 @@ const CompanyDetailsPage = () => {
                                 : 'Não informada'}
                             </strong>
                           </span>
-                          <span>
-                            Validade: <strong style={{ color: isExpired ? '#dc2626' : 'var(--text-primary)', fontWeight: isExpired ? '700' : '600' }}>
-                              {(() => {
-                                if (prog.type === 'laudo' || isLaudo(prog)) {
-                                  return 'Sem validade (Laudo)';
-                                }
-                                const effVal = getEffectiveValidityDate(prog);
-                                if (effVal) {
-                                  return `${effVal.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}${isExpired ? ' (Expirada)' : ''}`;
-                                }
-                                return 'Sem validade';
-                              })()}
-                            </strong>
-                          </span>
+                          {!(prog.type === 'laudo' || isLaudo(prog)) && (
+                            <span>
+                              Validade: <strong style={{ color: isExpired ? '#dc2626' : 'var(--text-primary)', fontWeight: isExpired ? '700' : '600' }}>
+                                {(() => {
+                                  const effVal = getEffectiveValidityDate(prog);
+                                  if (effVal) {
+                                    return `${effVal.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}${isExpired ? ' (Expirada)' : ''}`;
+                                  }
+                                  return 'Sem validade';
+                                })()}
+                              </strong>
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

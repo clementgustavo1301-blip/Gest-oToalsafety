@@ -305,50 +305,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                   </span>
                 </div>
 
-                <div className="grid-responsive-2">
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label className="modal-label" htmlFor="dlv-validity">
-                        Data de Validade {(type === 'laudo' || isLaudo({ title, type })) ? '(Não aplicável a laudos)' : '(Opcional)'}
-                      </label>
-                      {type !== 'laudo' && !isLaudo({ title, type }) && dataEnvio && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setValidityManuallyEdited(false);
-                            updateSuggestedValidity(title, type, dataEnvio);
-                          }}
-                          style={{
-                            background: 'none', border: 'none', color: 'var(--primary)',
-                            fontSize: '0.6875rem', cursor: 'pointer', padding: 0, textDecoration: 'underline'
-                          }}
-                        >
-                          Recalcular padrão
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      id="dlv-validity"
-                      type="date"
-                      value={(type === 'laudo' || isLaudo({ title, type })) ? '' : validityDate}
-                      onChange={(e) => {
-                        if (type !== 'laudo' && !isLaudo({ title, type })) {
-                          setValidityDate(e.target.value);
-                          setValidityManuallyEdited(true);
-                        }
-                      }}
-                      className="modal-input"
-                      disabled={saving || type === 'laudo' || isLaudo({ title, type })}
-                      placeholder={(type === 'laudo' || isLaudo({ title, type })) ? 'Laudos não têm validade' : ''}
-                      style={(type === 'laudo' || isLaudo({ title, type })) ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: 'var(--background)' } : {}}
-                    />
-                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      {(type === 'laudo' || isLaudo({ title, type }))
-                        ? 'ℹ️ Laudos técnicos não possuem prazo de validade (vigência indeterminada pelas NRs).'
-                        : 'PGR: 2 anos | PCMSO: 1 ano (ou livre)'}
-                    </span>
-                  </div>
-
+                {type === 'laudo' || isLaudo({ title, type }) ? (
                   <div>
                     <label className="modal-label" htmlFor="dlv-revisao">
                       Última Revisão (Opcional)
@@ -362,10 +319,66 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                       disabled={saving}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      Não obrigatório
+                      Não obrigatório (laudos têm vigência indeterminada pelas NRs e não possuem data de validade)
                     </span>
                   </div>
-                </div>
+                ) : (
+                  <div className="grid-responsive-2">
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="modal-label" htmlFor="dlv-validity">
+                          Data de Validade (Opcional)
+                        </label>
+                        {dataEnvio && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setValidityManuallyEdited(false);
+                              updateSuggestedValidity(title, type, dataEnvio);
+                            }}
+                            style={{
+                              background: 'none', border: 'none', color: 'var(--primary)',
+                              fontSize: '0.6875rem', cursor: 'pointer', padding: 0, textDecoration: 'underline'
+                            }}
+                          >
+                            Recalcular padrão
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        id="dlv-validity"
+                        type="date"
+                        value={validityDate}
+                        onChange={(e) => {
+                          setValidityDate(e.target.value);
+                          setValidityManuallyEdited(true);
+                        }}
+                        className="modal-input"
+                        disabled={saving}
+                      />
+                      <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                        PGR: 2 anos | PCMSO: 1 ano (ou livre)
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="modal-label" htmlFor="dlv-revisao">
+                        Última Revisão (Opcional)
+                      </label>
+                      <input
+                        id="dlv-revisao"
+                        type="date"
+                        value={ultimaRevisao}
+                        onChange={(e) => setUltimaRevisao(e.target.value)}
+                        className="modal-input"
+                        disabled={saving}
+                      />
+                      <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
+                        Não obrigatório
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Responsável */}

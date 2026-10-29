@@ -958,7 +958,7 @@ export async function updateDeliverable(deliverableId, updates) {
     snakeUpdates.due_date = emissaoVal;
   }
   if (updates.dueDate !== undefined && emissaoVal === undefined) snakeUpdates.due_date = updates.dueDate;
-  if (updates.type === 'laudo') {
+  if (updates.type === 'laudo' || isLaudo(updates)) {
     snakeUpdates.validity_date = null;
   } else if (updates.validityDate !== undefined) {
     snakeUpdates.validity_date = updates.validityDate;

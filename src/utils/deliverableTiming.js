@@ -44,20 +44,28 @@ export function isLaudo(item) {
   const type = (item.type || '').trim().toLowerCase();
   if (type === 'laudo') return true;
 
-  const title = (item.title || '').trim().toLowerCase();
+  const title = (item.title || item.name || '').trim().toLowerCase();
   if (
+    title === 'ltcat' ||
+    title === 'li' ||
+    title === 'lp' ||
+    title === 'aet' ||
     title.startsWith('laudo') ||
     title.includes('laudo técnico') ||
+    title.includes('laudo tecnico') ||
     title.includes('laudo pericial') ||
     title.includes('ltcat') ||
     title.includes('insalubridade') ||
     title.includes('periculosidade') ||
-    title.includes('aet') ||
+    title.includes('análise ergonômica') ||
+    title.includes('analise ergonomica') ||
     title.includes('ergonômico') ||
     title.includes('ergonomico') ||
-    title.includes('psicossocial')
+    title.includes('psicossocial') ||
+    title.includes('relatório analítico') ||
+    title.includes('relatorio analitico')
   ) {
-    if (!title.includes('pcmso') && !title.includes('pgr') && !title.includes('pca') && !title.includes('ppr')) {
+    if (!title.includes('pgr') && !title.includes('pca') && !title.includes('ppr') && title !== 'pcmso') {
       return true;
     }
   }
@@ -173,17 +181,7 @@ export function formatEffectiveValidityDateBR(d) {
 }
 
 export function getExpirationTargetDate(d) {
-  if (!d) return null;
-
-  // Laudos não possuem validade normativa após entregues.
-  // Apenas se o laudo ainda NÃO foi entregue e possui prazo de elaboração/envio pendente:
-  if (isLaudo(d)) {
-    if (!isDelivered(d) && !isUnconfiguredSeedItem(d)) {
-      const target = d.dueDate;
-      if (target) return parseSafeDate(target);
-    }
-    return null;
-  }
+  if (!d || isLaudo(d)) return null;
 
   // 1. Data de validade real (explícita ou calculada normativamente)
   const effValidity = getEffectiveValidityDate(d);
@@ -201,6 +199,7 @@ export function getExpirationTargetDate(d) {
 }
 
 export function getDaysUntilExpiration(d, refDate = new Date()) {
+  if (!d || isLaudo(d)) return null;
   const targetDate = getExpirationTargetDate(d);
   if (!targetDate) return null;
   const today = new Date(refDate);
@@ -212,27 +211,13 @@ export function getDaysUntilExpiration(d, refDate = new Date()) {
 
 export function isItemExpired(d, refDate = new Date()) {
   if (!d) return false;
+  // Laudos NUNCA vencem e não possuem prazo de validade normativa
+  if (isLaudo(d)) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
-
-  // Laudos não têm data de validade normativa.
-  // Uma vez entregues/concluídos, NUNCA expiram por validade.
-  if (isLaudo(d)) {
-    if (isDelivered(d)) return false;
-    // Se estiver pendente, verifica apenas se a data de envio/entrega limite (dueDate) já venceu
-    const target = d.dueDate;
-    if (target) {
-      const tDate = parseSafeDate(target);
-      if (tDate) {
-        tDate.setHours(0, 0, 0, 0);
-        if (tDate < today) return true;
-      }
-    }
-    return false;
-  }
 
   if (d.status === 'vencido') return true;
 
@@ -262,11 +247,9 @@ export function isItemExpired(d, refDate = new Date()) {
 }
 
 export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
-  if (!d) return false;
+  if (!d || isLaudo(d)) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
-  // Laudos entregues não vencem
-  if (isLaudo(d) && isDelivered(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
@@ -297,11 +280,9 @@ export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
 }
 
 export function isItemExpiring60(d, refDate = new Date(), in30 = null, in60 = null) {
-  if (!d) return false;
+  if (!d || isLaudo(d)) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
-  // Laudos entregues não vencem
-  if (isLaudo(d) && isDelivered(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
@@ -348,6 +329,17 @@ export function getDeliverableTimingInfo(d, refDate = new Date()) {
   }
   if (d.status === 'nao_se_aplica') {
     return { statusKey: 'nao_se_aplica', label: 'Não Se Aplica', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' };
+  }
+
+  // Laudos técnicos não possuem prazo de validade nem vencimento
+  if (isLaudo(d)) {
+    if (isDelivered(d)) {
+      return { statusKey: 'entregue', label: 'Entregue', bg: '#dcfce7', color: '#15803d', border: '#86efac', isDelivered: true };
+    }
+    if (d.status === 'em_elaboracao') {
+      return { statusKey: 'em_elaboracao', label: 'Em Elaboração', bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
+    }
+    return { statusKey: 'pendente', label: 'Pendente', bg: '#fef3c7', color: '#b45309', border: '#fde68a' };
   }
 
   const expired = isItemExpired(d, today);

@@ -16,7 +16,8 @@ import {
   isItemExpiring60,
   getDeliverableTimingInfo,
   getEffectiveValidityDate,
-  parseSafeDate
+  parseSafeDate,
+  isLaudo
 } from '../utils/deliverableTiming';
 
 // Helpers de normalização e comparação de nomes
@@ -1130,9 +1131,9 @@ const Dashboard = () => {
                         const isExpired = isItemExpired(item, today);
                         const sc = statusColors[item.status] || statusColors.pendente;
                         const effVal = getEffectiveValidityDate(item);
-                        const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) ? item.dueDate : null);
-                        const isExpiring30 = targetDate && new Date(targetDate) <= in30Days;
-                        const isExpiring60 = targetDate && new Date(targetDate) > in30Days && new Date(targetDate) <= in60Days;
+                        const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) && !isLaudo(item) ? item.dueDate : null);
+                        const isExpiring30 = isItemExpiring30(item, today, in30Days);
+                        const isExpiring60 = isItemExpiring60(item, today, in30Days, in60Days);
 
                         return (
                           <div key={item.id} style={{
@@ -1158,7 +1159,7 @@ const Dashboard = () => {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', margin: '0 0 0.125rem 0' }}>
-                                {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo')}
+                                {isLaudo(item) ? (isDelivered(item) ? 'Entregue (Sem validade)' : 'Em elaboração') : (targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo'))}
                               </p>
                               <span style={{
                                 fontSize: '0.65rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
@@ -1631,13 +1632,14 @@ const Dashboard = () => {
                   const isExpired = isItemExpired(item, today);
                   const sc = statusColors[item.status] || statusColors.pendente;
                   const effVal = getEffectiveValidityDate(item);
-                  const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) ? item.dueDate : null);
-                  const isExpiring30 = targetDate && new Date(targetDate) <= in30Days;
-                  const isExpiring60 = targetDate && new Date(targetDate) > in30Days && new Date(targetDate) <= in60Days;
+                  const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) && !isLaudo(item) ? item.dueDate : null);
+                  const isExpiring30 = isItemExpiring30(item, today, in30Days);
+                  const isExpiring60 = isItemExpiring60(item, today, in30Days, in60Days);
 
                   return (
                     <div key={item.id} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      justifyContent: 'space-between',
                       padding: '0.875rem',
                       border: isExpired ? '1px solid #fca5a5' : '1px solid var(--border)',
                       borderRadius: 'var(--radius-md)',
@@ -1657,7 +1659,7 @@ const Dashboard = () => {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                          {targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo')}
+                          {isLaudo(item) ? (isDelivered(item) ? 'Entregue (Sem validade)' : 'Em elaboração') : (targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo'))}
                         </p>
                         <span style={{
                           fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',

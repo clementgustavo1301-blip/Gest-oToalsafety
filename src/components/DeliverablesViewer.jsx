@@ -438,9 +438,11 @@ const DeliverablesViewer = ({ companyId }) => {
           : { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
       }>
         {filtered.map(d => {
+          const itemIsLaudo = d.type === 'laudo' || isLaudo(d);
           const typeConf = TYPE_CONFIG[d.type] || TYPE_CONFIG.contrato;
           const isExpired = isItemExpired(d, today);
-          const statusConf = isExpired ? STATUS_CONFIG.vencido : (STATUS_CONFIG[d.status] || STATUS_CONFIG.pendente);
+          const effectiveStatus = (itemIsLaudo && d.status === 'vencido') ? 'pendente' : d.status;
+          const statusConf = isExpired ? STATUS_CONFIG.vencido : (STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pendente);
 
           return (
             <div key={d.id} className="card" style={{ 
@@ -506,10 +508,7 @@ const DeliverablesViewer = ({ companyId }) => {
                 {viewMode === 'list' && (
                   <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                     {(d.dataEmissao || d.dataEnvio) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
-                    {(() => {
-                      if (d.type === 'laudo' || isLaudo(d)) {
-                        return <span>Validade: <strong style={{ color: 'var(--text-secondary)' }}>Sem validade (Laudo)</strong></span>;
-                      }
+                    {!itemIsLaudo && (() => {
                       const effVal = getEffectiveValidityDate(d);
                       if (effVal) {
                         return (
@@ -550,21 +549,20 @@ const DeliverablesViewer = ({ companyId }) => {
                     <span>Data de Emissão:</span>
                     <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{(d.dataEmissao || d.dataEnvio) ? new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>Validade:</span>
-                    <span style={{ fontWeight: '600', color: (d.type === 'laudo' || isLaudo(d)) ? 'var(--text-secondary)' : (isExpired ? 'var(--danger)' : 'var(--primary)') }}>
-                      {(() => {
-                        if (d.type === 'laudo' || isLaudo(d)) {
-                          return 'Sem validade (Laudo)';
-                        }
-                        const effVal = getEffectiveValidityDate(d);
-                        if (effVal) {
-                          return `${new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${isExpired ? '⚠️' : ''}`;
-                        }
-                        return 'Sem validade';
-                      })()}
-                    </span>
-                  </div>
+                  {!itemIsLaudo && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>Validade:</span>
+                      <span style={{ fontWeight: '600', color: isExpired ? 'var(--danger)' : 'var(--primary)' }}>
+                        {(() => {
+                          const effVal = getEffectiveValidityDate(d);
+                          if (effVal) {
+                            return `${new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${isExpired ? '⚠️' : ''}`;
+                          }
+                          return 'Sem validade';
+                        })()}
+                      </span>
+                    </div>
+                  )}
                   {d.ultimaRevisao && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Última Revisão:</span>
