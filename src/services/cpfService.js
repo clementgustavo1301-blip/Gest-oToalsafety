@@ -3,7 +3,7 @@
  * Base URL: https://api.cpfcnpj.com.br
  */
 
-const DEFAULT_TOKEN = '5ae973d7a997af13f0aaf2bf60e65803';
+const DEFAULT_TOKEN = '8ebc7b04958639ecbda124e77ff4667e';
 const BASE_URL = 'https://api.cpfcnpj.com.br';
 
 export const cleanCpf = (cpf = '') => {
@@ -57,7 +57,7 @@ export async function searchCpfA(cpf, customToken = null) {
     };
   }
 
-  const token = customToken || localStorage.getItem('cpfcnpj_api_token') || DEFAULT_TOKEN;
+  const token = customToken || import.meta.env?.VITE_CPFCNPJ_API_TOKEN || localStorage.getItem('cpfcnpj_api_token') || DEFAULT_TOKEN;
   const url = `${BASE_URL}/${token}/1/${digits}`;
 
   try {
