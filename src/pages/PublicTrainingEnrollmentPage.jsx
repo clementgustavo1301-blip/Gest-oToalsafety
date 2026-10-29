@@ -269,7 +269,8 @@ export default function PublicTrainingEnrollmentPage() {
       justifyContent: 'center',
       padding: '2rem 1rem',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-      color: '#0f172a'
+      color: '#0f172a',
+      colorScheme: 'light'
     }}>
       <div style={{
         width: '100%',
@@ -617,6 +618,8 @@ export default function PublicTrainingEnrollmentPage() {
                           border: `1px solid ${!selectedTurmaId ? '#0284c7' : '#cbd5e1'}`,
                           borderRadius: '6px',
                           color: selectedTurmaId ? '#0f172a' : '#64748b',
+                          WebkitTextFillColor: selectedTurmaId ? '#0f172a' : '#64748b',
+                          colorScheme: 'light',
                           fontSize: '0.9rem',
                           boxSizing: 'border-box',
                           outline: 'none',
@@ -811,6 +814,9 @@ export default function PublicTrainingEnrollmentPage() {
                       border: `1px solid ${searched ? '#16a34a' : '#cbd5e1'}`,
                       borderRadius: '6px',
                       color: '#0f172a',
+                      WebkitTextFillColor: '#0f172a',
+                      colorScheme: 'light',
+                      opacity: 1,
                       fontSize: '1rem',
                       fontFamily: 'monospace',
                       boxSizing: 'border-box',
@@ -845,6 +851,9 @@ export default function PublicTrainingEnrollmentPage() {
                       border: '1px solid #cbd5e1',
                       borderRadius: '6px',
                       color: '#0f172a',
+                      WebkitTextFillColor: '#0f172a',
+                      colorScheme: 'light',
+                      opacity: 1,
                       fontSize: '0.95rem',
                       boxSizing: 'border-box',
                       outline: 'none',
@@ -881,6 +890,9 @@ export default function PublicTrainingEnrollmentPage() {
                       border: '1px solid #cbd5e1',
                       borderRadius: '6px',
                       color: '#0f172a',
+                      WebkitTextFillColor: '#0f172a',
+                      colorScheme: 'light',
+                      opacity: 1,
                       fontSize: '0.95rem',
                       boxSizing: 'border-box',
                       outline: 'none',
@@ -944,20 +956,38 @@ export default function PublicTrainingEnrollmentPage() {
                       onChange={(e) => setNome(e.target.value)}
                       placeholder="Nome completo do participante"
                       required
-                      disabled={!isManualNome}
+                      readOnly={!isManualNome}
                       style={{
                         width: '100%',
                         padding: '0.75rem 0.85rem',
                         backgroundColor: isManualNome ? '#ffffff' : '#f0fdf4',
-                        border: `1px solid ${isManualNome ? '#cbd5e1' : '#bbf7d0'}`,
+                        border: `1.5px solid ${isManualNome ? '#cbd5e1' : '#16a34a'}`,
                         borderRadius: '6px',
                         color: '#0f172a',
+                        WebkitTextFillColor: '#0f172a',
+                        opacity: 1,
                         fontSize: '1rem',
-                        fontWeight: '600',
+                        fontWeight: '700',
                         boxSizing: 'border-box',
-                        outline: 'none'
+                        outline: 'none',
+                        colorScheme: 'light',
+                        cursor: isManualNome ? 'text' : 'default'
                       }}
                     />
+                    {!isManualNome && nome && (
+                      <div style={{
+                        marginTop: '0.4rem',
+                        fontSize: '0.8rem',
+                        color: '#15803d',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontWeight: '600'
+                      }}>
+                        <CheckCircle2 size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span>Nome consultado e confirmado na Receita Federal</span>
+                      </div>
+                    )}
                   </div>
                 )}
 

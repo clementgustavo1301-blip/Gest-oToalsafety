@@ -1635,3 +1635,22 @@ table tbody tr:last-child td {
   0% { stroke-dashoffset: 165; }
   100% { stroke-dashoffset: 0; }
 }
+
+/* Garantir legibilidade e contraste em formulários públicos de inscrição */
+#nome-input,
+#cpf-input,
+#birthdate-input,
+#matricula-input,
+#turma-select {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  opacity: 1 !important;
+  color-scheme: light !important;
+}
+
+#nome-input[readonly] {
+  background-color: #f0fdf4 !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
