@@ -9,7 +9,7 @@ import {
   uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable,
   deleteDeliverables
 } from '../services/storageService';
-import { isItemExpired, isDelivered, getEffectiveValidityDate } from '../utils/deliverableTiming';
+import { isItemExpired, isDelivered, getEffectiveValidityDate, isLaudo } from '../utils/deliverableTiming';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
 
@@ -507,6 +507,9 @@ const DeliverablesViewer = ({ companyId }) => {
                   <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                     {(d.dataEmissao || d.dataEnvio) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
                     {(() => {
+                      if (d.type === 'laudo' || isLaudo(d)) {
+                        return <span>Validade: <strong style={{ color: 'var(--text-secondary)' }}>Sem validade (Laudo)</strong></span>;
+                      }
                       const effVal = getEffectiveValidityDate(d);
                       if (effVal) {
                         return (
@@ -549,8 +552,11 @@ const DeliverablesViewer = ({ companyId }) => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>Validade:</span>
-                    <span style={{ fontWeight: '600', color: isExpired ? 'var(--danger)' : 'var(--primary)' }}>
+                    <span style={{ fontWeight: '600', color: (d.type === 'laudo' || isLaudo(d)) ? 'var(--text-secondary)' : (isExpired ? 'var(--danger)' : 'var(--primary)') }}>
                       {(() => {
+                        if (d.type === 'laudo' || isLaudo(d)) {
+                          return 'Sem validade (Laudo)';
+                        }
                         const effVal = getEffectiveValidityDate(d);
                         if (effVal) {
                           return `${new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${isExpired ? '⚠️' : ''}`;

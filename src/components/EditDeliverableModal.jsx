@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit3 } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
-import { getDefaultValidityMonths, parseSafeDate } from '../utils/deliverableTiming';
+import { getDefaultValidityMonths, parseSafeDate, isLaudo } from '../utils/deliverableTiming';
 
 const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const initialMatch = STANDARD_DELIVERABLES.find(
@@ -15,8 +15,9 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const [description, setDescription] = useState(deliverable?.description || '');
   const [type, setType] = useState(deliverable?.type || 'programa');
   const [contractId, setContractId] = useState(deliverable?.contractId || '');
+  const isInitialLaudo = deliverable?.type === 'laudo' || isLaudo(deliverable);
   const [dataEnvio, setDataEnvio] = useState(deliverable?.dataEmissao || deliverable?.dataEnvio || deliverable?.dueDate || '');
-  const [validityDate, setValidityDate] = useState(deliverable?.validityDate || '');
+  const [validityDate, setValidityDate] = useState(isInitialLaudo ? '' : (deliverable?.validityDate || ''));
   const [ultimaRevisao, setUltimaRevisao] = useState(deliverable?.ultimaRevisao || '');
   const [deliveredDate, setDeliveredDate] = useState(deliverable?.deliveredDate || '');
   const [status, setStatus] = useState(deliverable?.status || 'pendente');
@@ -51,6 +52,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
     if (!title.trim() || !dataEnvio) return;
     
     setSaving(true);
+    const isCurLaudo = type === 'laudo' || isLaudo({ title, type });
     await onSave(deliverable.id, {
       title: title.trim(),
       description: description.trim() || null,
@@ -61,7 +63,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
       dataEmissao: dataEnvio,
       data_emissao: dataEnvio,
       data_envio: dataEnvio,
-      validityDate: validityDate || null,
+      validityDate: isCurLaudo ? null : (validityDate || null),
       ultimaRevisao: ultimaRevisao || null,
       deliveredDate: deliveredDate || null,
       responsibleId: responsibleId || null,
@@ -112,6 +114,9 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                         setTitle(found.label);
                         setType(found.defaultType);
                         if (found.description && !description) setDescription(found.description);
+                        if (found.defaultType === 'laudo' || isLaudo({ title: found.label, type: found.defaultType })) {
+                          setValidityDate('');
+                        }
                       }
                     }
                   }}
@@ -161,7 +166,13 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                   <select
                     id="dlv-type"
                     value={type}
-                    onChange={(e) => setType(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setType(val);
+                      if (val === 'laudo' || isLaudo({ title, type: val })) {
+                        setValidityDate('');
+                      }
+                    }}
                     className="modal-input"
                     disabled={saving}
                   >
@@ -242,9 +253,9 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label className="modal-label" htmlFor="dlv-validity">
-                        Data de Validade (Opcional)
+                        Data de Validade {(type === 'laudo' || isLaudo({ title, type })) ? '(Não aplicável a laudos)' : '(Opcional)'}
                       </label>
-                      {dataEnvio && (
+                      {type !== 'laudo' && !isLaudo({ title, type }) && dataEnvio && (
                         <button
                           type="button"
                           onClick={() => {
@@ -270,13 +281,21 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                     <input
                       id="dlv-validity"
                       type="date"
-                      value={validityDate}
-                      onChange={(e) => setValidityDate(e.target.value)}
+                      value={(type === 'laudo' || isLaudo({ title, type })) ? '' : validityDate}
+                      onChange={(e) => {
+                        if (type !== 'laudo' && !isLaudo({ title, type })) {
+                          setValidityDate(e.target.value);
+                        }
+                      }}
                       className="modal-input"
-                      disabled={saving}
+                      disabled={saving || type === 'laudo' || isLaudo({ title, type })}
+                      placeholder={(type === 'laudo' || isLaudo({ title, type })) ? 'Laudos não têm validade' : ''}
+                      style={(type === 'laudo' || isLaudo({ title, type })) ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: 'var(--background)' } : {}}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      PGR: 2 anos | PCMSO/Laudos: 1 ano (ou livre)
+                      {(type === 'laudo' || isLaudo({ title, type }))
+                        ? 'ℹ️ Laudos técnicos não possuem prazo de validade (vigência indeterminada pelas NRs).'
+                        : 'PGR: 2 anos | PCMSO: 1 ano (ou livre)'}
                     </span>
                   </div>
 

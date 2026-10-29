@@ -120,6 +120,7 @@ export async function sendDeliverablesReport(type, replyChatId = null) {
     } else if (type === 'proximos') {
       title = '🚨 Próximos a Vencer';
       filtered = deliverables.filter(d => {
+        if (d.type === 'laudo') return false;
         if (!d.validity_date) return false;
         const vDate = new Date(d.validity_date + 'T00:00:00');
         const daysUntilDue = Math.ceil((vDate - today) / (1000 * 60 * 60 * 24));

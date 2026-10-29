@@ -207,7 +207,7 @@ export const initialDeliverables = [
     type: 'laudo',
     status: 'entregue',
     dueDate: '2026-05-01',
-    validityDate: '2027-05-01',
+    validityDate: null,
     deliveredDate: '2026-04-28',
     fileName: 'AET_LD_Transportes_2026.pdf',
   },

@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Stethoscope, Search, Plus, Trash2, Copy, Check, MessageSquare, 
   RefreshCw, DollarSign, Calculator, FileText, AlertCircle,
-  UserCheck, Building2, ClipboardList, Send, Info, ShieldAlert, FileCheck
+  UserCheck, Building2, ClipboardList, Send, Info, ShieldAlert, FileCheck,
+  Download, CheckCheck, Square, CheckSquare, RotateCcw, ArrowRight, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getCompanies } from '../services/storageService';
+import { generateCommercialProposalPDF } from '../services/proposalPdfGenerator';
 
 // Exames transcritos fielmente da Tabela Oficial ECOCLINIC (Anexo I - Tabela de Valores de Procedimentos)
 const ECOCLINIC_EXAMS = [
@@ -156,6 +159,293 @@ const ExamsBudgetPage = () => {
 
   // Toast / Copy notification
   const [copied, setCopied] = useState(false);
+
+  // Companies from DB for Proposal Selection
+  const [companies, setCompanies] = useState([]);
+  useEffect(() => {
+    async function loadCompanies() {
+      try {
+        const comps = await getCompanies();
+        setCompanies(comps || []);
+      } catch (err) {
+        console.error('Erro ao carregar empresas:', err);
+      }
+    }
+    loadCompanies();
+  }, []);
+
+  // Commercial Proposal State
+  const [clientName, setClientName] = useState('');
+  const [clientCnpj, setClientCnpj] = useState('');
+  const [clientContact, setClientContact] = useState('');
+  const [clientCity, setClientCity] = useState('');
+  const [proposalNumber, setProposalNumber] = useState(
+    `PROP-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`
+  );
+  const [proposalValidityDays, setProposalValidityDays] = useState(30);
+  const [proposalPaymentTerms, setProposalPaymentTerms] = useState(
+    'Faturamento mensal para 30 dias via boleto bancário.'
+  );
+  const [proposalObservations, setProposalObservations] = useState(
+    'Exames realizados mediante agendamento prévio. Emissão ágil de ASO e envio dos eventos de SST ao eSocial.'
+  );
+  const [proposalDiscountType, setProposalDiscountType] = useState('none');
+  const [proposalDiscountValue, setProposalDiscountValue] = useState(0);
+
+  // Proposal Exams Selection
+  const [proposalExams, setProposalExams] = useState([
+    { id: '1', name: 'ASO – Atestado de Saúde Ocupacional', category: 'Ocupacional', price: 40.00, qty: 1, originalPrice: 40.00 },
+    { id: '7', name: 'Audiometria Tonal', category: 'Auditivo', price: 45.00, qty: 1, originalPrice: 45.00 },
+    { id: '9', name: 'Acuidade Visual / Discriminação de Cores', category: 'Visão', price: 35.00, qty: 1, originalPrice: 35.00 },
+    { id: '11', name: 'Eletrocardiograma (ECG)', category: 'Cardiológico', price: 45.00, qty: 1, originalPrice: 45.00 },
+    { id: '12', name: 'Eletroencefalograma (EEG)', category: 'Neurológico', price: 80.00, qty: 1, originalPrice: 80.00 },
+    { id: '13', name: 'Espirometria', category: 'Respiratório', price: 60.00, qty: 1, originalPrice: 60.00 },
+    { id: '14', name: 'Avaliação Psicossocial (Teste Palográfico)', category: 'Psicológico', price: 105.00, qty: 1, originalPrice: 105.00 },
+    { id: '49', name: 'Hemograma Completo', category: 'Laboratorial', price: 14.00, qty: 1, originalPrice: 14.00 },
+    { id: '51', name: 'Glicemia (Jejum)', category: 'Laboratorial', price: 10.00, qty: 1, originalPrice: 10.00 }
+  ]);
+  const [proposalSearchTerm, setProposalSearchTerm] = useState('');
+  const [proposalCategory, setProposalCategory] = useState('Todos');
+  const [proposalCopied, setProposalCopied] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Filter catalog for proposal
+  const filteredProposalCatalog = ECOCLINIC_EXAMS.filter(exam => {
+    const matchesSearch = exam.name.toLowerCase().includes(proposalSearchTerm.toLowerCase());
+    const matchesCategory = proposalCategory === 'Todos' || exam.category === proposalCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Select all exams in proposal
+  const handleSelectAllProposalExams = () => {
+    const all = ECOCLINIC_EXAMS.map(catalogExam => {
+      const existing = proposalExams.find(pe => pe.id === catalogExam.id);
+      return existing || {
+        ...catalogExam,
+        qty: 1,
+        originalPrice: catalogExam.price
+      };
+    });
+    setProposalExams(all);
+  };
+
+  // Deselect all in proposal
+  const handleDeselectAllProposalExams = () => {
+    if (window.confirm('Deseja desmarcar todos os exames da proposta?')) {
+      setProposalExams([]);
+    }
+  };
+
+  // Toggle single exam in proposal
+  const handleToggleProposalExam = (catalogExam) => {
+    const isSelected = proposalExams.some(pe => pe.id === catalogExam.id);
+    if (isSelected) {
+      setProposalExams(prev => prev.filter(pe => pe.id !== catalogExam.id));
+    } else {
+      setProposalExams(prev => [
+        ...prev,
+        { ...catalogExam, qty: 1, originalPrice: catalogExam.price }
+      ]);
+    }
+  };
+
+  // Alter exam price in proposal
+  const handleProposalPriceChange = (id, newPrice) => {
+    const val = parseFloat(newPrice) || 0;
+    setProposalExams(prev => prev.map(item => 
+      item.id === id ? { ...item, price: val } : item
+    ));
+  };
+
+  // Reset exam price to default
+  const handleResetExamPrice = (id) => {
+    const cat = ECOCLINIC_EXAMS.find(e => e.id === id);
+    if (cat) {
+      setProposalExams(prev => prev.map(item => 
+        item.id === id ? { ...item, price: cat.price } : item
+      ));
+    }
+  };
+
+  // Reset all prices to default
+  const handleResetAllExamPrices = () => {
+    if (window.confirm('Restaurar preços padrão da tabela EcoClinic para todos os exames selecionados?')) {
+      setProposalExams(prev => prev.map(item => {
+        const cat = ECOCLINIC_EXAMS.find(e => e.id === item.id);
+        return cat ? { ...item, price: cat.price } : item;
+      }));
+    }
+  };
+
+  // Proposal quantity changes
+  const handleProposalQtyChange = (id, delta) => {
+    setProposalExams(prev => prev.map(item => {
+      if (item.id === id) {
+        const newQty = (item.qty || 1) + delta;
+        return newQty > 0 ? { ...item, qty: newQty } : item;
+      }
+      return item;
+    }));
+  };
+
+  // Copy from Tab 1 to Proposal
+  const handleCopyFromBudget = () => {
+    if (selectedExams.length === 0) {
+      alert('Nenhum exame selecionado no orçamento para importar.');
+      return;
+    }
+    const mapped = selectedExams.map(se => ({
+      ...se,
+      originalPrice: ECOCLINIC_EXAMS.find(e => e.id === se.id)?.price ?? se.price
+    }));
+    setProposalExams(mapped);
+    if (paymentTerms) setProposalPaymentTerms(paymentTerms);
+    if (observations) setProposalObservations(observations);
+    if (discountType !== 'none') {
+      setProposalDiscountType(discountType);
+      setProposalDiscountValue(discountValue);
+    }
+  };
+
+  // Calculations for Proposal
+  const proposalSubtotal = proposalExams.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 1)), 0);
+
+  let proposalCalculatedDiscount = 0;
+  if (proposalDiscountType === 'fixed') {
+    proposalCalculatedDiscount = Math.min(proposalDiscountValue, proposalSubtotal);
+  } else if (proposalDiscountType === 'percent') {
+    proposalCalculatedDiscount = (proposalSubtotal * Math.min(proposalDiscountValue, 100)) / 100;
+  }
+
+  const proposalGrandTotal = Math.max(0, proposalSubtotal - proposalCalculatedDiscount);
+
+  // Handle select company from DB
+  const handleSelectCompanyFromDb = (companyId) => {
+    if (!companyId) return;
+    const comp = companies.find(c => c.id === companyId);
+    if (comp) {
+      setClientName(comp.name || '');
+      setClientCnpj(comp.cnpj || '');
+      if (comp.contact) {
+        if (typeof comp.contact === 'string') {
+          try {
+            const parsed = JSON.parse(comp.contact);
+            setClientContact(parsed.contact || parsed.clientContact || parsed.responsible || '');
+          } catch {
+            setClientContact(comp.contact);
+          }
+        } else if (typeof comp.contact === 'object') {
+          setClientContact(comp.contact.contact || comp.contact.responsible || '');
+        }
+      }
+      if (comp.city) {
+        setClientCity(comp.state ? `${comp.city}/${comp.state}` : comp.city);
+      }
+    }
+  };
+
+  // Generate Proposal Text for WhatsApp/Copy
+  const generateProposalText = () => {
+    if (proposalExams.length === 0) {
+      return 'Nenhum exame selecionado para a proposta comercial.';
+    }
+
+    let text = `🏥 *PROPOSTA COMERCIAL - ECOCLINIC*\n`;
+    text += `*Medicina e Segurança do Trabalho*\n\n`;
+    text += `📋 *DADOS DA PROPOSTA:*\n`;
+    text += `• Proposta Nº: ${proposalNumber}\n`;
+    text += `• Empresa Proponente: *${clientName ? clientName.toUpperCase() : 'A DEFINIR'}*\n`;
+    if (clientCnpj) text += `• CNPJ: ${clientCnpj}\n`;
+    if (clientContact) text += `• Aos Cuidados de: ${clientContact}\n`;
+    text += `• Data: ${new Date().toLocaleDateString('pt-BR')} | Validade: ${proposalValidityDays} dias\n\n`;
+
+    text += `🔬 *TABELA DE EXAMES E PROCEDIMENTOS:*\n`;
+    proposalExams.forEach((item, index) => {
+      const itemTotal = (item.price || 0) * (item.qty || 1);
+      text += `${index + 1}. *${item.name}* (${item.category || 'Geral'})\n`;
+      text += `   • Unitário: ${formatBRL(item.price)} | Qtd: ${item.qty || 1}x | Total: ${formatBRL(itemTotal)}\n`;
+    });
+
+    text += `\n-----------------------------------\n`;
+    text += `💰 *Subtotal:* ${formatBRL(proposalSubtotal)}\n`;
+
+    if (proposalCalculatedDiscount > 0) {
+      text += `🏷️ *Desconto aplicado:* -${formatBRL(proposalCalculatedDiscount)}\n`;
+    }
+
+    text += `⭐ *VALOR TOTAL DA PROPOSTA:* *${formatBRL(proposalGrandTotal)}*\n`;
+
+    if (proposalPaymentTerms.trim()) {
+      text += `-----------------------------------\n`;
+      text += `💳 *Condições de Pagamento:* ${proposalPaymentTerms.trim()}\n`;
+    }
+
+    if (proposalObservations.trim()) {
+      text += `📝 *Observações Comerciais:* ${proposalObservations.trim()}\n`;
+    }
+
+    text += `\nFicamos à disposição para esclarecimentos e alinhamento do contrato! 🤝\n`;
+    text += `*EcoClinic Saúde Ocupacional*`;
+
+    return text;
+  };
+
+  const proposalText = generateProposalText();
+
+  // Copy proposal text
+  const handleCopyProposalText = async () => {
+    try {
+      await navigator.clipboard.writeText(proposalText);
+      setProposalCopied(true);
+      setTimeout(() => setProposalCopied(false), 2500);
+    } catch (err) {
+      console.error('Erro ao copiar texto da proposta:', err);
+    }
+  };
+
+  // Send proposal via WhatsApp
+  const handleSendProposalWhatsApp = () => {
+    const encodedText = encodeURIComponent(proposalText);
+    window.open(`https://api.whatsapp.com/send?text=${encodedText}`, '_blank');
+  };
+
+  // Export PDF
+  const handleExportProposalPDF = () => {
+    if (!clientName.trim()) {
+      alert('Por favor, informe o Nome da Empresa / Cliente para a qual está gerando a proposta comercial.');
+      return;
+    }
+    if (proposalExams.length === 0) {
+      alert('Selecione pelo menos um exame para gerar o PDF da proposta comercial.');
+      return;
+    }
+
+    try {
+      setIsGeneratingPdf(true);
+      generateCommercialProposalPDF({
+        clientName: clientName.trim(),
+        clientCnpj: clientCnpj.trim(),
+        clientContact: clientContact.trim(),
+        clientCity: clientCity.trim(),
+        proposalNumber,
+        proposalDate: new Date().toLocaleDateString('pt-BR'),
+        validityDays: proposalValidityDays,
+        paymentTerms: proposalPaymentTerms,
+        observations: proposalObservations,
+        exams: proposalExams,
+        discountType: proposalDiscountType,
+        discountValue: proposalDiscountValue,
+        subtotal: proposalSubtotal,
+        discountAmount: proposalCalculatedDiscount,
+        total: proposalGrandTotal
+      });
+    } catch (err) {
+      console.error('Erro ao gerar PDF da proposta:', err);
+      alert('Erro ao gerar o PDF da proposta comercial: ' + err.message);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   // Filter exams from catalog
   const filteredCatalog = ECOCLINIC_EXAMS.filter(exam => {
@@ -328,7 +618,7 @@ const ExamsBudgetPage = () => {
     if (isEditingSchedText && customSchedText) {
       return customSchedText;
     }
-    let text = `🏥 *SOLICITAÇÃO DE DADOS E PCMSO - TOTALSAFETY / ECOCLINIC*\n\n`;
+    let text = `🏥 *SOLICITAÇÃO DE DADOS E PCMSO - ECOCLINIC*\n\n`;
     text += `Olá! 👋 Para realizarmos o agendamento dos exames ocupacionais (${schedExamType}) e a elaboração do orçamento de acordo com os riscos da empresa, solicitamos o envio das seguintes informações:\n\n`;
 
     text += `🏢 *DADOS DA EMPRESA:*\n`;
@@ -401,25 +691,43 @@ const ExamsBudgetPage = () => {
           </p>
         </div>
 
-        {activeTab === 'budget' && (
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button 
-              className="btn btn-secondary"
-              onClick={handleClearSelection}
-              disabled={selectedExams.length === 0}
-              style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-            >
-              <RefreshCw size={15} /> Limpar
-            </button>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowCustomModal(true)}
-              style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-            >
-              <Plus size={16} /> Exame Avulso
-            </button>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button 
+            className="btn btn-primary"
+            onClick={() => {
+              if (selectedExams.length > 0 && proposalExams.length === 0) {
+                handleCopyFromBudget();
+              }
+              setActiveTab('proposal');
+            }}
+            style={{ 
+              fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem',
+              backgroundColor: '#057a55', borderColor: '#057a55', color: 'white', fontWeight: '600',
+              boxShadow: '0 2px 4px rgba(5,122,85,0.25)'
+            }}
+          >
+            <FileText size={16} /> Gerar Proposta Comercial (PDF)
+          </button>
+          {activeTab === 'budget' && (
+            <>
+              <button 
+                className="btn btn-secondary"
+                onClick={handleClearSelection}
+                disabled={selectedExams.length === 0}
+                style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <RefreshCw size={15} /> Limpar
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowCustomModal(true)}
+                style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <Plus size={16} /> Exame Avulso
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {/* Tabs Switcher */}
@@ -432,6 +740,17 @@ const ExamsBudgetPage = () => {
         >
           <Stethoscope size={18} />
           💰 Orçamento de Exames
+        </button>
+
+        <button
+          onClick={() => setActiveTab('proposal')}
+          className={activeTab === 'proposal' ? 'active' : ''}
+          role="tab"
+          aria-selected={activeTab === 'proposal'}
+          style={activeTab === 'proposal' ? { borderColor: '#057a55', color: '#057a55', fontWeight: '700' } : {}}
+        >
+          <FileText size={18} color={activeTab === 'proposal' ? '#057a55' : undefined} />
+          📄 Proposta Comercial EcoClinic (PDF)
         </button>
 
         <button
@@ -803,6 +1122,22 @@ const ExamsBudgetPage = () => {
               >
                 <MessageSquare size={16} /> Enviar via WhatsApp
               </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  handleCopyFromBudget();
+                  setActiveTab('proposal');
+                }}
+                disabled={selectedExams.length === 0}
+                style={{ 
+                  justifyContent: 'center', padding: '0.625rem', fontSize: '0.875rem', gap: '0.5rem', fontWeight: '700',
+                  gridColumn: 'span 2', backgroundColor: 'rgba(5, 122, 85, 0.08)', borderColor: 'rgba(5, 122, 85, 0.3)', color: '#057a55'
+                }}
+              >
+                <FileText size={16} /> Transformar em Proposta Comercial em PDF (EcoClinic)
+              </button>
             </div>
           </div>
 
@@ -810,7 +1145,559 @@ const ExamsBudgetPage = () => {
       </div>
       )}
 
-      {/* TAB 2: SCHEDULING DATA & PCMSO REQUEST TEMPLATE */}
+      {/* TAB 2: PROPOSTA COMERCIAL ECOCLINIC (PDF) */}
+      {activeTab === 'proposal' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Card 1: Informações do Cliente & Proposta */}
+          <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #057a55' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Building2 size={20} color="#057a55" />
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  1. Dados da Empresa Cliente e Parâmetros da Proposta
+                </h3>
+              </div>
+
+              {companies.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <label htmlFor="company-preset" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    Carregar dados de empresa cadastrada:
+                  </label>
+                  <select
+                    id="company-preset"
+                    className="modal-input"
+                    onChange={(e) => handleSelectCompanyFromDb(e.target.value)}
+                    defaultValue=""
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', width: 'auto', minWidth: '220px' }}
+                  >
+                    <option value="">Selecione uma empresa...</option>
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label className="modal-label" style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                  Nome da Empresa / Cliente * <span style={{ color: '#ef4444' }}>(Obrigatório)</span>
+                </label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="Ex: Indústria e Comércio de Cerâmica Santa Helena LTDA"
+                  required
+                  style={{ fontWeight: '600' }}
+                />
+              </div>
+
+              <div>
+                <label className="modal-label">CNPJ da Empresa</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={clientCnpj}
+                  onChange={(e) => setClientCnpj(e.target.value)}
+                  placeholder="00.000.000/0001-00"
+                />
+              </div>
+
+              <div>
+                <label className="modal-label">Aos Cuidados de / Contato</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={clientContact}
+                  onChange={(e) => setClientContact(e.target.value)}
+                  placeholder="Ex: João da Silva - Gerente de RH / SESMT"
+                />
+              </div>
+
+              <div>
+                <label className="modal-label">Cidade / Estado</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={clientCity}
+                  onChange={(e) => setClientCity(e.target.value)}
+                  placeholder="Ex: Mossoró/RN"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+              <div>
+                <label className="modal-label">Nº da Proposta</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={proposalNumber}
+                  onChange={(e) => setProposalNumber(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="modal-label">Validade da Proposta (Dias)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  className="modal-input"
+                  value={proposalValidityDays}
+                  onChange={(e) => setProposalValidityDays(parseInt(e.target.value) || 30)}
+                />
+              </div>
+
+              <div>
+                <label className="modal-label">Condição de Pagamento</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={proposalPaymentTerms}
+                  onChange={(e) => setProposalPaymentTerms(e.target.value)}
+                  placeholder="Ex: Faturamento mensal para 30 dias via boleto bancário."
+                />
+              </div>
+
+              <div>
+                <label className="modal-label">Observações da Proposta</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={proposalObservations}
+                  onChange={(e) => setProposalObservations(e.target.value)}
+                  placeholder="Ex: Atendimento in company ou na clínica EcoClinic."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Seleção de Exames e Ajuste de Valores (2 Colunas) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 1fr) minmax(380px, 1.2fr)', gap: '1.5rem', alignItems: 'start' }}>
+            
+            {/* Coluna Esquerda: Catálogo EcoClinic com Checkboxes & Selecionar Tudo */}
+            <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Stethoscope size={18} color="#057a55" />
+                    Catálogo de Exames EcoClinic
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {proposalExams.length} de {ECOCLINIC_EXAMS.length} exames selecionados
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.375rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleSelectAllProposalExams}
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    title="Selecionar todos os exames da EcoClinic"
+                  >
+                    <CheckCheck size={14} color="#057a55" /> Selecionar Tudo
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleDeselectAllProposalExams}
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    title="Desmarcar todos os exames"
+                  >
+                    <Square size={14} /> Desmarcar
+                  </button>
+                </div>
+              </div>
+
+              {/* Busca e Filtro de Categoria */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="modal-input"
+                  placeholder="Buscar exame (ex: ASO, Audiometria, Raio-X, ECG)..."
+                  value={proposalSearchTerm}
+                  onChange={(e) => setProposalSearchTerm(e.target.value)}
+                  style={{ paddingLeft: '2.5rem', fontSize: '0.8125rem' }}
+                />
+                <Search size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.375rem', overflowX: 'auto', paddingBottom: '0.375rem', scrollbarWidth: 'thin' }}>
+                {CATEGORIES.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setProposalCategory(cat)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '1rem',
+                      fontSize: '0.6875rem',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      border: '1px solid',
+                      backgroundColor: proposalCategory === cat ? '#057a55' : 'var(--surface)',
+                      color: proposalCategory === cat ? 'white' : 'var(--text-secondary)',
+                      borderColor: proposalCategory === cat ? '#057a55' : 'var(--border)'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Lista Selecionável */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', maxHeight: '550px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                {filteredProposalCatalog.map(exam => {
+                  const isSelected = proposalExams.some(pe => pe.id === exam.id);
+                  const selectedItem = proposalExams.find(pe => pe.id === exam.id);
+                  const currentPrice = selectedItem ? selectedItem.price : exam.price;
+
+                  return (
+                    <div
+                      key={exam.id}
+                      onClick={() => handleToggleProposalExam(exam)}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: isSelected ? '1.5px solid #057a55' : '1px solid var(--border)',
+                        backgroundColor: isSelected ? 'rgba(5, 122, 85, 0.06)' : 'var(--surface)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.625rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', minWidth: 0, flex: 1 }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}} // handled by parent onClick
+                          style={{ cursor: 'pointer', accentColor: '#057a55', width: '16px', height: '16px' }}
+                        />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p style={{ fontSize: '0.8125rem', fontWeight: isSelected ? '700' : '500', color: 'var(--text-primary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {exam.name}
+                          </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.125rem' }}>
+                            <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: '4px', backgroundColor: 'var(--background)', color: 'var(--text-secondary)' }}>
+                              {exam.category}
+                            </span>
+                            {selectedItem && selectedItem.price !== exam.price && (
+                              <span style={{ fontSize: '0.65rem', color: '#b45309', fontWeight: '700' }}>
+                                Preço editado!
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: isSelected ? '#057a55' : 'var(--text-primary)' }}>
+                          {formatBRL(currentPrice)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Coluna Direita: Exames Selecionados com Edição de Valores Unitários */}
+            <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Calculator size={18} color="#057a55" />
+                    Exames da Proposta & Edição de Valores ({proposalExams.length})
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Altere os valores unitários ou quantidades conforme a negociação com o cliente
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.375rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleResetAllExamPrices}
+                    disabled={proposalExams.length === 0}
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    title="Restaurar preços originais da tabela EcoClinic"
+                  >
+                    <RotateCcw size={13} /> Restaurar Preços
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleSetAllQuantitiesToOne}
+                    disabled={proposalExams.length === 0}
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                    title="Definir todas quantidades como 1"
+                  >
+                    Qtd = 1
+                  </button>
+                </div>
+              </div>
+
+              {proposalExams.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', border: '1.5px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)' }}>
+                  <AlertCircle size={32} style={{ marginBottom: '0.5rem', opacity: 0.5, color: '#057a55' }} />
+                  <p style={{ fontWeight: '600', fontSize: '0.9375rem' }}>Nenhum exame selecionado para a proposta.</p>
+                  <p style={{ fontSize: '0.8125rem', marginTop: '0.25rem' }}>
+                    Clique no botão <strong>"Selecionar Tudo"</strong> à esquerda para incluir a tabela completa ou selecione exames específicos.
+                  </p>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSelectAllProposalExams}
+                    style={{ marginTop: '1rem', backgroundColor: '#057a55', borderColor: '#057a55' }}
+                  >
+                    <CheckCheck size={16} /> Selecionar Todos os Exames
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', maxHeight: '520px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                  {proposalExams.map((item, idx) => {
+                    const isPriceChanged = item.price !== item.originalPrice;
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: '0.625rem 0.875rem',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor: isPriceChanged ? '#fffbeb' : 'var(--background)',
+                          border: isPriceChanged ? '1px solid #fde68a' : '1px solid var(--border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                              #{idx + 1}
+                            </span>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {item.name}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)' }}>
+                              {item.category}
+                            </span>
+                            {isPriceChanged && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetExamPrice(item.id)}
+                                style={{
+                                  background: 'none', border: 'none', color: '#b45309',
+                                  fontSize: '0.6875rem', cursor: 'pointer', padding: 0, textDecoration: 'underline'
+                                }}
+                                title="Voltar ao preço original da tabela EcoClinic"
+                              >
+                                Padrão: {formatBRL(item.originalPrice)} ↺
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Editor de Preço Unitário & Quantidade */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>R$</span>
+                            <input
+                              type="number"
+                              step="0.50"
+                              min="0"
+                              value={item.price}
+                              onChange={(e) => handleProposalPriceChange(item.id, e.target.value)}
+                              title="Alterar valor unitário deste exame na proposta"
+                              style={{
+                                width: '75px',
+                                padding: '0.25rem 0.375rem',
+                                fontSize: '0.8125rem',
+                                borderRadius: '4px',
+                                border: isPriceChanged ? '1.5px solid #d97706' : '1px solid var(--border)',
+                                backgroundColor: 'var(--surface)',
+                                fontWeight: '700',
+                                color: isPriceChanged ? '#b45309' : 'var(--text-primary)',
+                                textAlign: 'right'
+                              }}
+                            />
+                          </div>
+
+                          {/* Contador de Quantidade */}
+                          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', backgroundColor: 'var(--surface)' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleProposalQtyChange(item.id, -1)}
+                              style={{ padding: '0.25rem 0.5rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                            >
+                              -
+                            </button>
+                            <span style={{ padding: '0.25rem 0.375rem', fontSize: '0.75rem', fontWeight: '700', minWidth: '22px', textAlign: 'center' }}>
+                              {item.qty || 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleProposalQtyChange(item.id, 1)}
+                              style={{ padding: '0.25rem 0.5rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {/* Total Item */}
+                          <div style={{ minWidth: '70px', textAlign: 'right' }}>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: '#057a55' }}>
+                              {formatBRL((item.price || 0) * (item.qty || 1))}
+                            </span>
+                          </div>
+
+                          {/* Botão Remover */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleProposalExam(item)}
+                            style={{ padding: '0.25rem', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}
+                            title="Remover exame da proposta"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Ajustes Financeiros: Descontos & Resumo */}
+              <div style={{ marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="modal-label" style={{ fontSize: '0.75rem' }}>Desconto Comercial</label>
+                  <select
+                    className="modal-input"
+                    value={proposalDiscountType}
+                    onChange={(e) => setProposalDiscountType(e.target.value)}
+                    style={{ padding: '0.375rem 0.5rem', fontSize: '0.75rem' }}
+                  >
+                    <option value="none">Sem Desconto</option>
+                    <option value="fixed">Valor Fixo (R$)</option>
+                    <option value="percent">Porcentagem (%)</option>
+                  </select>
+                </div>
+
+                {proposalDiscountType !== 'none' && (
+                  <div>
+                    <label className="modal-label" style={{ fontSize: '0.75rem' }}>
+                      {proposalDiscountType === 'fixed' ? 'Valor do Desconto (R$)' : 'Percentual (%)'}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step={proposalDiscountType === 'fixed' ? '5' : '1'}
+                      className="modal-input"
+                      value={proposalDiscountValue}
+                      onChange={(e) => setProposalDiscountValue(parseFloat(e.target.value) || 0)}
+                      style={{ padding: '0.375rem 0.5rem', fontSize: '0.75rem' }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Totalizador Proposta */}
+              <div style={{
+                padding: '1rem',
+                backgroundColor: 'rgba(5, 122, 85, 0.08)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid rgba(5, 122, 85, 0.3)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {proposalExams.length} exame(s) selecionado(s) • Subtotal: {formatBRL(proposalSubtotal)}
+                  </span>
+                  {proposalCalculatedDiscount > 0 && (
+                    <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                      Desconto concedido: -{formatBRL(proposalCalculatedDiscount)}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#057a55', marginTop: '0.125rem' }}>
+                    {formatBRL(proposalGrandTotal)}
+                  </div>
+                </div>
+
+                {/* BOTÃO PRINCIPAL DE GERAR PDF */}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleExportProposalPDF}
+                  disabled={isGeneratingPdf || proposalExams.length === 0}
+                  style={{
+                    backgroundColor: '#057a55',
+                    borderColor: '#057a55',
+                    color: 'white',
+                    padding: '0.625rem 1.25rem',
+                    fontSize: '0.9375rem',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(5, 122, 85, 0.4)'
+                  }}
+                >
+                  <Download size={18} />
+                  {isGeneratingPdf ? 'Gerando PDF...' : 'Gerar Proposta em PDF (EcoClinic)'}
+                </button>
+              </div>
+
+              {/* Ações Auxiliares: Copiar Texto e WhatsApp */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCopyProposalText}
+                  disabled={proposalExams.length === 0}
+                  style={{ justifyContent: 'center', padding: '0.5rem', fontSize: '0.8125rem', gap: '0.375rem' }}
+                >
+                  {proposalCopied ? <Check size={16} color="#057a55" /> : <Copy size={16} />}
+                  {proposalCopied ? 'Texto Copiado!' : 'Copiar Texto da Proposta'}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSendProposalWhatsApp}
+                  disabled={proposalExams.length === 0}
+                  style={{
+                    justifyContent: 'center', padding: '0.5rem', fontSize: '0.8125rem', gap: '0.375rem',
+                    backgroundColor: '#25D366', borderColor: '#25D366', color: 'white'
+                  }}
+                >
+                  <MessageSquare size={16} /> Enviar via WhatsApp
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 3: SCHEDULING DATA & PCMSO REQUEST TEMPLATE */}
       {activeTab === 'scheduling' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(340px, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
           

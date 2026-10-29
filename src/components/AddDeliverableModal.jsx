@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
-import { getDefaultValidityMonths, parseSafeDate } from '../utils/deliverableTiming';
+import { getDefaultValidityMonths, parseSafeDate, isLaudo } from '../utils/deliverableTiming';
 
 const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'programa' }) => {
   const [selectedDeliverable, setSelectedDeliverable] = useState('');
@@ -19,6 +19,10 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
   const [file, setFile] = useState(null);
 
   const updateSuggestedValidity = (curTitle, curType, curDateEnvio) => {
+    if (curType === 'laudo' || isLaudo({ title: curTitle, type: curType })) {
+      setValidityDate('');
+      return;
+    }
     if (validityManuallyEdited || !curDateEnvio) return;
     const months = getDefaultValidityMonths({ title: curTitle, type: curType });
     if (months) {
@@ -28,6 +32,8 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
         calc.setMonth(calc.getMonth() + months);
         setValidityDate(calc.toISOString().split('T')[0]);
       }
+    } else {
+      setValidityDate('');
     }
   };
 
@@ -70,7 +76,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
       dataEmissao: dataEnvio,
       data_emissao: dataEnvio,
       data_envio: dataEnvio,
-      validityDate: validityDate || null,
+      validityDate: (type === 'laudo' || isLaudo({ title, type })) ? null : (validityDate || null),
       ultimaRevisao: ultimaRevisao || null,
       status: file ? 'entregue' : 'pendente',
       deliveredDate: deliveredDate || dataEnvio || (file ? new Date().toISOString() : null),
@@ -168,7 +174,12 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                         setTitle(found.label);
                         setType(found.defaultType);
                         if (found.description) setDescription(found.description);
-                        updateSuggestedValidity(found.label, found.defaultType, dataEnvio);
+                        if (found.defaultType === 'laudo' || isLaudo({ title: found.label, type: found.defaultType })) {
+                          setValidityDate('');
+                          setValidityManuallyEdited(false);
+                        } else {
+                          updateSuggestedValidity(found.label, found.defaultType, dataEnvio);
+                        }
                       }
                     }
                   }}
@@ -227,7 +238,12 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                     onChange={(e) => {
                       const val = e.target.value;
                       setType(val);
-                      updateSuggestedValidity(title, val, dataEnvio);
+                      if (val === 'laudo' || isLaudo({ title, type: val })) {
+                        setValidityDate('');
+                        setValidityManuallyEdited(false);
+                      } else {
+                        updateSuggestedValidity(title, val, dataEnvio);
+                      }
                     }}
                     className="modal-input"
                     disabled={saving}
@@ -293,9 +309,9 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label className="modal-label" htmlFor="dlv-validity">
-                        Data de Validade (Opcional)
+                        Data de Validade {(type === 'laudo' || isLaudo({ title, type })) ? '(Não aplicável a laudos)' : '(Opcional)'}
                       </label>
-                      {dataEnvio && (
+                      {type !== 'laudo' && !isLaudo({ title, type }) && dataEnvio && (
                         <button
                           type="button"
                           onClick={() => {
@@ -314,16 +330,22 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                     <input
                       id="dlv-validity"
                       type="date"
-                      value={validityDate}
+                      value={(type === 'laudo' || isLaudo({ title, type })) ? '' : validityDate}
                       onChange={(e) => {
-                        setValidityDate(e.target.value);
-                        setValidityManuallyEdited(true);
+                        if (type !== 'laudo' && !isLaudo({ title, type })) {
+                          setValidityDate(e.target.value);
+                          setValidityManuallyEdited(true);
+                        }
                       }}
                       className="modal-input"
-                      disabled={saving}
+                      disabled={saving || type === 'laudo' || isLaudo({ title, type })}
+                      placeholder={(type === 'laudo' || isLaudo({ title, type })) ? 'Laudos não têm validade' : ''}
+                      style={(type === 'laudo' || isLaudo({ title, type })) ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: 'var(--background)' } : {}}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      PGR: 2 anos | PCMSO/Laudos: 1 ano (ou livre)
+                      {(type === 'laudo' || isLaudo({ title, type }))
+                        ? 'ℹ️ Laudos técnicos não possuem prazo de validade (vigência indeterminada pelas NRs).'
+                        : 'PGR: 2 anos | PCMSO: 1 ano (ou livre)'}
                     </span>
                   </div>
 

@@ -35,6 +35,36 @@ export function isDelivered(d) {
   return ['entregue', 'feito', 'concluido'].includes(d.status);
 }
 
+/**
+ * Identifica se um item é um Laudo Técnico (LTCAT, LI, LP, AET, etc.).
+ * Laudos retratam condições ambientais e periciais e NÃO possuem prazo de validade normativa.
+ */
+export function isLaudo(item) {
+  if (!item) return false;
+  const type = (item.type || '').trim().toLowerCase();
+  if (type === 'laudo') return true;
+
+  const title = (item.title || '').trim().toLowerCase();
+  if (
+    title.startsWith('laudo') ||
+    title.includes('laudo técnico') ||
+    title.includes('laudo pericial') ||
+    title.includes('ltcat') ||
+    title.includes('insalubridade') ||
+    title.includes('periculosidade') ||
+    title.includes('aet') ||
+    title.includes('ergonômico') ||
+    title.includes('ergonomico') ||
+    title.includes('psicossocial')
+  ) {
+    if (!title.includes('pcmso') && !title.includes('pgr') && !title.includes('pca') && !title.includes('ppr')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Identifica itens padrão gerados em lote (seed) que ainda não tiveram validade ou emissão real configurada
 export function isUnconfiguredSeedItem(d) {
   if (!d) return false;
@@ -44,10 +74,16 @@ export function isUnconfiguredSeedItem(d) {
 
 /**
  * Retorna a quantidade de meses padrão de validade conforme normas regulamentadoras de SST.
- * Retorna null para documentos sem periodicidade normativa fixa (ex: Ordem de Serviço, eSocial, Contrato, Visitas).
+ * Retorna null para laudos e documentos sem periodicidade normativa fixa (ex: LTCAT, LI, LP, AET, Ordem de Serviço, eSocial, Contrato, Visitas).
  */
 export function getDefaultValidityMonths(item) {
   if (!item) return null;
+
+  // Laudos não têm data de validade normativa
+  if (isLaudo(item)) {
+    return null;
+  }
+
   const title = (item.title || '').trim().toLowerCase();
   const type = (item.type || '').trim().toLowerCase();
 
@@ -57,19 +93,13 @@ export function getDefaultValidityMonths(item) {
     return 24;
   }
 
-  // 2. Programas / Laudos com periodicidade anual (12 meses / 1 ano)
-  // PCMSO (NR-07), Relatório Analítico, LTCAT, LI, LP, AET, PCA, PPR, Mapeamento Psicossocial
+  // 2. Programas com periodicidade anual (12 meses / 1 ano)
+  // PCMSO (NR-07), Relatório Analítico do PCMSO, PCA, PPR
   if (
     title.includes('pcmso') ||
     title.includes('controle m') ||
-    title.includes('relat') ||
-    title.includes('ltcat') ||
-    title.includes('insalubridade') ||
-    title.includes('periculosidade') ||
-    title.includes('laudo') ||
-    title.includes('aet') ||
-    title.includes('ergon') ||
-    title.includes('psicossocial') ||
+    title.includes('relatório analítico') ||
+    title.includes('relatorio analitico') ||
     title.includes('pca') ||
     title.includes('ppr')
   ) {
@@ -89,24 +119,25 @@ export function getDefaultValidityMonths(item) {
     return 12;
   }
 
-  // 5. Laudos em geral: 12 meses
-  if (type === 'laudo') {
-    return 12;
-  }
-
   return null;
 }
 
 /**
  * Retorna a data real de validade do documento.
+ * Retorna null para Laudos Técnicos (laudos não possuem data de validade).
  * Prioridade:
  * 1. Data de validade explícita (validityDate / validity_date).
  * 2. Se não houver validade explícita, calcula a data real com base na Data de Emissão + periodicidade normativa (ex: PGR +2 anos, PCMSO +1 ano).
- * 3. Se for um documento sem validade normativa (ex: Ordem de Serviço, Contrato), retorna null.
+ * 3. Se for um laudo ou documento sem validade normativa (ex: LTCAT, Ordem de Serviço, Contrato), retorna null.
  * ATENÇÃO: NUNCA retorna dueDate ou dataEmissao como se fossem a data de validade.
  */
 export function getEffectiveValidityDate(d) {
   if (!d) return null;
+
+  // Laudos não devem ter data de validade
+  if (isLaudo(d)) {
+    return null;
+  }
 
   // 1. Data de validade explícita preenchida
   if (d.validityDate) {
@@ -132,6 +163,7 @@ export function getEffectiveValidityDate(d) {
 }
 
 export function formatEffectiveValidityDateBR(d) {
+  if (isLaudo(d)) return 'Sem validade (Laudo)';
   const vDate = getEffectiveValidityDate(d);
   if (!vDate) return 'Sem validade';
   const day = String(vDate.getUTCDate()).padStart(2, '0');
@@ -142,6 +174,16 @@ export function formatEffectiveValidityDateBR(d) {
 
 export function getExpirationTargetDate(d) {
   if (!d) return null;
+
+  // Laudos não possuem validade normativa após entregues.
+  // Apenas se o laudo ainda NÃO foi entregue e possui prazo de elaboração/envio pendente:
+  if (isLaudo(d)) {
+    if (!isDelivered(d) && !isUnconfiguredSeedItem(d)) {
+      const target = d.dueDate;
+      if (target) return parseSafeDate(target);
+    }
+    return null;
+  }
 
   // 1. Data de validade real (explícita ou calculada normativamente)
   const effValidity = getEffectiveValidityDate(d);
@@ -171,11 +213,28 @@ export function getDaysUntilExpiration(d, refDate = new Date()) {
 export function isItemExpired(d, refDate = new Date()) {
   if (!d) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
-  if (d.status === 'vencido') return true;
   if (isUnconfiguredSeedItem(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
+
+  // Laudos não têm data de validade normativa.
+  // Uma vez entregues/concluídos, NUNCA expiram por validade.
+  if (isLaudo(d)) {
+    if (isDelivered(d)) return false;
+    // Se estiver pendente, verifica apenas se a data de envio/entrega limite (dueDate) já venceu
+    const target = d.dueDate;
+    if (target) {
+      const tDate = parseSafeDate(target);
+      if (tDate) {
+        tDate.setHours(0, 0, 0, 0);
+        if (tDate < today) return true;
+      }
+    }
+    return false;
+  }
+
+  if (d.status === 'vencido') return true;
 
   // 1. Validade real do documento: se já passou, está vencido
   const effValidity = getEffectiveValidityDate(d);
@@ -206,6 +265,8 @@ export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
   if (!d) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
+  // Laudos entregues não vencem
+  if (isLaudo(d) && isDelivered(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
@@ -239,6 +300,8 @@ export function isItemExpiring60(d, refDate = new Date(), in30 = null, in60 = nu
   if (!d) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
+  // Laudos entregues não vencem
+  if (isLaudo(d) && isDelivered(d)) return false;
 
   const today = new Date(refDate);
   today.setHours(0, 0, 0, 0);
