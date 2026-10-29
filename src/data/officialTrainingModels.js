@@ -260,7 +260,7 @@ export const OFFICIAL_TRAINING_MODELS = [
     "validade": "24 meses",
     "description": "treinamento com carga horária de 8 horas, desenvolvido em conformidade com a Norma Regulamentadora nº 35 (NR-35), ABNT NBR 16325-1, ABNT NBR 16325-2 e demais requisitos técnicos aplicáveis.",
     "content": "1.  Conceitos, definições e requisitos da NR-35;\n2. Responsabilidades do empregador, supervisor e trabalhador;\n3. Planejamento, organização e execução do trabalho em altura;\n4. Análise de Risco (AR) e Permissão de Trabalho (PT);\n5. Identificação dos perigos e medidas de prevenção;\n6. Sistemas de proteção coletiva;\n7. Equipamentos de Proteção Individual (EPIs): seleção, inspeção, utilização, conservação e limitações;\n8. Sistemas de proteção contra quedas;\n9. Fator de queda, zona livre de queda e efeito pêndulo;\n10. Pontos e sistemas de ancoragem;\n11. Talabartes, trava-quedas e linhas de vida;\n12. Procedimentos para suspensão das atividades em condições de risco;\n13. Noções básicas de resgate em altura;\n14. Procedimentos de emergência;\n15. Primeiros socorros aplicados ao trabalho em altura;\n16. Atividades práticas de utilização dos equipamentos;\n17. Avaliação teórica e prática.",
-    "modelType": "modelo2",
+    "modelType": "modelo1",
     "defaultInstructor": {
       "name": "Eider Gomes do Nascimento",
       "role": "Instrutor e Responsável Técnico",
@@ -292,7 +292,7 @@ export const OFFICIAL_TRAINING_MODELS = [
     "validade": "24 meses",
     "description": "Projeto de treinamento com carga horária de 16 horas, desenvolvido em conformidade com a Norma Regulamentadora nº 35 (NR-35), ABNT NBR 16325-1, ABNT NBR 16325-2 e demais requisitos técnicos aplicáveis.",
     "content": "1.  Conceitos, definições e requisitos da NR-35;\n2. Normas técnicas aplicáveis ao trabalho em altura;\n3. Responsabilidades do empregador, supervisor e trabalhador;\n4. Planejamento e gestão das atividades em altura;\n5. Análise de Risco (AR), Permissão de Trabalho (PT) e condições impeditivas;\n6. Identificação, avaliação e controle dos riscos;\n7. Sistemas de proteção coletiva;\n8. Sistemas de proteção individual contra quedas;\n9. Seleção, inspeção, conservação e limitações dos EPIs;\n10. Sistemas de ancoragem e linhas de vida;\n11. Fator de queda, força de impacto e efeito pêndulo;\n12. Técnicas de movimentação, posicionamento e deslocamento em altura;\n13. Trabalhos em telhados, escadas, plataformas, andaimes e estruturas metálicas;\n14. Movimentação segura de ferramentas e materiais;\n15. Inspeção e verificação dos equipamentos;\n16. Acidentes típicos em trabalho em altura e medidas preventivas;\n17. Procedimentos de emergência;\n18. Técnicas básicas de resgate;\n19. Primeiros socorros;\n20. Estudos de caso;\n21. Exercícios práticos;\n22. Simulações de emergência;\n23. Avaliação teórica;\n24. Avaliação prática.",
-    "modelType": "modelo2",
+    "modelType": "modelo1",
     "defaultInstructor": {
       "name": "Eider Gomes do Nascimento",
       "role": "Instrutor e Responsável Técnico",
@@ -514,7 +514,7 @@ export const OFFICIAL_TRAINING_MODELS = [
     "title": "NR-11 – OPERADOR DE EMPILHADEIRA",
     "duration": "16 horas",
     "validade": "12 meses",
-    "description": "Treinamento com carga horária de 40 horas, conforme a NR-10 – Segurança em Instalações e Serviços em Eletricidade, abordando os requisitos e as medidas de controle para garantir a segurança e a saúde dos trabalhadores que interagem, direta ou indiretamente, com instalações elétricas e serviços com eletricidade, em conformidade com a legislação vigente Mossoró,",
+    "description": "Treinamento com carga horária de 16 horas, desenvolvido em conformidade com a Norma Regulamentadora nº 11 (NR-11) – Transporte, Movimentação, Armazenagem e Manuseio de Materiais, abordando a operação segura de empilhadeiras e prevenção de acidentes.",
     "content": "1. Legislação aplicável (NR-11 e Código de Trânsito Brasileiro)\n2. Componentes mecânicos, elétricos e hidráulicos do equipamento\n3. Centro de gravidade, estabilidade e capacidade de carga\n4. Inspeção diária de segurança (Checklist de pré-uso)\n5. Manobras operacionais, empilhamento e desempilhamento de cargas\n6. Regras de circulação e operação segura em áreas industriais",
     "modelType": "modelo2",
     "defaultInstructor": {
@@ -611,7 +611,7 @@ export const OFFICIAL_TRAINING_MODELS = [
     "duration": "50 horas",
     "validade": "24 meses",
     "description": "Projeto de treinamento com carga horária de 50 horas, desenvolvido em conformidade com as Normas Regulamentadoras vigentes e requisitos técnicos aplicáveis.",
-    "content": "PEDRO HENRIQUE DE LIMA PADILHA SEG CONTRA INCENDIO\nID única do documento: #w2rBLeDfppv5Lfx0e0oqscxQi8jIacTj\nEste Log é exclusivo ao documento #w2rBLeDfppv5Lfx0e0oqscxQi8jIacTj e deve ser considerado parte do mesmo, com os efeitos prescritos nos\nTermos de Uso.\nAssinatura e histórico\nNome completo: PEDRO PADILHA\nE-mail ou telefone: pedro.ecosafetytreinamentos@gmail.com\nEndereço de IP: 177.73.206.108\nData e hora da assinatura: 09/07/2026 08:47:14\nGeolocalização\nRua 13 de Maio,CEP 87433-000,Macau,Rio Grande do Norte - Brasil (aproximada)\nLatitude: -5.113349783655388, Longitude: -36.63594696273245\nO documento não foi modificado, a assinatura eletrônica é válida para LTV. Assinatura com validade jurídica conforme a lei 14.063 na modalidade\nde 'Assinatura eletrônica avançada', Art. 4º.\nAutenticidade deste documento poderá ser verificada em:\nhttps://app.assinadoc.com/validate/w2rBLeDfppv5Lfx0e0oqscxQi8jIacTj\nCódigo: W2RB",
+    "content": "Módulo 01 – Legislação e Normas\n▪ Legislação de Segurança Contra Incêndio e Pânico.\n▪ Normas Técnicas da ABNT e Instruções Técnicas do CBMBA.\n▪ Responsabilidades legais e medidas preventivas.\nMódulo 02 – Sistemas de Segurança Contra Incêndio\n▪ Sistemas de proteção por extintores.\n▪ Sistemas de hidrantes e mangotinhos.\n▪ Sistemas de detecção, alarme e iluminação de emergência.\n▪ Sinalização de emergência.\nMódulo 03 – Prevenção e Análise de Riscos\n▪ Identificação e avaliação de riscos.\n▪ Medidas de prevenção e proteção contra incêndio.\n▪ Inspeção dos sistemas de segurança.\n▪ Controle de materiais combustíveis.\nMódulo 04 – Planos e Procedimentos de Emergência\n▪ Plano de Emergência Contra Incêndio.\n▪ Rotas de fuga e abandono de área.\n▪ Procedimentos de resposta a emergências.\n▪ Comunicação em situações de emergência.\nMódulo 05 – Atividades Práticas\n▪ Inspeção de sistemas preventivos.\n▪ Identificação de não conformidades.\n▪ Simulados de emergência.\n▪ Avaliação prática.",
     "modelType": "modelo2",
     "defaultInstructor": {
       "name": "Eider Gomes do Nascimento",

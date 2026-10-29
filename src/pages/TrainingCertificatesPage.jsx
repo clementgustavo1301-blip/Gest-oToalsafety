@@ -325,7 +325,7 @@ export const getModelo1VersoStyles = (conteudo = '') => {
   if (maxLinesInCol > 36) {
     return {
       useTwoCols: true, fontSize: '0.36rem', lineHeight: '1.10', gap: '0.7rem',
-      headerSize: '0.60rem', footerSize: '0.43rem'
+      headerSize: '0.60rem', headerDurationSize: '0.50rem', headerPadding: '0.12rem', headerMargin: '0.15rem', footerSize: '0.43rem'
     };
   }
   if (totalWeight > 24) {
@@ -333,13 +333,14 @@ export const getModelo1VersoStyles = (conteudo = '') => {
       useTwoCols: true,
       fontSize: maxLinesInCol > 27 ? '0.42rem' : '0.49rem',
       lineHeight: maxLinesInCol > 27 ? '1.14' : '1.20',
-      gap: '0.8rem', headerSize: '0.66rem', footerSize: '0.47rem'
+      gap: '0.8rem',
+      headerSize: '0.66rem', headerDurationSize: '0.55rem', headerPadding: '0.18rem', headerMargin: '0.22rem', footerSize: '0.47rem'
     };
   }
   if (totalWeight > 12) {
     return {
       useTwoCols: false, fontSize: '0.54rem', lineHeight: '1.26', gap: '0',
-      headerSize: '0.70rem', footerSize: '0.50rem'
+      headerSize: '0.70rem', headerDurationSize: '0.58rem', headerPadding: '0.22rem', headerMargin: '0.28rem', footerSize: '0.50rem'
     };
   }
   return {
@@ -348,6 +349,9 @@ export const getModelo1VersoStyles = (conteudo = '') => {
     lineHeight: '1.45',
     gap: '0',
     headerSize: '0.74rem',
+    headerDurationSize: '0.62rem',
+    headerPadding: '0.25rem',
+    headerMargin: '0.35rem',
     footerSize: '0.56rem'
   };
 };
@@ -2388,7 +2392,13 @@ const TrainingCertificatesPage = () => {
                           <img 
                             src="/certificate-templates/m1_header_transparent.png" 
                             alt="EcoSafety Certificado de Capacitação" 
-                            style={{ width: '100%', maxHeight: m1FrenteStyles.headerMaxHeight, objectFit: 'contain' }} 
+                            style={{ 
+                              height: m1FrenteStyles.headerMaxHeight, 
+                              maxWidth: '100%', 
+                              width: 'auto', 
+                              objectFit: 'contain', 
+                              display: 'inline-block' 
+                            }} 
                           />
                         </div>
 
@@ -2524,11 +2534,15 @@ const TrainingCertificatesPage = () => {
                       /* MODELO 1 - VERSO (Conteúdo Dinâmico sem barra de rolagem e sem cortes) */
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '0.25rem', marginBottom: '0.35rem' }}>
+                          <div style={{ 
+                            borderBottom: '1px solid rgba(0,0,0,0.1)', 
+                            paddingBottom: m1VersoStyles.headerPadding || '0.2rem', 
+                            marginBottom: m1VersoStyles.headerMargin || '0.25rem' 
+                          }}>
                             <div style={{ fontSize: m1VersoStyles.headerSize, fontWeight: '700', color: '#595959' }}>
                               Programa: <span style={{ color: '#64268a' }}>{formData.curso}</span>
                             </div>
-                            <div style={{ fontSize: '0.62rem', color: '#595959', fontWeight: '400', marginTop: '1px' }}>
+                            <div style={{ fontSize: m1VersoStyles.headerDurationSize || '0.54rem', color: '#595959', fontWeight: '400', marginTop: '1px' }}>
                               Carga horária: {formData.duracao}
                             </div>
                           </div>
@@ -2588,8 +2602,8 @@ const TrainingCertificatesPage = () => {
                     previewTab === 'frente' ? (
                       /* MODELO 2 - FRENTE */
                       <div className="tc-certificate-front" style={{ fontFamily: "'Lato', sans-serif" }}>
-                        {/* Conteúdo centralizado dentro da área útil, com densidade adaptativa */}
-                        <div className="tc-certificate-main" style={{ textAlign: 'center', maxHeight: certificateFrontGeometry.previewContentMaxHeight }}>
+                        {/* Topo: Header com Título Oficial e Subtítulo */}
+                        <div style={{ textAlign: 'center', paddingTop: m2FrenteStyles.topPadding }}>
                           <div style={{ 
                             fontFamily: "'Montserrat', sans-serif",
                             fontSize: m2FrenteStyles.titleSize, 
@@ -2603,7 +2617,10 @@ const TrainingCertificatesPage = () => {
                           <div style={{ fontSize: m2FrenteStyles.subTitleSize, fontWeight: '400', color: '#000000', marginTop: m2FrenteStyles.subTitleMargin }}>
                             A ECOSAFETY certifica que:
                           </div>
+                        </div>
 
+                        {/* Conteúdo centralizado dentro da área útil, com densidade adaptativa */}
+                        <div className="tc-certificate-main" style={{ textAlign: 'center', maxHeight: certificateFrontGeometry.previewContentMaxHeight }}>
                           {/* Destaque do Nome em Azul Real Oficial #3340e6 com Lato Black 900 */}
                           <div style={{ 
                             fontFamily: "'Lato', sans-serif",

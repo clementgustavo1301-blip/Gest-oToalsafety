@@ -210,10 +210,31 @@ async function drawInlineImages(pdf, root, rootRect, scaleX, scaleY) {
 
     try {
       const asset = await loadImageAsset(source);
-      const x = (rect.left - rootRect.left) * scaleX;
-      const y = (rect.top - rootRect.top) * scaleY;
-      const width = rect.width * scaleX;
-      const height = rect.height * scaleY;
+      const style = window.getComputedStyle(image);
+      const objectFit = style.objectFit || 'fill';
+
+      let x = (rect.left - rootRect.left) * scaleX;
+      let y = (rect.top - rootRect.top) * scaleY;
+      let width = rect.width * scaleX;
+      let height = rect.height * scaleY;
+
+      const naturalWidth = image.naturalWidth || 0;
+      const naturalHeight = image.naturalHeight || 0;
+
+      if (objectFit === 'contain' && naturalWidth > 0 && naturalHeight > 0) {
+        const imgAspect = naturalWidth / naturalHeight;
+        const boxAspect = width / height;
+        if (imgAspect > boxAspect) {
+          const renderHeight = width / imgAspect;
+          y += (height - renderHeight) / 2;
+          height = renderHeight;
+        } else {
+          const renderWidth = height * imgAspect;
+          x += (width - renderWidth) / 2;
+          width = renderWidth;
+        }
+      }
+
       pdf.addImage(
         asset.data,
         asset.format,
