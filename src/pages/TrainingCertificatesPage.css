@@ -241,9 +241,13 @@
   align-items: center;
   gap: 0.45rem;
   margin-bottom: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.tc-step-head--compact .tc-step-actions { margin-left: auto; }
+.tc-step-head--compact .tc-step-actions {
+  margin-left: auto;
+  align-items: center;
+}
 
 .tc-step-head h2 {
   font-size: 0.98rem;
@@ -278,6 +282,11 @@
   display: flex;
   gap: 0.4rem;
   flex-shrink: 0;
+  align-items: center;
+}
+
+.tc-step-actions .tc-btn {
+  white-space: nowrap;
 }
 
 /* ---------- Campos ---------- */

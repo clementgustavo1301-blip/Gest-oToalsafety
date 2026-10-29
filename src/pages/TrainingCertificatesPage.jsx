@@ -2410,26 +2410,6 @@ const TrainingCertificatesPage = () => {
                   {selectedCount === validCount ? `${validCount} selecionados` : `${selectedCount}/${validCount}`}
                 </span>
                 <div className="tc-step-actions">
-                  {validCount > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        className="tc-link"
-                        onClick={() => handleToggleSelectAllColaboradores(true)}
-                        style={{ fontSize: '0.8rem' }}
-                      >
-                        Marcar todos
-                      </button>
-                      <button
-                        type="button"
-                        className="tc-link tc-link--muted"
-                        onClick={() => handleToggleSelectAllColaboradores(false)}
-                        style={{ fontSize: '0.8rem' }}
-                      >
-                        Desmarcar todos
-                      </button>
-                    </>
-                  )}
                   <button
                     id="btn-paste-students"
                     type="button"
@@ -2452,7 +2432,7 @@ const TrainingCertificatesPage = () => {
                 </div>
               </div>
 
-              {selectedTurmaIdInGenerator && (
+              {selectedTurmaIdInGenerator ? (
                 <div className="tc-linked-turma-bar">
                   <div className="tc-linked-turma-info">
                     <Users size={15} className="tc-linked-turma-icon" />
@@ -2481,7 +2461,32 @@ const TrainingCertificatesPage = () => {
                     </button>
                   </div>
                 </div>
-              )}
+              ) : validCount > 1 ? (
+                <div className="tc-linked-turma-bar" style={{ justifyContent: 'space-between' }}>
+                  <div className="tc-linked-turma-info">
+                    <span className="tc-badge tc-badge--subtle">
+                      {selectedCount} de {validCount} selecionado(s) para certificado
+                    </span>
+                  </div>
+                  <div className="tc-linked-turma-actions">
+                    <button
+                      type="button"
+                      className="tc-link"
+                      onClick={() => handleToggleSelectAllColaboradores(true)}
+                    >
+                      Selecionar todos
+                    </button>
+                    <span className="tc-divider">·</span>
+                    <button
+                      type="button"
+                      className="tc-link tc-link--muted"
+                      onClick={() => handleToggleSelectAllColaboradores(false)}
+                    >
+                      Desmarcar todos
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="tc-students">
                 <div className="tc-students-head">
