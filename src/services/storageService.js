@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { getDefaultValidityMonths, parseSafeDate, isLaudo } from '../utils/deliverableTiming';
+import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram } from '../utils/deliverableTiming';
 
 // --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
 
@@ -790,10 +790,10 @@ export async function getDeliverablesByContract(contractId) {
 }
 
 export async function addDeliverable(deliverable) {
-  const isLaudoDoc = deliverable.type === 'laudo' || isLaudo(deliverable);
+  const isProg = deliverable.type === 'programa' && isProgram(deliverable);
   const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
-  let validityVal = isLaudoDoc ? null : (deliverable.validityDate || null);
-  if (!isLaudoDoc && !validityVal && emissaoVal) {
+  let validityVal = isProg ? (deliverable.validityDate || null) : null;
+  if (isProg && !validityVal && emissaoVal) {
     const months = getDefaultValidityMonths(deliverable);
     if (months) {
       const base = parseSafeDate(emissaoVal);
@@ -958,7 +958,7 @@ export async function updateDeliverable(deliverableId, updates) {
     snakeUpdates.due_date = emissaoVal;
   }
   if (updates.dueDate !== undefined && emissaoVal === undefined) snakeUpdates.due_date = updates.dueDate;
-  if (updates.type === 'laudo' || isLaudo(updates)) {
+  if ((updates.type && updates.type !== 'programa') || isLaudo(updates)) {
     snakeUpdates.validity_date = null;
   } else if (updates.validityDate !== undefined) {
     snakeUpdates.validity_date = updates.validityDate;

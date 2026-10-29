@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit3 } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
-import { getDefaultValidityMonths, parseSafeDate, isLaudo } from '../utils/deliverableTiming';
+import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram } from '../utils/deliverableTiming';
 
 const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const initialMatch = STANDARD_DELIVERABLES.find(
@@ -15,9 +15,9 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const [description, setDescription] = useState(deliverable?.description || '');
   const [type, setType] = useState(deliverable?.type || 'programa');
   const [contractId, setContractId] = useState(deliverable?.contractId || '');
-  const isInitialLaudo = deliverable?.type === 'laudo' || isLaudo(deliverable);
+  const isInitialProgram = (deliverable?.type === 'programa') && isProgram(deliverable);
   const [dataEnvio, setDataEnvio] = useState(deliverable?.dataEmissao || deliverable?.dataEnvio || deliverable?.dueDate || '');
-  const [validityDate, setValidityDate] = useState(isInitialLaudo ? '' : (deliverable?.validityDate || ''));
+  const [validityDate, setValidityDate] = useState(isInitialProgram ? (deliverable?.validityDate || '') : '');
   const [ultimaRevisao, setUltimaRevisao] = useState(deliverable?.ultimaRevisao || '');
   const [deliveredDate, setDeliveredDate] = useState(deliverable?.deliveredDate || '');
   const [status, setStatus] = useState(deliverable?.status || 'pendente');
@@ -52,7 +52,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
     if (!title.trim() || !dataEnvio) return;
     
     setSaving(true);
-    const isCurLaudo = type === 'laudo' || isLaudo({ title, type });
+    const isCurProgram = type === 'programa' && isProgram({ title, type });
     await onSave(deliverable.id, {
       title: title.trim(),
       description: description.trim() || null,
@@ -63,7 +63,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
       dataEmissao: dataEnvio,
       data_emissao: dataEnvio,
       data_envio: dataEnvio,
-      validityDate: isCurLaudo ? null : (validityDate || null),
+      validityDate: isCurProgram ? (validityDate || null) : null,
       ultimaRevisao: ultimaRevisao || null,
       deliveredDate: deliveredDate || null,
       responsibleId: responsibleId || null,
@@ -249,7 +249,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                   </span>
                 </div>
 
-                {type === 'laudo' || isLaudo({ title, type }) ? (
+                {type !== 'programa' || !isProgram({ title, type }) ? (
                   <div>
                     <label className="modal-label" htmlFor="dlv-revisao">
                       Última Revisão (Opcional)
@@ -263,7 +263,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                       disabled={saving}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      Não obrigatório (laudos têm vigência indeterminada pelas NRs e não possuem data de validade)
+                      Não obrigatório (apenas programas possuem prazo de validade normativa)
                     </span>
                   </div>
                 ) : (

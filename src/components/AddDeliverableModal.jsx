@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
 import { getContractsByCompany, getProfiles } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
-import { getDefaultValidityMonths, parseSafeDate, isLaudo } from '../utils/deliverableTiming';
+import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram } from '../utils/deliverableTiming';
 
 const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'programa' }) => {
   const [selectedDeliverable, setSelectedDeliverable] = useState('');
@@ -19,7 +19,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
   const [file, setFile] = useState(null);
 
   const updateSuggestedValidity = (curTitle, curType, curDateEnvio) => {
-    if (curType === 'laudo' || isLaudo({ title: curTitle, type: curType })) {
+    if (curType !== 'programa' && !isProgram({ title: curTitle, type: curType })) {
       setValidityDate('');
       return;
     }
@@ -76,7 +76,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
       dataEmissao: dataEnvio,
       data_emissao: dataEnvio,
       data_envio: dataEnvio,
-      validityDate: (type === 'laudo' || isLaudo({ title, type })) ? null : (validityDate || null),
+      validityDate: (type === 'programa' && isProgram({ title, type })) ? (validityDate || null) : null,
       ultimaRevisao: ultimaRevisao || null,
       status: file ? 'entregue' : 'pendente',
       deliveredDate: deliveredDate || dataEnvio || (file ? new Date().toISOString() : null),
@@ -174,11 +174,11 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                         setTitle(found.label);
                         setType(found.defaultType);
                         if (found.description) setDescription(found.description);
-                        if (found.defaultType === 'laudo' || isLaudo({ title: found.label, type: found.defaultType })) {
+                        if (found.defaultType === 'programa') {
+                          updateSuggestedValidity(found.label, found.defaultType, dataEnvio);
+                        } else {
                           setValidityDate('');
                           setValidityManuallyEdited(false);
-                        } else {
-                          updateSuggestedValidity(found.label, found.defaultType, dataEnvio);
                         }
                       }
                     }
@@ -238,11 +238,11 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                     onChange={(e) => {
                       const val = e.target.value;
                       setType(val);
-                      if (val === 'laudo' || isLaudo({ title, type: val })) {
+                      if (val === 'programa') {
+                        updateSuggestedValidity(title, val, dataEnvio);
+                      } else {
                         setValidityDate('');
                         setValidityManuallyEdited(false);
-                      } else {
-                        updateSuggestedValidity(title, val, dataEnvio);
                       }
                     }}
                     className="modal-input"
@@ -305,7 +305,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                   </span>
                 </div>
 
-                {type === 'laudo' || isLaudo({ title, type }) ? (
+                {type !== 'programa' || !isProgram({ title, type }) ? (
                   <div>
                     <label className="modal-label" htmlFor="dlv-revisao">
                       Última Revisão (Opcional)
@@ -319,7 +319,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                       disabled={saving}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      Não obrigatório (laudos têm vigência indeterminada pelas NRs e não possuem data de validade)
+                      Não obrigatório (apenas programas possuem prazo de validade normativa)
                     </span>
                   </div>
                 ) : (

@@ -9,7 +9,7 @@ import {
   uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable,
   deleteDeliverables
 } from '../services/storageService';
-import { isItemExpired, isDelivered, getEffectiveValidityDate, isLaudo } from '../utils/deliverableTiming';
+import { isItemExpired, isDelivered, getEffectiveValidityDate, isLaudo, isProgram } from '../utils/deliverableTiming';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
 
@@ -438,10 +438,10 @@ const DeliverablesViewer = ({ companyId }) => {
           : { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
       }>
         {filtered.map(d => {
-          const itemIsLaudo = d.type === 'laudo' || isLaudo(d);
+          const itemIsProgram = d.type === 'programa' && isProgram(d);
           const typeConf = TYPE_CONFIG[d.type] || TYPE_CONFIG.contrato;
           const isExpired = isItemExpired(d, today);
-          const effectiveStatus = (itemIsLaudo && d.status === 'vencido') ? 'pendente' : d.status;
+          const effectiveStatus = (!itemIsProgram && d.status === 'vencido') ? 'pendente' : d.status;
           const statusConf = isExpired ? STATUS_CONFIG.vencido : (STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pendente);
 
           return (
@@ -508,7 +508,7 @@ const DeliverablesViewer = ({ companyId }) => {
                 {viewMode === 'list' && (
                   <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                     {(d.dataEmissao || d.dataEnvio) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
-                    {!itemIsLaudo && (() => {
+                    {itemIsProgram && (() => {
                       const effVal = getEffectiveValidityDate(d);
                       if (effVal) {
                         return (
@@ -549,7 +549,7 @@ const DeliverablesViewer = ({ companyId }) => {
                     <span>Data de Emissão:</span>
                     <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{(d.dataEmissao || d.dataEnvio) ? new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}</span>
                   </div>
-                  {!itemIsLaudo && (
+                  {itemIsProgram && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>Validade:</span>
                       <span style={{ fontWeight: '600', color: isExpired ? 'var(--danger)' : 'var(--primary)' }}>

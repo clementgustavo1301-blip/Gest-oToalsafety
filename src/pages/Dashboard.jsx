@@ -17,7 +17,8 @@ import {
   getDeliverableTimingInfo,
   getEffectiveValidityDate,
   parseSafeDate,
-  isLaudo
+  isLaudo,
+  isProgram
 } from '../utils/deliverableTiming';
 
 // Helpers de normalização e comparação de nomes
@@ -1131,7 +1132,8 @@ const Dashboard = () => {
                         const isExpired = isItemExpired(item, today);
                         const sc = statusColors[item.status] || statusColors.pendente;
                         const effVal = getEffectiveValidityDate(item);
-                        const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) && !isLaudo(item) ? item.dueDate : null);
+                        const isProg = item.type === 'programa' && isProgram(item);
+                        const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) && isProg ? item.dueDate : null);
                         const isExpiring30 = isItemExpiring30(item, today, in30Days);
                         const isExpiring60 = isItemExpiring60(item, today, in30Days, in60Days);
 
@@ -1159,7 +1161,7 @@ const Dashboard = () => {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', margin: '0 0 0.125rem 0' }}>
-                                {isLaudo(item) ? (isDelivered(item) ? 'Entregue (Sem validade)' : 'Em elaboração') : (targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo'))}
+                                {!isProg ? (isDelivered(item) ? 'Entregue (Sem validade)' : 'Em elaboração') : (targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo'))}
                               </p>
                               <span style={{
                                 fontSize: '0.65rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',
@@ -1632,7 +1634,8 @@ const Dashboard = () => {
                   const isExpired = isItemExpired(item, today);
                   const sc = statusColors[item.status] || statusColors.pendente;
                   const effVal = getEffectiveValidityDate(item);
-                  const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) && !isLaudo(item) ? item.dueDate : null);
+                  const isProg = item.type === 'programa' && isProgram(item);
+                  const targetDate = effVal ? effVal.toISOString().split('T')[0] : (!isDelivered(item) && isProg ? item.dueDate : null);
                   const isExpiring30 = isItemExpiring30(item, today, in30Days);
                   const isExpiring60 = isItemExpiring60(item, today, in30Days, in60Days);
 
@@ -1659,7 +1662,7 @@ const Dashboard = () => {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '0.75rem', fontWeight: '600', color: isExpired ? '#dc2626' : 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                          {isLaudo(item) ? (isDelivered(item) ? 'Entregue (Sem validade)' : 'Em elaboração') : (targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo'))}
+                          {!isProg ? (isDelivered(item) ? 'Entregue (Sem validade)' : 'Em elaboração') : (targetDate ? new Date(targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : (isDelivered(item) ? 'Sem validade' : 'Sem prazo'))}
                         </p>
                         <span style={{
                           fontSize: '0.6875rem', padding: '0.125rem 0.5rem', borderRadius: '1rem',

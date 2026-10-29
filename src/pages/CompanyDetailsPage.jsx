@@ -22,7 +22,8 @@ import {
   isItemExpiring60,
   getDeliverableTimingInfo,
   getEffectiveValidityDate,
-  isLaudo
+  isLaudo,
+  isProgram
 } from '../utils/deliverableTiming';
 
 const TABS = [
@@ -599,7 +600,7 @@ const CompanyDetailsPage = () => {
                                 : 'Não informada'}
                             </strong>
                           </span>
-                          {!(prog.type === 'laudo' || isLaudo(prog)) && (
+                          {(prog.type === 'programa' && isProgram(prog)) && (
                             <span>
                               Validade: <strong style={{ color: isExpired ? '#dc2626' : 'var(--text-primary)', fontWeight: isExpired ? '700' : '600' }}>
                                 {(() => {
