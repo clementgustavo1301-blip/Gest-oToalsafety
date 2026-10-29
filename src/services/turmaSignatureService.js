@@ -83,8 +83,8 @@ export function initializeDefaultSignaturesForTurma(turma) {
   });
 
   // 2. Responsável Técnico
-  const techLeadName = turma.tech_lead?.name || turma.tech_lead_name || 'Eider Gomes do Nascimento';
-  if (!updated.tech_lead?.dataUrl && techLeadName) {
+  const techLeadName = turma.tech_lead?.name || turma.tech_lead_name;
+  if (!updated.tech_lead?.dataUrl && techLeadName && techLeadName.trim()) {
     const sigUrl = getInstructorSignatureUrl(techLeadName);
     if (sigUrl) {
       updated.tech_lead = {
@@ -98,8 +98,8 @@ export function initializeDefaultSignaturesForTurma(turma) {
   }
 
   // 3. Coordenação Técnica
-  const coordName = turma.coordinator?.name || turma.tech_lead?.coordinator?.name || (turma.cert_model === 'modelo2' ? 'Cezar Augusto Galvão De P. Camêlo' : null);
-  if (!updated.coordinator?.dataUrl && coordName) {
+  const coordName = turma.coordinator?.name || turma.tech_lead?.coordinator?.name;
+  if (!updated.coordinator?.dataUrl && coordName && coordName.trim()) {
     const sigUrl = getInstructorSignatureUrl(coordName);
     if (sigUrl) {
       updated.coordinator = {

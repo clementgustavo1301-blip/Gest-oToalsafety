@@ -11,9 +11,9 @@ const CertificatesPage = () => {
     local: '',
     empresa: '',
     duracao: '1 hora',
-    instrutorNome: 'Adeylton da Silva Araújo',
-    instrutorCargo: 'Técnico em Segurança do Trabalho',
-    instrutorRegistro: 'SRTE N° 0009823/RN',
+    instrutorNome: '',
+    instrutorCargo: '',
+    instrutorRegistro: '',
     conteudo: 'a) descrição do equipamento e seus componentes;\nb) risco ocupacional contra o qual o EPI oferece proteção;\nc) restrições e limitações de proteção;\nd) forma adequada de uso e ajuste;\ne) manutenção e substituição; e\nf) cuidados de limpeza, higienização, guarda e conservação.',
   });
 

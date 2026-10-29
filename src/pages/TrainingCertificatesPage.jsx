@@ -39,28 +39,27 @@ const COURSE_PRESETS = OFFICIAL_TRAINING_MODELS;
 const FALLBACK_PROFILES = OFFICIAL_INSTRUCTORS;
 
 const DEFAULT_TECH_LEAD = {
-  name: 'Eider Gomes do Nascimento',
+  name: '',
   role: 'Responsável Técnico / Engenheiro de Segurança',
-  registration: 'CREA 210874512-0 / MTE 0009995/RN'
+  registration: ''
 };
 const DEFAULT_COORDINATOR = {
-  name: 'Cezar Augusto Galvão De P. Camêlo',
-  role: 'Coordenação Técnica / Engenheiro Eletricista',
-  registration: 'CREA-RN 211051104-4'
+  name: '',
+  role: 'Coordenação Técnica',
+  registration: ''
 };
 const DEFAULT_APH_COORDINATOR = {
-  name: 'Leiliana Nunes de Lima Fernandes',
+  name: '',
   role: 'Coordenação Técnica / Instrutora de Saúde e APH',
-  registration: 'Coren RN 333018'
+  registration: ''
 };
 
-const getDefaultCoordinator = (courseName = '') =>
-  /(?:aph|hospitalar|primeiros socorros)/i.test(courseName)
-    ? { ...DEFAULT_APH_COORDINATOR }
-    : { ...DEFAULT_COORDINATOR };
+const getDefaultCoordinator = () => null;
 
 const getTurmaCoordinator = (turma = {}) =>
-  turma.coordinator || turma.tech_lead?.coordinator || getDefaultCoordinator(turma.course_name || turma.curso || '');
+  (turma.coordinator && (turma.coordinator.name || turma.coordinator.role || turma.coordinator.registration))
+    ? turma.coordinator
+    : null;
 
 /**
  * Determina dinamicamente as proporções, tamanhos de fonte, entrelinhas e espaçamentos
@@ -438,20 +437,16 @@ const TrainingCertificatesPage = () => {
     validade: '24 meses',
     start_date: new Date().toISOString().split('T')[0],
     location: 'Mossoró - RN',
-    company: 'TotalSafety',
+    company: 'EcoClinic',
     instructors: [],
     instructor_name: '',
     instructor_role: '',
     instructor_registration: '',
-    tech_lead: {
-      name: 'Eider Gomes do Nascimento',
-      role: 'Responsável Técnico / Engenheiro de Segurança',
-      registration: 'CREA 210874512-0 / MTE 0009995/RN'
-    },
-    tech_lead_name: 'Eider Gomes do Nascimento',
-    tech_lead_role: 'Responsável Técnico / Engenheiro de Segurança',
-    tech_lead_registration: 'CREA 210874512-0 / MTE 0009995/RN',
-    coordinator: { ...DEFAULT_COORDINATOR },
+    tech_lead: null,
+    tech_lead_name: '',
+    tech_lead_role: '',
+    tech_lead_registration: '',
+    coordinator: null,
     cert_model: 'modelo1',
     content: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
     status: 'Aberta'
@@ -482,12 +477,13 @@ const TrainingCertificatesPage = () => {
     duracao: defaultOfficialModel ? defaultOfficialModel.duration : '8 horas',
     validade: defaultOfficialModel ? defaultOfficialModel.validade : '24 meses',
     local: 'Mossoró - RN',
-    empresa: 'TotalSafety',
-    instrutorNome: defaultOfficialModel?.defaultInstructor?.name || 'Eider Gomes do Nascimento',
-    instrutorCargo: defaultOfficialModel?.defaultInstructor?.role || 'Instrutor e Responsável Técnico',
-    instrutorRegistro: defaultOfficialModel?.defaultInstructor?.registration || 'MTE0009995/RN',
-    tech_lead: { ...DEFAULT_TECH_LEAD },
-    coordinator: getDefaultCoordinator(defaultOfficialModel?.title || defaultOfficialModel?.name || ''),
+    empresa: 'EcoClinic',
+    instructors: [],
+    instrutorNome: '',
+    instrutorCargo: '',
+    instrutorRegistro: '',
+    tech_lead: null,
+    coordinator: null,
     conteudo: defaultOfficialModel ? defaultOfficialModel.content : '1. Conceitos, definições e requisitos da NR-35...'
   });
 
@@ -602,16 +598,16 @@ const TrainingCertificatesPage = () => {
       title = inst?.role || 'Instrutor(a)';
     } else if (roleKey === 'instructor') {
       const inst = (formData.instructors && formData.instructors[0]) || activeTurma?.instructors?.[0];
-      name = inst?.name || formData.instrutorNome || activeTurma?.instructor_name || 'Adeylton da Silva Araújo';
+      name = inst?.name || formData.instrutorNome || activeTurma?.instructor_name || 'Instrutor';
       title = inst?.role || 'Instrutor(a)';
     } else if (roleKey === 'tech_lead') {
-      const techLead = formData.tech_lead || activeTurma?.tech_lead || DEFAULT_TECH_LEAD;
-      name = techLead.name || DEFAULT_TECH_LEAD.name;
-      title = techLead.role || 'Responsável Técnico';
+      const techLead = formData.tech_lead || activeTurma?.tech_lead;
+      name = techLead?.name || '';
+      title = techLead?.role || 'Responsável Técnico';
     } else if (roleKey === 'coordinator') {
       const coordinator = formData.coordinator || getTurmaCoordinator(activeTurma);
-      name = coordinator.name || getDefaultCoordinator(formData.curso).name;
-      title = coordinator.role || 'Coordenador(a) Técnico(a)';
+      name = coordinator?.name || '';
+      title = coordinator?.role || 'Coordenador(a) Técnico(a)';
     }
 
     setSignModalRole(roleKey);
@@ -648,21 +644,25 @@ const TrainingCertificatesPage = () => {
   };
 
   const handleOpenQrModal = (turma = null, initialSignerKey = 'instructor') => {
+    const activeInstructorsList = (formData.instructors && formData.instructors.length > 0)
+      ? formData.instructors
+      : (formData.instrutorNome ? [
+          {
+            id: 'inst-1',
+            name: formData.instrutorNome,
+            role: formData.instrutorCargo || 'Instrutor',
+            registration: formData.instrutorRegistro || ''
+          }
+        ] : []);
+
     const t = turma || turmas.find(item => String(item.id) === String(selectedTurmaIdInGenerator)) || {
       id: selectedTurmaIdInGenerator || 'draft_turma',
       name: formData.curso || 'Turma Ativa',
       course_name: formData.curso || 'Curso de Treinamento',
-      company: formData.empresa || 'TotalSafety',
-      instructors: formData.instructors || [
-        {
-          id: 'inst-1',
-          name: formData.instrutorNome || 'Eider Gomes do Nascimento',
-          role: formData.instrutorCargo || 'Instrutor e Responsável Técnico',
-          registration: formData.instrutorRegistro || 'MTE0009995/RN'
-        }
-      ],
-      tech_lead: formData.tech_lead || DEFAULT_TECH_LEAD,
-      coordinator: formData.coordinator || getDefaultCoordinator(formData.curso)
+      company: formData.empresa || 'EcoClinic',
+      instructors: activeInstructorsList,
+      tech_lead: formData.tech_lead?.name ? formData.tech_lead : null,
+      coordinator: formData.coordinator?.name ? formData.coordinator : null
     };
     setQrModalTurma(t);
     setQrModalSelectedSignerKey(initialSignerKey);
@@ -694,17 +694,38 @@ const TrainingCertificatesPage = () => {
         duration: preset.duration || preset.duracao || prev.duration,
         validade: preset.validade || prev.validade || '24 meses',
         content: preset.content || preset.conteudo || prev.content,
-        cert_model: preset.modelType || preset.cert_model || prev.cert_model || 'modelo1',
-        coordinator: [DEFAULT_COORDINATOR.name, DEFAULT_APH_COORDINATOR.name].includes(prev.coordinator?.name)
-          ? getDefaultCoordinator(preset.title || preset.name)
-          : prev.coordinator
+        cert_model: preset.modelType || preset.cert_model || prev.cert_model || 'modelo1'
       }));
     }
   };
 
+  const handleAddTechLeadToTurma = () => {
+    setTurmaFormData(prev => ({
+      ...prev,
+      tech_lead: {
+        name: '',
+        role: 'Responsável Técnico / Engenheiro de Segurança',
+        registration: ''
+      },
+      tech_lead_name: '',
+      tech_lead_role: 'Responsável Técnico / Engenheiro de Segurança',
+      tech_lead_registration: ''
+    }));
+  };
+
+  const handleRemoveTechLeadFromTurma = () => {
+    setTurmaFormData(prev => ({
+      ...prev,
+      tech_lead: null,
+      tech_lead_name: '',
+      tech_lead_role: '',
+      tech_lead_registration: ''
+    }));
+  };
+
   const handleUpdateTechLeadInTurma = (updates) => {
     setTurmaFormData(prev => {
-      const current = prev.tech_lead || {};
+      const current = prev.tech_lead || { role: 'Responsável Técnico / Engenheiro de Segurança' };
       const updated = { ...current, ...updates };
       return {
         ...prev,
@@ -716,10 +737,28 @@ const TrainingCertificatesPage = () => {
     });
   };
 
+  const handleAddCoordinatorToTurma = () => {
+    setTurmaFormData(prev => ({
+      ...prev,
+      coordinator: {
+        name: '',
+        role: 'Coordenação Técnica',
+        registration: ''
+      }
+    }));
+  };
+
+  const handleRemoveCoordinatorFromTurma = () => {
+    setTurmaFormData(prev => ({
+      ...prev,
+      coordinator: null
+    }));
+  };
+
   const handleUpdateCoordinatorInTurma = (updates) => {
     setTurmaFormData(prev => ({
       ...prev,
-      coordinator: { ...(prev.coordinator || {}), ...updates }
+      coordinator: { ...(prev.coordinator || { role: 'Coordenação Técnica' }), ...updates }
     }));
   };
 
@@ -768,11 +807,119 @@ const TrainingCertificatesPage = () => {
     });
   };
 
+  // ----------------------------------------------------
+  // Ações do Gerador de Certificados (Instrutores e Responsáveis)
+  // ----------------------------------------------------
+  const handleAddInstructorToForm = () => {
+    setFormData(prev => {
+      const currentList = Array.isArray(prev.instructors) && prev.instructors.length > 0
+        ? [...prev.instructors]
+        : (prev.instrutorNome ? [{ id: 'inst-1', name: prev.instrutorNome, role: prev.instrutorCargo || 'Instrutor', registration: prev.instrutorRegistro || '' }] : []);
+      const updatedList = [
+        ...currentList,
+        {
+          id: `inst-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          name: '',
+          role: 'Instrutor(a)',
+          registration: ''
+        }
+      ];
+      return {
+        ...prev,
+        instructors: updatedList,
+        instrutorNome: updatedList[0]?.name || '',
+        instrutorCargo: updatedList[0]?.role || '',
+        instrutorRegistro: updatedList[0]?.registration || ''
+      };
+    });
+  };
+
+  const handleRemoveInstructorFromForm = (index) => {
+    setFormData(prev => {
+      const currentList = Array.isArray(prev.instructors) && prev.instructors.length > 0
+        ? [...prev.instructors]
+        : (prev.instrutorNome ? [{ id: 'inst-1', name: prev.instrutorNome, role: prev.instrutorCargo || 'Instrutor', registration: prev.instrutorRegistro || '' }] : []);
+      currentList.splice(index, 1);
+      return {
+        ...prev,
+        instructors: currentList,
+        instrutorNome: currentList[0]?.name || '',
+        instrutorCargo: currentList[0]?.role || '',
+        instrutorRegistro: currentList[0]?.registration || ''
+      };
+    });
+  };
+
+  const handleUpdateInstructorInForm = (index, updates) => {
+    setFormData(prev => {
+      const currentList = Array.isArray(prev.instructors) && prev.instructors.length > 0
+        ? [...prev.instructors]
+        : [{ id: 'inst-1', name: prev.instrutorNome || '', role: prev.instrutorCargo || 'Instrutor', registration: prev.instrutorRegistro || '' }];
+      currentList[index] = { ...currentList[index], ...updates };
+      return {
+        ...prev,
+        instructors: currentList,
+        instrutorNome: currentList[0]?.name || '',
+        instrutorCargo: currentList[0]?.role || '',
+        instrutorRegistro: currentList[0]?.registration || ''
+      };
+    });
+  };
+
+  const handleAddTechLeadToForm = () => {
+    setFormData(prev => ({
+      ...prev,
+      tech_lead: {
+        name: '',
+        role: 'Responsável Técnico / Engenheiro de Segurança',
+        registration: ''
+      }
+    }));
+  };
+
+  const handleRemoveTechLeadFromForm = () => {
+    setFormData(prev => ({
+      ...prev,
+      tech_lead: null
+    }));
+  };
+
+  const handleUpdateTechLeadInForm = (updates) => {
+    setFormData(prev => ({
+      ...prev,
+      tech_lead: { ...(prev.tech_lead || { role: 'Responsável Técnico / Engenheiro de Segurança' }), ...updates }
+    }));
+  };
+
+  const handleAddCoordinatorToForm = () => {
+    setFormData(prev => ({
+      ...prev,
+      coordinator: {
+        name: '',
+        role: 'Coordenação Técnica',
+        registration: ''
+      }
+    }));
+  };
+
+  const handleRemoveCoordinatorFromForm = () => {
+    setFormData(prev => ({
+      ...prev,
+      coordinator: null
+    }));
+  };
+
+  const handleUpdateCoordinatorInForm = (updates) => {
+    setFormData(prev => ({
+      ...prev,
+      coordinator: { ...(prev.coordinator || { role: 'Coordenação Técnica' }), ...updates }
+    }));
+  };
+
   const handleOpenNewTurma = () => {
     setEditingTurma(null);
     setTurmaFormErrors({});
     const defaultModel = COURSE_PRESETS[0] || {};
-    const defaultLead = profiles.find(p => p.role?.toLowerCase().includes('responsável') || p.role?.toLowerCase().includes('admin')) || profiles[0] || {};
 
     const nextFormData = {
       name: '',
@@ -782,20 +929,16 @@ const TrainingCertificatesPage = () => {
       validade: defaultModel.validade || '24 meses',
       start_date: new Date().toISOString().split('T')[0],
       location: 'Mossoró - RN',
-      company: 'TotalSafety',
-      instructors: [], // Opcional: usuário pode adicionar ou deixar para depois
+      company: 'EcoClinic',
+      instructors: [],
       instructor_name: '',
       instructor_role: '',
       instructor_registration: '',
-      tech_lead: {
-        name: defaultLead.name || 'Eider Gomes do Nascimento',
-        role: defaultLead.role || 'Responsável Técnico / Engenheiro de Segurança',
-        registration: defaultLead.registration || 'CREA 210874512-0 / MTE 0009995/RN'
-      },
-      tech_lead_name: defaultLead.name || 'Eider Gomes do Nascimento',
-      tech_lead_role: defaultLead.role || 'Responsável Técnico / Engenheiro de Segurança',
-      tech_lead_registration: defaultLead.registration || 'CREA 210874512-0 / MTE 0009995/RN',
-      coordinator: getDefaultCoordinator(defaultModel.title || defaultModel.name),
+      tech_lead: null,
+      tech_lead_name: '',
+      tech_lead_role: '',
+      tech_lead_registration: '',
+      coordinator: null,
       cert_model: defaultModel.modelType || 'modelo1',
       content: defaultModel.content || '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Aplicáveis\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
       status: 'Aberta'
@@ -819,12 +962,25 @@ const TrainingCertificatesPage = () => {
           }
         ] : []);
 
-    const loadedTechLead = turma.tech_lead || {
-      name: turma.tech_lead_name || 'Eider Gomes do Nascimento',
-      role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
-      registration: turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
-    };
-    const loadedCoordinator = getTurmaCoordinator(turma);
+    const loadedTechLead = (turma.tech_lead && (turma.tech_lead.name || turma.tech_lead.role || turma.tech_lead.registration))
+      ? {
+          name: turma.tech_lead.name || turma.tech_lead_name || '',
+          role: turma.tech_lead.role || turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
+          registration: turma.tech_lead.registration || turma.tech_lead_registration || ''
+        }
+      : (turma.tech_lead_name ? {
+          name: turma.tech_lead_name,
+          role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
+          registration: turma.tech_lead_registration || ''
+        } : null);
+
+    const loadedCoordinator = (turma.coordinator && (turma.coordinator.name || turma.coordinator.role || turma.coordinator.registration))
+      ? {
+          name: turma.coordinator.name || '',
+          role: turma.coordinator.role || 'Coordenação Técnica',
+          registration: turma.coordinator.registration || ''
+        }
+      : null;
 
     const nextFormData = {
       name: turma.name || '',
@@ -840,9 +996,9 @@ const TrainingCertificatesPage = () => {
       instructor_role: loadedInstructors[0]?.role || turma.instructor_role || '',
       instructor_registration: loadedInstructors[0]?.registration || turma.instructor_registration || '',
       tech_lead: loadedTechLead,
-      tech_lead_name: loadedTechLead.name,
-      tech_lead_role: loadedTechLead.role,
-      tech_lead_registration: loadedTechLead.registration,
+      tech_lead_name: loadedTechLead?.name || '',
+      tech_lead_role: loadedTechLead?.role || '',
+      tech_lead_registration: loadedTechLead?.registration || '',
       coordinator: loadedCoordinator,
       cert_model: turma.cert_model || 'modelo1',
       content: turma.content || '',
@@ -887,6 +1043,26 @@ const TrainingCertificatesPage = () => {
 
       const primary = validInstructors[0] || {};
 
+      const techLeadToSave = (turmaFormData.tech_lead && (turmaFormData.tech_lead.name?.trim() || turmaFormData.tech_lead.role?.trim() || turmaFormData.tech_lead.registration?.trim()))
+        ? {
+            name: (turmaFormData.tech_lead.name || '').trim(),
+            role: (turmaFormData.tech_lead.role || '').trim(),
+            registration: (turmaFormData.tech_lead.registration || '').trim()
+          }
+        : (turmaFormData.tech_lead_name?.trim() ? {
+            name: turmaFormData.tech_lead_name.trim(),
+            role: (turmaFormData.tech_lead_role || '').trim(),
+            registration: (turmaFormData.tech_lead_registration || '').trim()
+          } : null);
+
+      const coordinatorToSave = (turmaFormData.coordinator && (turmaFormData.coordinator.name?.trim() || turmaFormData.coordinator.role?.trim() || turmaFormData.coordinator.registration?.trim()))
+        ? {
+            name: (turmaFormData.coordinator.name || '').trim(),
+            role: (turmaFormData.coordinator.role || '').trim(),
+            registration: (turmaFormData.coordinator.registration || '').trim()
+          }
+        : null;
+
       const savedTurma = await saveTrainingClass({
         id: editingTurma ? editingTurma.id : null,
         ...turmaFormData,
@@ -894,15 +1070,11 @@ const TrainingCertificatesPage = () => {
         instructor_name: primary.name || '',
         instructor_role: primary.role || '',
         instructor_registration: primary.registration || '',
-        tech_lead: {
-          ...(turmaFormData.tech_lead || {
-          name: turmaFormData.tech_lead_name || 'Eider Gomes do Nascimento',
-          role: turmaFormData.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
-          registration: turmaFormData.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
-          }),
-          coordinator: turmaFormData.coordinator || getDefaultCoordinator(turmaFormData.course_name)
-        },
-        coordinator: turmaFormData.coordinator || getDefaultCoordinator(turmaFormData.course_name)
+        tech_lead: techLeadToSave,
+        tech_lead_name: techLeadToSave?.name || '',
+        tech_lead_role: techLeadToSave?.role || '',
+        tech_lead_registration: techLeadToSave?.registration || '',
+        coordinator: coordinatorToSave
       });
       initializeDefaultSignaturesForTurma(savedTurma);
       setShowTurmaModal(false);
@@ -1140,12 +1312,25 @@ const TrainingCertificatesPage = () => {
     const instructorRoles = turmaInstructors.map(i => i.role).filter(Boolean).join(' / ');
     const instructorRegs = turmaInstructors.map(i => i.registration).filter(Boolean).join(' / ');
 
-    const techLead = turma.tech_lead || {
-      name: turma.tech_lead_name || 'Eider Gomes do Nascimento',
-      role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
-      registration: turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN'
-    };
-    const coordinator = getTurmaCoordinator(turma);
+    const techLead = (turma.tech_lead && (turma.tech_lead.name || turma.tech_lead.role || turma.tech_lead.registration))
+      ? {
+          name: turma.tech_lead.name || turma.tech_lead_name || '',
+          role: turma.tech_lead.role || turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
+          registration: turma.tech_lead.registration || turma.tech_lead_registration || ''
+        }
+      : (turma.tech_lead_name ? {
+          name: turma.tech_lead_name,
+          role: turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança',
+          registration: turma.tech_lead_registration || ''
+        } : null);
+
+    const coordinator = (turma.coordinator && (turma.coordinator.name || turma.coordinator.role || turma.coordinator.registration))
+      ? {
+          name: turma.coordinator.name || '',
+          role: turma.coordinator.role || 'Coordenação Técnica',
+          registration: turma.coordinator.registration || ''
+        }
+      : null;
 
     // Atualiza o formulário do certificado com todos os dados da turma
     setFormData(prev => ({
@@ -1157,14 +1342,14 @@ const TrainingCertificatesPage = () => {
       local: turma.location || prev.local,
       empresa: turma.company || prev.empresa,
       instructors: turmaInstructors,
-      instrutorNome: instructorNames || prev.instrutorNome,
-      instrutorCargo: instructorRoles || prev.instrutorCargo,
-      instrutorRegistro: instructorRegs || prev.instrutorRegistro,
+      instrutorNome: instructorNames || '',
+      instrutorCargo: instructorRoles || '',
+      instrutorRegistro: instructorRegs || '',
       tech_lead: techLead,
       coordinator,
-      techLeadNome: techLead.name,
-      techLeadCargo: techLead.role,
-      techLeadRegistro: techLead.registration,
+      techLeadNome: techLead?.name || '',
+      techLeadCargo: techLead?.role || '',
+      techLeadRegistro: techLead?.registration || '',
       conteudo: turma.content || prev.conteudo
     }));
 
@@ -1241,10 +1426,7 @@ const TrainingCertificatesPage = () => {
       duracao: preset.duration || preset.duracao || prev.duracao,
       conteudo: preset.content || preset.conteudo || prev.conteudo,
       descricao: preset.description || preset.descricao || `Projeto de treinamento com carga horária de ${preset.duration || preset.duracao || '8 horas'}, desenvolvido em conformidade com as diretrizes e requisitos técnicos de ${preset.name}.`,
-      validade: preset.validade || prev.validade || '24 meses',
-      instrutorNome: preset.defaultInstructor?.name || preset.instrutor_nome || prev.instrutorNome,
-      instrutorCargo: preset.defaultInstructor?.role || preset.instrutor_cargo || prev.instrutorCargo,
-      instrutorRegistro: preset.defaultInstructor?.registration || preset.instrutor_registro || prev.instrutorRegistro
+      validade: preset.validade || prev.validade || '24 meses'
     }));
     if (preset.modelType || preset.cert_model) {
       setCertModel(preset.modelType || preset.cert_model);
@@ -1460,9 +1642,9 @@ const TrainingCertificatesPage = () => {
         ? `Projeto de treinamento com carga horária de 8 horas, desenvolvido em conformidade com as normas e requisitos técnicos aplicáveis.`
         : '',
       conteudo: '1. Introdução e Contextualização Geral\n2. Normas, Procedimentos e Diretrizes Técnicas\n3. Metodologias e Execução Prática\n4. Avaliação e Verificação de Aprendizagem',
-      instrutorNome: profiles[0]?.name || 'Eider Gomes do Nascimento',
-      instrutorCargo: profiles[0]?.role || 'Instrutor e Responsável Técnico',
-      instrutorRegistro: profiles[0]?.registration || 'MTE 0009995/RN'
+      instrutorNome: '',
+      instrutorCargo: '',
+      instrutorRegistro: ''
     });
     setShowCreateCourseModal(true);
   };
@@ -1613,41 +1795,123 @@ const TrainingCertificatesPage = () => {
     p.name?.trim().toLowerCase() === formData.curso?.trim().toLowerCase() ||
     p.title?.trim().toLowerCase() === formData.curso?.trim().toLowerCase()
   );
-  const activeTechLead = formData.tech_lead || DEFAULT_TECH_LEAD;
-  const activeCoordinator = formData.coordinator || getDefaultCoordinator(formData.curso);
+  const activeTechLead = (formData.tech_lead && (formData.tech_lead.name?.trim() || formData.tech_lead.role?.trim() || formData.tech_lead.registration?.trim()))
+    ? formData.tech_lead
+    : null;
+  const activeCoordinator = (formData.coordinator && (formData.coordinator.name?.trim() || formData.coordinator.role?.trim() || formData.coordinator.registration?.trim()))
+    ? formData.coordinator
+    : null;
 
   // Papéis de assinatura dinâmicos com suporte a múltiplos instrutores
-  const instructorRoles = (formData.instructors && formData.instructors.length > 0)
-    ? formData.instructors.map((inst, idx) => ({
-        key: idx === 0 ? 'instructor' : `instructor_${idx}`,
-        label: formData.instructors.length > 1 ? `Instrutor(a) #${idx + 1}` : 'Instrutor(a)',
-        name: inst.name || 'Instrutor não definido',
-        roleTitle: inst.role || 'Instrutor',
-        registration: inst.registration || ''
-      }))
-    : [
-        { key: 'instructor', label: 'Instrutor(a)', name: formData.instrutorNome || 'Instrutor não definido' }
-      ];
+  const formInstructors = (Array.isArray(formData.instructors) && formData.instructors.length > 0)
+    ? formData.instructors
+    : (formData.instrutorNome && formData.instrutorNome.trim() ? [{ id: 'inst-1', name: formData.instrutorNome, role: formData.instrutorCargo || 'Instrutor', registration: formData.instrutorRegistro || '' }] : []);
+
+  const activeInstructors = formInstructors.filter(i => i && i.name && i.name.trim());
+
+  const instructorRoles = activeInstructors.map((inst, idx) => ({
+    key: idx === 0 ? 'instructor' : `instructor_${idx}`,
+    label: activeInstructors.length > 1 ? `Instrutor(a) #${idx + 1}` : 'Instrutor(a)',
+    name: inst.name,
+    roleTitle: inst.role || 'Instrutor',
+    registration: inst.registration || ''
+  }));
 
   const signatureRoles = [
     ...instructorRoles,
-    {
+    ...(activeTechLead && activeTechLead.name?.trim() ? [{
       key: 'tech_lead',
       label: 'Responsável Técnico',
-      name: activeTechLead.name || DEFAULT_TECH_LEAD.name,
+      name: activeTechLead.name,
       roleTitle: activeTechLead.role || 'Responsável Técnico',
       registration: activeTechLead.registration || ''
-    },
-    ...(certModel === 'modelo2'
-      ? [{
-          key: 'coordinator',
-          label: 'Coordenação Técnica',
-          name: activeCoordinator.name || getDefaultCoordinator(formData.curso).name,
-          roleTitle: activeCoordinator.role || 'Coordenação Técnica',
-          registration: activeCoordinator.registration || ''
-        }]
-      : [])
+    }] : []),
+    ...(activeCoordinator && activeCoordinator.name?.trim() ? [{
+      key: 'coordinator',
+      label: 'Coordenação Técnica',
+      name: activeCoordinator.name,
+      roleTitle: activeCoordinator.role || 'Coordenação Técnica',
+      registration: activeCoordinator.registration || ''
+    }] : [])
   ];
+
+  // Colunas de assinatura no rodapé do certificado (Frente Modelo 1)
+  const m1SignerColumns = [];
+  if (activeTechLead && activeTechLead.name?.trim()) {
+    m1SignerColumns.push({
+      key: 'tech_lead',
+      roleLabel: (activeTechLead.role || 'RESPONSÁVEL TÉCNICO').toUpperCase(),
+      name: activeTechLead.name,
+      registration: activeTechLead.registration ? `Registro: ${activeTechLead.registration}` : '',
+      sigImg: currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)
+    });
+  }
+  if (activeCoordinator && activeCoordinator.name?.trim()) {
+    m1SignerColumns.push({
+      key: 'coordinator',
+      roleLabel: (activeCoordinator.role || 'COORDENAÇÃO TÉCNICA').toUpperCase(),
+      name: activeCoordinator.name,
+      registration: activeCoordinator.registration ? `Registro: ${activeCoordinator.registration}` : '',
+      sigImg: currentTurmaSignatures?.coordinator?.dataUrl || getInstructorSignatureUrl(activeCoordinator.name)
+    });
+  }
+  m1SignerColumns.push({
+    key: 'aluno',
+    isStudent: true,
+    roleLabel: 'ALUNO:',
+    name: firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE',
+    registration: ''
+  });
+  activeInstructors.forEach((inst, idx) => {
+    const sigKey = idx === 0 ? 'instructor' : `instructor_${idx}`;
+    const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
+    m1SignerColumns.push({
+      key: sigKey,
+      roleLabel: activeInstructors.length > 1 ? `INSTRUTOR #${idx + 1}:` : 'INSTRUTOR:',
+      name: inst.name,
+      registration: inst.registration ? `Registro: ${inst.registration}` : '',
+      sigImg
+    });
+  });
+
+  // Colunas de assinatura no rodapé do certificado (Frente Modelo 2)
+  const m2SignerColumns = [];
+  if (activeTechLead && activeTechLead.name?.trim()) {
+    m2SignerColumns.push({
+      key: 'tech_lead',
+      roleLabel: (activeTechLead.role || 'RESPONSÁVEL TÉCNICO').toUpperCase(),
+      name: activeTechLead.name,
+      registration: activeTechLead.registration || '',
+      sigImg: currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)
+    });
+  }
+  if (activeCoordinator && activeCoordinator.name?.trim()) {
+    m2SignerColumns.push({
+      key: 'coordinator',
+      roleLabel: (activeCoordinator.role || 'COORDENAÇÃO TÉCNICA').toUpperCase(),
+      name: activeCoordinator.name,
+      registration: activeCoordinator.registration || '',
+      sigImg: currentTurmaSignatures?.coordinator?.dataUrl || getInstructorSignatureUrl(activeCoordinator.name)
+    });
+  }
+  m2SignerColumns.push({
+    key: 'aluno',
+    isStudent: true,
+    roleLabel: 'ALUNO',
+    name: firstStudent?.nome || 'Participante',
+    registration: ''
+  });
+  activeInstructors.forEach((inst, idx) => {
+    const sigKey = idx === 0 ? 'instructor' : `instructor_${idx}`;
+    const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
+    m2SignerColumns.push({
+      key: sigKey,
+      roleLabel: activeInstructors.length > 1 ? `INSTRUTOR #${idx + 1}` : 'INSTRUTOR',
+      name: inst.name,
+      registration: inst.registration || '',
+      sigImg
+    });
+  });
   const signedCount = signatureRoles.filter(r => currentTurmaSignatures?.[r.key]?.dataUrl).length;
   const countStudentsInTurma = (turmaId) => enrollments.filter(e => String(e.turma_id) === String(turmaId)).length;
   const turmaStatusGroups = [
@@ -1893,93 +2157,244 @@ const TrainingCertificatesPage = () => {
                 </div>
               </div>
 
-              {/* Instrutor */}
-              <div className="tc-field">
-                <div className="tc-label-row">
-                  <label htmlFor="tc-instrutor">Instrutor *</label>
-                  <button
-                    type="button"
-                    className="tc-link"
-                    onClick={() => setIsEditingInstructor(!isEditingInstructor)}
-                  >
-                    {isEditingInstructor ? 'Concluir edição' : 'Editar dados'}
-                  </button>
+              {/* Signatários do Certificado (Instrutores, Responsável Técnico e Coordenação Técnica) */}
+              <div className="tc-field tc-mt" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                <div className="tc-label-row" style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ fontWeight: '600', fontSize: '0.95rem' }}>Signatários do Certificado</label>
+                  <span className="tc-hint" style={{ margin: 0 }}>Adicione ou exclua instrutores e responsáveis</span>
                 </div>
-                <select
-                  id="tc-instrutor"
-                  className="tc-input"
-                  value={profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase()) ? formData.instrutorNome : 'custom'}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === 'custom') {
-                      setIsEditingInstructor(true);
-                    } else if (val) {
-                      const sel = profiles.find(p => p.name === val);
-                      setFormData(prev => ({
-                        ...prev,
-                        instrutorNome: sel ? sel.name : val,
-                        instrutorCargo: sel?.role || prev.instrutorCargo,
-                        instrutorRegistro: sel?.registration || prev.instrutorRegistro
-                      }));
-                    }
-                  }}
-                >
-                  {profiles.map(p => (
-                    <option key={p.id || p.name} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                  <option value="custom">
-                    {profiles.some(p => p.name.trim().toLowerCase() === formData.instrutorNome?.trim().toLowerCase())
-                      ? 'Outro instrutor (digitar)...'
-                      : (formData.instrutorNome || 'Outro instrutor (digitar)...')}
-                  </option>
-                </select>
-                {!isEditingInstructor && (formData.instrutorCargo || formData.instrutorRegistro) && (
-                  <span className="tc-hint">
-                    {[formData.instrutorCargo, formData.instrutorRegistro].filter(Boolean).join(' · ')}
-                  </span>
-                )}
-                {isEditingInstructor && (
-                  <div className="tc-grid-3 tc-mt">
-                    <div className="tc-field">
-                      <label htmlFor="tc-instrutor-nome">Nome</label>
-                      <input
-                        id="tc-instrutor-nome"
-                        type="text"
-                        name="instrutorNome"
-                        className="tc-input"
-                        value={formData.instrutorNome}
-                        onChange={handleChange}
-                        placeholder="Nome completo"
-                      />
-                    </div>
-                    <div className="tc-field">
-                      <label htmlFor="tc-instrutor-cargo">Cargo</label>
-                      <input
-                        id="tc-instrutor-cargo"
-                        type="text"
-                        name="instrutorCargo"
-                        className="tc-input"
-                        value={formData.instrutorCargo}
-                        onChange={handleChange}
-                        placeholder="Ex: Técnico em Segurança"
-                      />
-                    </div>
-                    <div className="tc-field">
-                      <label htmlFor="tc-instrutor-registro">Registro</label>
-                      <input
-                        id="tc-instrutor-registro"
-                        type="text"
-                        name="instrutorRegistro"
-                        className="tc-input"
-                        value={formData.instrutorRegistro}
-                        onChange={handleChange}
-                        placeholder="Ex: MTE0009995/RN"
-                      />
-                    </div>
+
+                {/* 1. SEÇÃO DE INSTRUTORES */}
+                <div style={{ marginBottom: '1.25rem', padding: '0.85rem', background: 'var(--bg-subtle, #f8fafc)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                  <div className="tc-subsection-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <strong style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
+                      Instrutores {formInstructors.length > 0 ? `(${formInstructors.length})` : ''}
+                    </strong>
+                    <button type="button" className="tc-btn tc-btn--sm tc-btn--soft" onClick={handleAddInstructorToForm} style={{ padding: '3px 8px', fontSize: '0.78rem' }}>
+                      <Plus size={13} /> Adicionar Instrutor
+                    </button>
                   </div>
-                )}
+
+                  {formInstructors.length === 0 ? (
+                    <p className="tc-compact-empty" style={{ margin: 0, padding: '0.5rem 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      Nenhum instrutor adicionado. Clique em &quot;Adicionar Instrutor&quot; para incluir.
+                    </p>
+                  ) : (
+                    <div className="tc-instructor-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {formInstructors.map((inst, index) => (
+                        <div className="tc-instructor-row" key={inst.id || index} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
+                          <div className="tc-instructor-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ fontWeight: '600', fontSize: '0.8rem' }}>
+                              {formInstructors.length > 1 ? `Instrutor #${index + 1}` : 'Instrutor'}
+                            </span>
+                            <button
+                              type="button"
+                              className="tc-link tc-link--danger"
+                              onClick={() => handleRemoveInstructorFromForm(index)}
+                              aria-label={`Excluir instrutor ${index + 1}`}
+                              style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                            >
+                              <Trash2 size={12} /> Excluir
+                            </button>
+                          </div>
+                          <select
+                            className="tc-input"
+                            style={{ marginBottom: '0.4rem', fontSize: '0.82rem' }}
+                            value={profiles.some(p => p.name.trim() === inst.name?.trim()) ? inst.name : (inst.name ? 'custom' : '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val && val !== 'custom') {
+                                const sel = profiles.find(p => p.name === val);
+                                handleUpdateInstructorInForm(index, {
+                                  name: sel?.name || val,
+                                  role: sel?.role === 'Admin' ? 'Instrutor e Responsável Técnico' : (sel?.role ? `Instrutor / ${sel.role}` : (inst.role || 'Instrutor')),
+                                  registration: sel?.registration || inst.registration || ''
+                                });
+                              }
+                            }}
+                          >
+                            <option value="">Selecionar da lista de profissionais</option>
+                            {profiles.map(p => <option key={p.id || p.name} value={p.name}>{p.name}{p.role ? ` — ${p.role}` : ''}</option>)}
+                            <option value="custom">Outro profissional (digitar)</option>
+                          </select>
+                          <div className="tc-grid-3">
+                            <input
+                              type="text"
+                              className="tc-input"
+                              placeholder="Nome completo do instrutor"
+                              value={inst.name || ''}
+                              onChange={e => handleUpdateInstructorInForm(index, { name: e.target.value })}
+                            />
+                            <input
+                              type="text"
+                              className="tc-input"
+                              placeholder="Cargo / Qualificação"
+                              value={inst.role || ''}
+                              onChange={e => handleUpdateInstructorInForm(index, { role: e.target.value })}
+                            />
+                            <input
+                              type="text"
+                              className="tc-input"
+                              placeholder="Registro (CREA, MTE, etc.)"
+                              value={inst.registration || ''}
+                              onChange={e => handleUpdateInstructorInForm(index, { registration: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. SEÇÃO DE RESPONSÁVEL TÉCNICO */}
+                <div style={{ marginBottom: '1.25rem', padding: '0.85rem', background: 'var(--bg-subtle, #f8fafc)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                  <div className="tc-subsection-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <strong style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
+                      Responsável Técnico
+                    </strong>
+                    {formData.tech_lead ? (
+                      <button
+                        type="button"
+                        className="tc-link tc-link--danger"
+                        onClick={handleRemoveTechLeadFromForm}
+                        style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <Trash2 size={12} /> Excluir
+                      </button>
+                    ) : (
+                      <button type="button" className="tc-btn tc-btn--sm tc-btn--soft" onClick={handleAddTechLeadToForm} style={{ padding: '3px 8px', fontSize: '0.78rem' }}>
+                        <Plus size={13} /> Adicionar Responsável Técnico
+                      </button>
+                    )}
+                  </div>
+
+                  {!formData.tech_lead ? (
+                    <p className="tc-compact-empty" style={{ margin: 0, padding: '0.5rem 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      Nenhum responsável técnico adicionado.
+                    </p>
+                  ) : (
+                    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
+                      <select
+                        className="tc-input"
+                        style={{ marginBottom: '0.4rem', fontSize: '0.82rem' }}
+                        value={profiles.some(p => p.name.trim() === formData.tech_lead?.name?.trim()) ? formData.tech_lead?.name : (formData.tech_lead?.name ? 'custom' : '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val && val !== 'custom') {
+                            const sel = profiles.find(p => p.name === val);
+                            handleUpdateTechLeadInForm({
+                              name: sel?.name || val,
+                              role: sel?.role || 'Responsável Técnico / Engenheiro de Segurança',
+                              registration: sel?.registration || 'CREA 210874512-0 / MTE 0009995/RN'
+                            });
+                          }
+                        }}
+                      >
+                        <option value="">Selecionar da lista de profissionais</option>
+                        {profiles.map(p => <option key={p.id || p.name} value={p.name}>{p.name}{p.role ? ` — ${p.role}` : ''}</option>)}
+                        <option value="custom">Outro profissional (digitar)</option>
+                      </select>
+                      <div className="tc-grid-3">
+                        <input
+                          type="text"
+                          className="tc-input"
+                          placeholder="Nome completo do responsável"
+                          value={formData.tech_lead?.name || ''}
+                          onChange={e => handleUpdateTechLeadInForm({ name: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="tc-input"
+                          placeholder="Cargo / Qualificação"
+                          value={formData.tech_lead?.role || ''}
+                          onChange={e => handleUpdateTechLeadInForm({ role: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="tc-input"
+                          placeholder="Registro CREA / MTE"
+                          value={formData.tech_lead?.registration || ''}
+                          onChange={e => handleUpdateTechLeadInForm({ registration: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. SEÇÃO DE COORDENAÇÃO TÉCNICA */}
+                <div style={{ marginBottom: '0.5rem', padding: '0.85rem', background: 'var(--bg-subtle, #f8fafc)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                  <div className="tc-subsection-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <strong style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
+                      Coordenação Técnica
+                    </strong>
+                    {formData.coordinator ? (
+                      <button
+                        type="button"
+                        className="tc-link tc-link--danger"
+                        onClick={handleRemoveCoordinatorFromForm}
+                        style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <Trash2 size={12} /> Excluir
+                      </button>
+                    ) : (
+                      <button type="button" className="tc-btn tc-btn--sm tc-btn--soft" onClick={handleAddCoordinatorToForm} style={{ padding: '3px 8px', fontSize: '0.78rem' }}>
+                        <Plus size={13} /> Adicionar Coordenação Técnica
+                      </button>
+                    )}
+                  </div>
+
+                  {!formData.coordinator ? (
+                    <p className="tc-compact-empty" style={{ margin: 0, padding: '0.5rem 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      Nenhuma coordenação técnica adicionada.
+                    </p>
+                  ) : (
+                    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
+                      <select
+                        className="tc-input"
+                        style={{ marginBottom: '0.4rem', fontSize: '0.82rem' }}
+                        value={profiles.some(p => p.name.trim() === formData.coordinator?.name?.trim()) ? formData.coordinator?.name : (formData.coordinator?.name ? 'custom' : '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val && val !== 'custom') {
+                            const sel = profiles.find(p => p.name === val);
+                            handleUpdateCoordinatorInForm({
+                              name: sel?.name || val,
+                              role: sel?.role || 'Coordenação Técnica',
+                              registration: sel?.registration || ''
+                            });
+                          }
+                        }}
+                      >
+                        <option value="">Selecionar da lista de profissionais</option>
+                        {profiles.map(p => <option key={p.id || p.name} value={p.name}>{p.name}{p.role ? ` — ${p.role}` : ''}</option>)}
+                        <option value="custom">Outro profissional (digitar)</option>
+                      </select>
+                      <div className="tc-grid-3">
+                        <input
+                          type="text"
+                          className="tc-input"
+                          placeholder="Nome da coordenação técnica"
+                          value={formData.coordinator?.name || ''}
+                          onChange={e => handleUpdateCoordinatorInForm({ name: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="tc-input"
+                          placeholder="Cargo / Qualificação"
+                          value={formData.coordinator?.role || ''}
+                          onChange={e => handleUpdateCoordinatorInForm({ role: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="tc-input"
+                          placeholder="Registro CREA, Coren, CFT"
+                          value={formData.coordinator?.registration || ''}
+                          onChange={e => handleUpdateCoordinatorInForm({ registration: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
 
@@ -2306,10 +2721,10 @@ const TrainingCertificatesPage = () => {
                       list="tc-empresas-list"
                       value={formData.empresa}
                       onChange={handleChange}
-                      placeholder="TotalSafety"
+                      placeholder="EcoClinic"
                     />
                     <datalist id="tc-empresas-list">
-                      <option value="TotalSafety" />
+                      <option value="EcoClinic" />
                       {companies.map(c => (
                         <option key={c.id} value={c.name} />
                       ))}
@@ -2480,54 +2895,42 @@ const TrainingCertificatesPage = () => {
                           </div>
                         </div>
 
-                        {/* Rodapé: 3 Assinaturas com Traços e Tipografia em Roxo Oficial EcoSafety #64268a */}
+                        {/* Rodapé: Assinaturas Dinâmicas com Traços e Tipografia em Roxo Oficial EcoSafety #64268a */}
                         <div style={{
                           display: 'grid',
-                          gridTemplateColumns: `1fr 1fr repeat(${Math.max(1, formData.instructors?.length || 1)}, 1fr)`,
+                          gridTemplateColumns: `repeat(${Math.max(1, m1SignerColumns.length)}, 1fr)`,
                           gap: m1FrenteStyles.sigGap,
                           alignItems: 'end',
                           textAlign: 'center',
                           marginTop: '0.25rem',
                           fontFamily: "'Lato', sans-serif"
                         }}>
-                          {/* Coluna 1: Responsável Técnico */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
-                            <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: m1FrenteStyles.sigNameSize, fontWeight: '700', color: '#64268a' }}>{activeTechLead.name}</div>
-                              <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>{activeTechLead.registration ? `Registro: ${activeTechLead.registration}` : 'Registro não informado'}</div>
-                            </div>
-                          </div>
-
-                          {/* Coluna 2: Aluno (PENDENTE) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <div style={{ height: m1FrenteStyles.sigHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: m1FrenteStyles.sigRegSize, letterSpacing: '0.3px' }}>[ Assinatura Pendente ]</span>
-                            </div>
-                            <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a' }}>ALUNO:</div>
-                              <div style={{ fontSize: m1FrenteStyles.sigNameSize, color: '#64268a', fontWeight: '700' }}>{firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE'}</div>
-                            </div>
-                          </div>
-
-                          {/* Colunas dos Instrutores (Suporte a múltiplos instrutores) */}
-                          {(formData.instructors && formData.instructors.length > 0 ? formData.instructors : [{ name: formData.instrutorNome, registration: formData.instrutorRegistro }]).map((inst, idx) => {
-                            const sigKey = idx === 0 ? 'instructor' : `instructor_${idx}`;
-                            const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
-                            return (
-                              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <img src={sigImg} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
-                                <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
-                                    {formData.instructors?.length > 1 ? `INSTRUTOR #${idx + 1}:` : 'INSTRUTOR:'}
-                                  </div>
-                                  <div style={{ fontSize: m1FrenteStyles.sigNameSize, color: '#64268a', fontWeight: '700' }}>{inst.name || 'Instrutor'}</div>
-                                  <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>{inst.registration ? `Registro: ${inst.registration}` : (formData.instrutorRegistro ? `Registro: ${formData.instrutorRegistro}` : 'MTE 0122480/SP')}</div>
+                          {m1SignerColumns.map((col) => (
+                            <div key={col.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              {col.isStudent ? (
+                                <div style={{ height: m1FrenteStyles.sigHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: m1FrenteStyles.sigRegSize, letterSpacing: '0.3px' }}>[ Assinatura Pendente ]</span>
                                 </div>
+                              ) : col.sigImg ? (
+                                <img src={col.sigImg} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
+                              ) : (
+                                <div style={{ height: m1FrenteStyles.sigHeight, marginBottom: '2px' }} />
+                              )}
+                              <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
+                                <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
+                                  {col.roleLabel}
+                                </div>
+                                <div style={{ fontSize: m1FrenteStyles.sigNameSize, fontWeight: '700', color: '#64268a' }}>
+                                  {col.name}
+                                </div>
+                                {col.registration ? (
+                                  <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>
+                                    {col.registration}
+                                  </div>
+                                ) : null}
                               </div>
-                            );
-                          })}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ) : (
@@ -2666,10 +3069,10 @@ const TrainingCertificatesPage = () => {
                           </div>
                         </div>
 
-                        {/* Rodapé: 4 Assinaturas com Linhas e Textos em Preto Oficial #000000 (Afastado da onda roxa) */}
+                        {/* Rodapé: Assinaturas Dinâmicas com Linhas e Textos em Preto Oficial #000000 (Afastado da onda roxa) */}
                         <div style={{
                           display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                          gridTemplateColumns: `repeat(${Math.max(1, m2SignerColumns.length)}, 1fr)`,
                           gap: m2FrenteStyles.sigGap,
                           alignItems: 'end',
                           textAlign: 'center',
@@ -2679,54 +3082,32 @@ const TrainingCertificatesPage = () => {
                           paddingRight: m2FrenteStyles.sigPaddingX,
                           fontFamily: "'Lato', sans-serif"
                         }}>
-                          {/* Raimundo - Responsável Técnico Geral */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
-                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>RESPONSAVEL TÉCNICO</div>
-                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>{activeTechLead.name}</div>
-                              <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>{activeTechLead.registration || 'Registro não informado'}</div>
-                            </div>
-                          </div>
-
-                          {/* Cezar Augusto ou Leiliana Nunes (se APH) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <img src={currentTurmaSignatures?.coordinator?.dataUrl || getInstructorSignatureUrl(activeCoordinator.name)} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
-                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>{(activeCoordinator.role || 'COORDENAÇÃO TÉCNICA').toUpperCase()}</div>
-                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '600' }}>{activeCoordinator.name}</div>
-                              <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>{activeCoordinator.registration || 'Registro não informado'}</div>
-                            </div>
-                          </div>
-
-                          {/* Aluno (PENDENTE - sem imagem de assinatura falsa) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <div style={{ height: m2FrenteStyles.sigImageHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#94a3b8', fontStyle: 'italic' }}>[ Assinatura Pendente ]</span>
-                            </div>
-                            <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                              <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>ALUNO</div>
-                              <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#3340e6', fontWeight: '700' }}>{firstStudent?.nome || 'Participante'}</div>
-                            </div>
-                          </div>
-
-                          {/* Colunas dos Instrutores (Suporte a múltiplos instrutores) */}
-                          {(formData.instructors && formData.instructors.length > 0 ? formData.instructors : [{ name: formData.instrutorNome, registration: formData.instrutorRegistro }]).map((inst, idx) => {
-                            const sigKey = idx === 0 ? 'instructor' : `instructor_${idx}`;
-                            const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
-                            return (
-                              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <img src={sigImg} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
-                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>
-                                    {formData.instructors?.length > 1 ? `INSTRUTOR #${idx + 1}` : 'INSTRUTOR'}
-                                  </div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: '#000000', fontWeight: '700' }}>{inst.name || 'Eider Gomes do Nascimento'}</div>
-                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>{inst.registration || formData.instrutorRegistro || 'MTE0009995/RN'}</div>
+                          {m2SignerColumns.map((col) => (
+                            <div key={col.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              {col.isStudent ? (
+                                <div style={{ height: m2FrenteStyles.sigImageHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <span style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#94a3b8', fontStyle: 'italic' }}>[ Assinatura Pendente ]</span>
                                 </div>
+                              ) : col.sigImg ? (
+                                <img src={col.sigImg} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
+                              ) : (
+                                <div style={{ height: m2FrenteStyles.sigImageHeight, marginBottom: '1px' }} />
+                              )}
+                              <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
+                                <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>
+                                  {col.roleLabel}
+                                </div>
+                                <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: col.isStudent ? '#3340e6' : '#000000', fontWeight: col.isStudent ? '700' : '600' }}>
+                                  {col.name}
+                                </div>
+                                {col.registration ? (
+                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>
+                                    {col.registration}
+                                  </div>
+                                ) : null}
                               </div>
-                            );
-                          })}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ) : (
@@ -3628,57 +4009,83 @@ const TrainingCertificatesPage = () => {
 
                     <div className="tc-subsection-head tc-subsection-head--divided">
                       <h4>Responsável técnico</h4>
+                      {turmaFormData.tech_lead ? (
+                        <button type="button" className="tc-link tc-link--danger" onClick={handleRemoveTechLeadFromTurma}>
+                          <Trash2 size={13} /> Excluir
+                        </button>
+                      ) : (
+                        <button type="button" className="tc-link" onClick={handleAddTechLeadToTurma}>
+                          <Plus size={13} /> Adicionar
+                        </button>
+                      )}
                     </div>
-                    <div className="tc-modal-grid">
-                      <select
-                        className="tc-input tc-modal-span-2"
-                        aria-label="Selecionar responsável técnico"
-                        value={profiles.some(profile => profile.name.trim() === turmaFormData.tech_lead?.name?.trim()) ? turmaFormData.tech_lead?.name : (turmaFormData.tech_lead?.name ? 'custom' : '')}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          if (value && value !== 'custom') {
-                            const selected = profiles.find(profile => profile.name === value);
-                            handleUpdateTechLeadInTurma({ name: selected?.name || value, role: selected?.role || 'Responsável Técnico / Engenheiro de Segurança', registration: selected?.registration || 'CREA 210874512-0 / MTE 0009995/RN' });
-                          }
-                        }}
-                      >
-                        <option value="">Selecionar profissional</option>
-                        {profiles.map(profile => <option key={profile.id || profile.name} value={profile.name}>{profile.name}{profile.role ? ` — ${profile.role}` : ''}</option>)}
-                        <option value="custom">Outro profissional</option>
-                      </select>
-                      <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome do responsável técnico" placeholder="Nome completo" value={turmaFormData.tech_lead?.name || ''} onChange={event => handleUpdateTechLeadInTurma({ name: event.target.value })} />
-                      <input type="text" className="tc-input" aria-label="Cargo do responsável técnico" placeholder="Cargo ou qualificação" value={turmaFormData.tech_lead?.role || ''} onChange={event => handleUpdateTechLeadInTurma({ role: event.target.value })} />
-                      <input type="text" className="tc-input" aria-label="Registro do responsável técnico" placeholder="Registro CREA, CFT ou MTE" value={turmaFormData.tech_lead?.registration || ''} onChange={event => handleUpdateTechLeadInTurma({ registration: event.target.value })} />
-                    </div>
+                    {!turmaFormData.tech_lead ? (
+                      <p className="tc-compact-empty">Nenhum responsável técnico definido.</p>
+                    ) : (
+                      <div className="tc-modal-grid">
+                        <select
+                          className="tc-input tc-modal-span-2"
+                          aria-label="Selecionar responsável técnico"
+                          value={profiles.some(profile => profile.name.trim() === turmaFormData.tech_lead?.name?.trim()) ? turmaFormData.tech_lead?.name : (turmaFormData.tech_lead?.name ? 'custom' : '')}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            if (value && value !== 'custom') {
+                              const selected = profiles.find(profile => profile.name === value);
+                              handleUpdateTechLeadInTurma({ name: selected?.name || value, role: selected?.role || 'Responsável Técnico / Engenheiro de Segurança', registration: selected?.registration || '' });
+                            }
+                          }}
+                        >
+                          <option value="">Selecionar profissional</option>
+                          {profiles.map(profile => <option key={profile.id || profile.name} value={profile.name}>{profile.name}{profile.role ? ` — ${profile.role}` : ''}</option>)}
+                          <option value="custom">Outro profissional</option>
+                        </select>
+                        <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome do responsável técnico" placeholder="Nome completo" value={turmaFormData.tech_lead?.name || ''} onChange={event => handleUpdateTechLeadInTurma({ name: event.target.value })} />
+                        <input type="text" className="tc-input" aria-label="Cargo do responsável técnico" placeholder="Cargo ou qualificação" value={turmaFormData.tech_lead?.role || ''} onChange={event => handleUpdateTechLeadInTurma({ role: event.target.value })} />
+                        <input type="text" className="tc-input" aria-label="Registro do responsável técnico" placeholder="Registro CREA, CFT ou MTE" value={turmaFormData.tech_lead?.registration || ''} onChange={event => handleUpdateTechLeadInTurma({ registration: event.target.value })} />
+                      </div>
+                    )}
 
                     <div className="tc-subsection-head tc-subsection-head--divided">
                       <h4>Coordenação técnica</h4>
+                      {turmaFormData.coordinator ? (
+                        <button type="button" className="tc-link tc-link--danger" onClick={handleRemoveCoordinatorFromTurma}>
+                          <Trash2 size={13} /> Excluir
+                        </button>
+                      ) : (
+                        <button type="button" className="tc-link" onClick={handleAddCoordinatorToTurma}>
+                          <Plus size={13} /> Adicionar
+                        </button>
+                      )}
                     </div>
-                    <div className="tc-modal-grid">
-                      <select
-                        className="tc-input tc-modal-span-2"
-                        aria-label="Selecionar coordenação técnica"
-                        value={profiles.some(profile => profile.name.trim() === turmaFormData.coordinator?.name?.trim()) ? turmaFormData.coordinator?.name : (turmaFormData.coordinator?.name ? 'custom' : '')}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          if (value && value !== 'custom') {
-                            const selected = profiles.find(profile => profile.name === value);
-                            handleUpdateCoordinatorInTurma({
-                              name: selected?.name || value,
-                              role: selected?.role || 'Coordenação Técnica',
-                              registration: selected?.registration || ''
-                            });
-                          }
-                        }}
-                      >
-                        <option value="">Selecionar profissional</option>
-                        {profiles.map(profile => <option key={profile.id || profile.name} value={profile.name}>{profile.name}{profile.role ? ` — ${profile.role}` : ''}</option>)}
-                        <option value="custom">Outro profissional</option>
-                      </select>
-                      <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome da coordenação técnica" placeholder="Nome completo" value={turmaFormData.coordinator?.name || ''} onChange={event => handleUpdateCoordinatorInTurma({ name: event.target.value })} />
-                      <input type="text" className="tc-input" aria-label="Cargo da coordenação técnica" placeholder="Cargo ou qualificação" value={turmaFormData.coordinator?.role || ''} onChange={event => handleUpdateCoordinatorInTurma({ role: event.target.value })} />
-                      <input type="text" className="tc-input" aria-label="Registro da coordenação técnica" placeholder="Registro CREA, Coren, CFT ou MTE" value={turmaFormData.coordinator?.registration || ''} onChange={event => handleUpdateCoordinatorInTurma({ registration: event.target.value })} />
-                    </div>
+                    {!turmaFormData.coordinator ? (
+                      <p className="tc-compact-empty">Nenhuma coordenação técnica definida.</p>
+                    ) : (
+                      <div className="tc-modal-grid">
+                        <select
+                          className="tc-input tc-modal-span-2"
+                          aria-label="Selecionar coordenação técnica"
+                          value={profiles.some(profile => profile.name.trim() === turmaFormData.coordinator?.name?.trim()) ? turmaFormData.coordinator?.name : (turmaFormData.coordinator?.name ? 'custom' : '')}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            if (value && value !== 'custom') {
+                              const selected = profiles.find(profile => profile.name === value);
+                              handleUpdateCoordinatorInTurma({
+                                name: selected?.name || value,
+                                role: selected?.role || 'Coordenação Técnica',
+                                registration: selected?.registration || ''
+                              });
+                            }
+                          }}
+                        >
+                          <option value="">Selecionar profissional</option>
+                          {profiles.map(profile => <option key={profile.id || profile.name} value={profile.name}>{profile.name}{profile.role ? ` — ${profile.role}` : ''}</option>)}
+                          <option value="custom">Outro profissional</option>
+                        </select>
+                        <input type="text" className="tc-input tc-modal-span-2" aria-label="Nome da coordenação técnica" placeholder="Nome completo" value={turmaFormData.coordinator?.name || ''} onChange={event => handleUpdateCoordinatorInTurma({ name: event.target.value })} />
+                        <input type="text" className="tc-input" aria-label="Cargo da coordenação técnica" placeholder="Cargo ou qualificação" value={turmaFormData.coordinator?.role || ''} onChange={event => handleUpdateCoordinatorInTurma({ role: event.target.value })} />
+                        <input type="text" className="tc-input" aria-label="Registro da coordenação técnica" placeholder="Registro CREA, Coren, CFT ou MTE" value={turmaFormData.coordinator?.registration || ''} onChange={event => handleUpdateCoordinatorInTurma({ registration: event.target.value })} />
+                      </div>
+                    )}
                   </div>
                 </details>
 
@@ -4009,36 +4416,48 @@ const TrainingCertificatesPage = () => {
       {showQrModal && qrModalTurma && (() => {
         const modalCertModel = qrModalTurma.cert_model || certModel;
         const modalInstructors = (Array.isArray(qrModalTurma.instructors) && qrModalTurma.instructors.length > 0)
-          ? qrModalTurma.instructors
-          : [
+          ? qrModalTurma.instructors.filter(i => i && i.name && i.name.trim())
+          : (qrModalTurma.instructor_name && qrModalTurma.instructor_name.trim() ? [
               {
                 id: 'inst-1',
-                name: qrModalTurma.instructor_name || 'Eider Gomes do Nascimento',
-                role: qrModalTurma.instructor_role || 'Instrutor e Responsável Técnico',
-                registration: qrModalTurma.instructor_registration || 'MTE0009995/RN'
+                name: qrModalTurma.instructor_name,
+                role: qrModalTurma.instructor_role || 'Instrutor',
+                registration: qrModalTurma.instructor_registration || ''
               }
-            ];
+            ] : []);
+
+        const modalTechLead = (qrModalTurma.tech_lead && (qrModalTurma.tech_lead.name?.trim() || qrModalTurma.tech_lead.role?.trim()))
+          ? qrModalTurma.tech_lead
+          : (qrModalTurma.tech_lead_name?.trim() ? {
+              name: qrModalTurma.tech_lead_name,
+              role: qrModalTurma.tech_lead_role || 'Responsável Técnico',
+              registration: qrModalTurma.tech_lead_registration || ''
+            } : null);
+
+        const modalCoordinator = (qrModalTurma.coordinator && (qrModalTurma.coordinator.name?.trim() || qrModalTurma.coordinator.role?.trim()))
+          ? qrModalTurma.coordinator
+          : null;
 
         const signersList = [
           ...modalInstructors.map((inst, idx) => ({
             key: idx === 0 ? 'instructor' : `instructor_${idx}`,
             label: modalInstructors.length > 1 ? `Instrutor #${idx + 1}` : 'Instrutor(a)',
-            name: inst.name || 'Instrutor',
+            name: inst.name,
             role: inst.role || 'Instrutor(a)',
             instructorId: inst.id
           })),
-          {
+          ...(modalTechLead && modalTechLead.name?.trim() ? [{
             key: 'tech_lead',
             label: 'Responsável Técnico',
-            name: (qrModalTurma.tech_lead || DEFAULT_TECH_LEAD).name,
-            role: (qrModalTurma.tech_lead || DEFAULT_TECH_LEAD).role || 'Responsável Técnico',
+            name: modalTechLead.name,
+            role: modalTechLead.role || 'Responsável Técnico',
             instructorId: null
-          },
-          ...(modalCertModel === 'modelo2' ? [{
+          }] : []),
+          ...(modalCoordinator && modalCoordinator.name?.trim() ? [{
             key: 'coordinator',
             label: 'Coordenação Técnica',
-            name: getTurmaCoordinator(qrModalTurma).name,
-            role: getTurmaCoordinator(qrModalTurma).role || 'Coordenação Técnica',
+            name: modalCoordinator.name,
+            role: modalCoordinator.role || 'Coordenação Técnica',
             instructorId: null
           }] : [])
         ];
