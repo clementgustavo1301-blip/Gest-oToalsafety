@@ -107,7 +107,7 @@ const ProfileSetup = () => {
   return (
     <div className="profile-setup">
       <header className="profile-topbar">
-        <img className="profile-topbar__logo" src="/logo-totalsafety.png" alt="TotalSafety" />
+        <img className="profile-topbar__logo" src="/logo-ecosafety.png" alt="EcoClinic" />
         <div className="profile-topbar__actions">
           <button className="icon-button" onClick={toggleTheme} title={isDark ? 'Usar tema claro' : 'Usar tema escuro'}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}

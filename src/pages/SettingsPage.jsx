@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, Bell, Shield, Key, Sparkles, LogOut, Save } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
+import { User, Bell, Shield, Key, Sparkles, LogOut, Save, Sun, Moon, Palette } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const SettingsPage = () => {
   const { user, userProfile, refreshProfile, signOut } = useAuth();
+  const { theme, isDark, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('profile');
   
   // Real state for form
@@ -169,6 +171,87 @@ const SettingsPage = () => {
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
                   Preferências do Sistema
                 </h3>
+
+                <div>
+                  <label className="modal-label" style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Palette size={16} color="var(--primary)" /> Aparência & Tema do Sistema
+                  </label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                    Mantenha o tema padrão claro ou alterne para o modo escuro conforme sua preferência.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setTheme('light')}
+                      style={{
+                        padding: '0.875rem 1rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: !isDark ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        backgroundColor: !isDark ? 'var(--primary-light)' : 'var(--surface)',
+                        color: 'var(--text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontWeight: !isDark ? '700' : '500',
+                        boxShadow: !isDark ? 'var(--shadow-sm)' : 'none',
+                        transition: 'var(--transition)'
+                      }}
+                    >
+                      <div style={{
+                        width: '34px', height: '34px', borderRadius: '50%',
+                        backgroundColor: '#fef3c7', color: '#d97706',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Sun size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem' }}>Modo Claro (Padrão)</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          Visual padrão oficial EcoClinic
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTheme('dark')}
+                      style={{
+                        padding: '0.875rem 1rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: isDark ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        backgroundColor: isDark ? 'var(--primary-light)' : 'var(--surface)',
+                        color: 'var(--text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontWeight: isDark ? '700' : '500',
+                        boxShadow: isDark ? 'var(--shadow-sm)' : 'none',
+                        transition: 'var(--transition)'
+                      }}
+                    >
+                      <div style={{
+                        width: '34px', height: '34px', borderRadius: '50%',
+                        backgroundColor: '#1e293b', color: '#38bdf8',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Moon size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.875rem' }}>Modo Escuro</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          Conforto para baixa luminosidade
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="modal-label">Fuso Horário Padrão</label>
                   <select className="modal-input">

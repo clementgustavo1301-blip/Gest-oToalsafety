@@ -154,14 +154,14 @@ const Sidebar = ({ isOpen, onClose }) => {
     <aside className={`sidebar ${isCollapsed ? 'sidebar--collapsed' : ''} ${isOpen ? 'sidebar-open' : ''}`}>
       <div className="sidebar__brand">
         <div className="sidebar__brand-wrapper">
-          <img className="sidebar__logo" src="/logo-totalsafety.png" alt="TotalSafety" />
+          <img className="sidebar__logo" src="/logo-ecosafety.png" alt="EcoClinic" />
           {activeLink && (
             <span className="sidebar__brand-meta" title={`${activeLink.sector} · ${activeLink.role}`}>
               {activeLink.sector} • {activeLink.role}
             </span>
           )}
         </div>
-        <span className="sidebar__logo-mark" aria-hidden="true">TS</span>
+        <span className="sidebar__logo-mark" aria-hidden="true">EC</span>
         <button className="sidebar__collapse hide-on-mobile" onClick={() => setIsCollapsed(value => !value)} title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}>
           {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
@@ -218,9 +218,9 @@ const Sidebar = ({ isOpen, onClose }) => {
       </nav>
 
       <div className="sidebar__footer">
-        <button className="sidebar__utility" onClick={toggleTheme} title={isDark ? 'Usar tema claro' : 'Usar tema escuro'}>
+        <button className="sidebar__utility" onClick={toggleTheme} title={isDark ? 'Usar tema padrão (Claro)' : 'Usar modo escuro'}>
           {isDark ? <Sun size={14} /> : <Moon size={14} />}
-          <span>{isDark ? 'Modo claro' : 'Modo escuro'}</span>
+          <span>{isDark ? 'Modo claro (Padrão)' : 'Modo escuro'}</span>
         </button>
         <button className="sidebar__utility" onClick={() => setActiveLink(null)} title="Alterar vínculo">
           <Users size={14} />

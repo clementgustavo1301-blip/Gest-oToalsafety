@@ -2182,7 +2182,7 @@ const TrainingCertificatesPage = () => {
                   ) : (
                     <div className="tc-instructor-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       {formInstructors.map((inst, index) => (
-                        <div className="tc-instructor-row" key={inst.id || index} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
+                        <div className="tc-instructor-row" key={inst.id || index} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
                           <div className="tc-instructor-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                             <span style={{ fontWeight: '600', fontSize: '0.8rem' }}>
                               {formInstructors.length > 1 ? `Instrutor #${index + 1}` : 'Instrutor'}
@@ -2273,7 +2273,7 @@ const TrainingCertificatesPage = () => {
                       Nenhum responsável técnico adicionado.
                     </p>
                   ) : (
-                    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
                       <select
                         className="tc-input"
                         style={{ marginBottom: '0.4rem', fontSize: '0.82rem' }}
@@ -2348,7 +2348,7 @@ const TrainingCertificatesPage = () => {
                       Nenhuma coordenação técnica adicionada.
                     </p>
                   ) : (
-                    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.65rem' }}>
                       <select
                         className="tc-input"
                         style={{ marginBottom: '0.4rem', fontSize: '0.82rem' }}

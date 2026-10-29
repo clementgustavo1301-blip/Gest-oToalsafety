@@ -1,16 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ThemeContext } from './themeStore';
-const STORAGE_KEY = 'totalsafety_theme';
+
+const PRIMARY_STORAGE_KEY = 'ecoclinic_theme';
+const LEGACY_STORAGE_KEY = 'totalsafety_theme';
 
 const getInitialTheme = () => {
   try {
-    const savedTheme = localStorage.getItem(STORAGE_KEY);
+    const savedTheme = localStorage.getItem(PRIMARY_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
   } catch {
-    // Browsers with restricted storage still receive the system preference.
+    // Fallback silencioso caso o localStorage esteja bloqueado
   }
 
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // Padrão do sistema: Claro ('light'), mantendo a opção de modo escuro sempre disponível
+  return 'light';
 };
 
 export const ThemeProvider = ({ children }) => {
@@ -26,7 +29,8 @@ export const ThemeProvider = ({ children }) => {
     if (themeColor) themeColor.setAttribute('content', theme === 'dark' ? '#000000' : '#f6f8fb');
 
     try {
-      localStorage.setItem(STORAGE_KEY, theme);
+      localStorage.setItem(PRIMARY_STORAGE_KEY, theme);
+      localStorage.setItem(LEGACY_STORAGE_KEY, theme);
     } catch {
       // Theme remains active for the current session.
     }
@@ -41,3 +45,5 @@ export const ThemeProvider = ({ children }) => {
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
+
+export { useTheme } from '../hooks/useTheme';

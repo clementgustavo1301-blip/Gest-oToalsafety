@@ -13,7 +13,7 @@ const MobileTopBar = ({ onOpenSidebar }) => {
         <Menu size={22} />
       </button>
 
-      <img className="mobile-topbar__logo" src="/logo-totalsafety.png" alt="TotalSafety" />
+      <img className="mobile-topbar__logo" src="/logo-ecosafety.png" alt="EcoClinic" />
 
       <div className="mobile-topbar__actions">
         <button className="mobile-topbar__action" onClick={toggleTheme} aria-label={isDark ? 'Usar tema claro' : 'Usar tema escuro'}>

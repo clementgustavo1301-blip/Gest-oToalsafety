@@ -1435,8 +1435,13 @@ table tbody tr:last-child td {
 /* Compatibilidade do tema escuro com telas antigas que ainda usam cores inline. */
 :root[data-theme='dark'] [style*='background-color: rgb(255, 255, 255)'],
 :root[data-theme='dark'] [style*='background-color: #ffffff'],
-:root[data-theme='dark'] [style*='background-color: white'] {
+:root[data-theme='dark'] [style*='background-color: white'],
+:root[data-theme='dark'] [style*='background: rgb(255, 255, 255)'],
+:root[data-theme='dark'] [style*='background: #ffffff'],
+:root[data-theme='dark'] [style*='background: #fff'],
+:root[data-theme='dark'] [style*='background: white'] {
   background-color: var(--surface) !important;
+  background: var(--surface) !important;
 }
 
 :root[data-theme='dark'] [style*='background-color: rgb(248, 250, 252)'],
