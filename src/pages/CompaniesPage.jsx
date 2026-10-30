@@ -104,10 +104,17 @@ const CompaniesPage = () => {
             className="btn btn-secondary"
             onClick={() => setShowExportModal(true)}
             id="btn-export-companies"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              whiteSpace: 'nowrap',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
             title="Exportar lista de empresas com opção TotalSafety em Excel/CSV ou PDF"
           >
-            <Download size={18} /> Exportar Empresas
+            <Download size={16} /> Exportar Empresas
           </button>
           <button className="btn btn-primary" onClick={() => setShowGroupModal(true)} id="btn-add-group">
             <Plus size={18} /> Novo Grupo
