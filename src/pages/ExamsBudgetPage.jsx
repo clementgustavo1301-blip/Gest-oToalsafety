@@ -282,6 +282,11 @@ const ExamsBudgetPage = () => {
     }
   };
 
+  // Set all proposal quantities to 1
+  const handleSetAllQuantitiesToOne = () => {
+    setProposalExams(prev => prev.map(item => ({ ...item, qty: 1 })));
+  };
+
   // Proposal quantity changes
   const handleProposalQtyChange = (id, delta) => {
     setProposalExams(prev => prev.map(item => {
