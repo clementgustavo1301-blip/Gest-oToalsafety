@@ -163,6 +163,8 @@ const CalendarView = () => {
     const matchRegion = filterRegion === 'all' || (isExt ? true : getCompanyRegion(t.companyId) === filterRegion);
     const matchScope = calendarScope === 'geral' 
       ? true 
+      : calendarScope === 'totalsafety'
+      ? !isExt
       : calendarScope === 'minha_agenda'
       ? t.responsibleId === userProfile?.id || getSecondaryResponsible(t.description) === userProfile?.id
       : calendarScope === 'empresa'
@@ -875,6 +877,7 @@ const CalendarView = () => {
                 }}
               >
                 <option value="geral">Agenda Geral</option>
+                <option value="totalsafety">🏢 Apenas TotalSafety</option>
                 <option value="minha_agenda">Minha Agenda</option>
                 <option value="externas">⚡ Demandas Fora TS</option>
                 <option value="empresa">Por Empresa</option>

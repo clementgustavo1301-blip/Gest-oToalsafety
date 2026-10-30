@@ -85,6 +85,8 @@ const ScheduleModal = ({
         matchScope = t.responsibleId === responsibleId || secResp === responsibleId;
       } else if (scope === 'externas') {
         matchScope = isExt;
+      } else if (scope === 'totalsafety') {
+        matchScope = !isExt;
       }
 
       return matchStatus && matchRegion && matchScope;
@@ -99,6 +101,7 @@ const ScheduleModal = ({
   const naoFeitosCount = filteredTrainings.filter((t) => t.status === 'nao_feito').length;
 
   const getScopeLabel = () => {
+    if (scope === 'totalsafety') return 'Apenas TotalSafety';
     if (scope === 'minha_agenda') return `Minha Agenda (${userProfile?.name || 'Usuário'})`;
     if (scope === 'externas') return 'Demandas Fora do TotalSafety (Externas)';
     if (scope === 'empresa') {
@@ -325,6 +328,7 @@ const ScheduleModal = ({
                   style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
                 >
                   <option value="geral">Agenda Geral (Todas)</option>
+                  <option value="totalsafety">🏢 Apenas TotalSafety</option>
                   <option value="minha_agenda">Minha Agenda</option>
                   <option value="externas">⚡ Demandas Fora do TotalSafety</option>
                   <option value="empresa">Por Empresa Específica</option>

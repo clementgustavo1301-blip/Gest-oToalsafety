@@ -57,7 +57,18 @@ export async function searchCpfA(cpf, customToken = null) {
     };
   }
 
-  const token = customToken || import.meta.env?.VITE_CPFCNPJ_API_TOKEN || localStorage.getItem('cpfcnpj_api_token') || DEFAULT_TOKEN;
+  // Pré-validação com algoritmo oficial do CPF para não enviar dados inválidos à API (evita erro HTTP 400)
+  if (!validateCpf(digits)) {
+    return {
+      success: false,
+      error: 'CPF inválido. Verifique os dígitos digitados.'
+    };
+  }
+
+  const token = customToken || 
+    import.meta.env?.VITE_CPFCNPJ_API_TOKEN || 
+    (typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('cpfcnpj_api_token') : null) || 
+    DEFAULT_TOKEN;
   const url = `${BASE_URL}/${token}/1/${digits}`;
 
   try {
@@ -68,22 +79,36 @@ export async function searchCpfA(cpf, customToken = null) {
       }
     });
 
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (_) {
+      // Falha ao ler JSON
+    }
+
     if (!response.ok) {
       if (response.status === 429) {
         return {
           success: false,
-          error: 'Limite de requisições por segundo excedido. Tente novamente em instantes.'
+          error: 'Limite de requisições excedido. Tente novamente em alguns instantes.'
+        };
+      }
+      if (response.status === 400) {
+        const msg = data?.erro || data?.message;
+        return {
+          success: false,
+          error: msg ? `Não foi possível localizar o CPF: ${msg}` : 'CPF não encontrado ou inválido na Receita Federal.',
+          raw: data
         };
       }
       return {
         success: false,
-        error: `Erro de comunicação com a API (HTTP ${response.status}).`
+        error: data?.erro || data?.message || 'Serviço de consulta de CPF temporariamente indisponível.',
+        raw: data
       };
     }
 
-    const data = await response.json();
-
-    if (data.status === 1) {
+    if (data && data.status === 1) {
       return {
         success: true,
         nome: data.nome,
@@ -93,8 +118,8 @@ export async function searchCpfA(cpf, customToken = null) {
     } else {
       return {
         success: false,
-        error: data.erro || 'CPF não encontrado ou inválido na Receita Federal.',
-        erroCodigo: data.erroCodigo,
+        error: data?.erro || 'CPF não encontrado ou inválido na Receita Federal.',
+        erroCodigo: data?.erroCodigo,
         raw: data
       };
     }
@@ -102,7 +127,7 @@ export async function searchCpfA(cpf, customToken = null) {
     console.error('Erro na consulta do CPF A:', error);
     return {
       success: false,
-      error: 'Não foi possível conectar ao servidor de consulta de CPF. Verifique sua conexão.'
+      error: 'Não foi possível conectar ao servidor de consulta de CPF. Você pode preencher o nome manualmente.'
     };
   }
 }

@@ -6,7 +6,7 @@ import {
   Building, User, ChevronDown, Lock, BookOpen, FileX,
   Sun, Moon
 } from 'lucide-react';
-import { formatCpf, cleanCpf, searchCpfA } from '../services/cpfService';
+import { formatCpf, cleanCpf, validateCpf, searchCpfA } from '../services/cpfService';
 import { getTrainingClasses, getTrainingClassById, registerStudent } from '../services/trainingClassesService';
 import { useTheme } from '../context/ThemeContext';
 import './PublicTrainingEnrollmentPage.css';
@@ -18,6 +18,26 @@ const isTurmaAberta = (t) => {
   if (!t) return false;
   const st = String(t.status || 'Aberta').trim().toLowerCase();
   return st === 'aberta';
+};
+
+/**
+ * Validação rigorosa de data de nascimento (formato YYYY-MM-DD, ano realista e não futura)
+ */
+const isValidBirthDate = (val) => {
+  if (!val || typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  if (year < 1920 || year > currentYear) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  const parsed = new Date(`${trimmed}T00:00:00`);
+  return !isNaN(parsed.getTime()) && parsed <= now;
 };
 
 export default function PublicTrainingEnrollmentPage() {
@@ -162,12 +182,22 @@ export default function PublicTrainingEnrollmentPage() {
 
     const digits = cleanCpf(cpf);
     if (digits.length !== 11) {
-      setErrorMsg('Informe um CPF válido com 11 dígitos.');
+      setErrorMsg('Informe um CPF completo com 11 dígitos.');
       return;
     }
 
-    if (!birthDate) {
+    if (!validateCpf(digits)) {
+      setErrorMsg('CPF inválido. Por favor, verifique os números digitados.');
+      return;
+    }
+
+    if (!birthDate || !String(birthDate).trim()) {
       setErrorMsg('Informe sua data de nascimento.');
+      return;
+    }
+
+    if (!isValidBirthDate(birthDate)) {
+      setErrorMsg('Data de nascimento inválida. Verifique o ano, mês e dia informados.');
       return;
     }
 
@@ -248,7 +278,20 @@ export default function PublicTrainingEnrollmentPage() {
     setTimeout(() => setCopiedProtocol(false), 2500);
   };
 
-  const canSearch = Boolean(activeTurma) && isTurmaAberta(activeTurma) && cleanCpf(cpf).length === 11 && Boolean(birthDate) && !searching;
+  const digits = cleanCpf(cpf);
+  const isCpfFilled = digits.length === 11;
+  const isCpfValid = isCpfFilled && validateCpf(digits);
+  const isBirthDateFilled = Boolean(birthDate && String(birthDate).trim().length > 0);
+  const isBirthDateValid = isBirthDateFilled && isValidBirthDate(birthDate);
+
+  // O botão Continuar só fica liberado após colocar o CPF e a Data de Nascimento válidos
+  const canSearch = Boolean(activeTurma) &&
+    isTurmaAberta(activeTurma) &&
+    isCpfFilled &&
+    isCpfValid &&
+    isBirthDateFilled &&
+    isBirthDateValid &&
+    !searching;
 
   return (
     <div className="pte-wrapper">
@@ -679,6 +722,12 @@ export default function PublicTrainingEnrollmentPage() {
                     disabled={!activeTurma}
                     className="pte-input pte-input-mono"
                   />
+                  {isCpfFilled && !isCpfValid && (
+                    <span style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      CPF com dígitos verificadores inválidos.
+                    </span>
+                  )}
                 </div>
 
                 {/* CAMPO 2: DATA DE NASCIMENTO */}
@@ -695,6 +744,12 @@ export default function PublicTrainingEnrollmentPage() {
                     disabled={!activeTurma}
                     className="pte-input"
                   />
+                  {birthDate && !isBirthDateValid && (
+                    <span style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      Data de nascimento inválida. Verifique o ano, mês e dia.
+                    </span>
+                  )}
                 </div>
 
                 {/* CAMPO 3: MATRÍCULA (OPCIONAL) */}
@@ -767,23 +822,36 @@ export default function PublicTrainingEnrollmentPage() {
 
                 {/* BOTÕES DE AÇÃO */}
                 {!searched ? (
-                  <button
-                    type="submit"
-                    disabled={!canSearch}
-                    className={`pte-btn ${canSearch ? 'pte-btn-primary' : 'pte-btn-disabled'}`}
-                  >
-                    {searching ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" />
-                        Consultando CPF...
-                      </>
-                    ) : (
-                      <>
-                        <Search size={18} />
-                        Continuar
-                      </>
+                  <>
+                    <button
+                      type="submit"
+                      disabled={!canSearch}
+                      className={`pte-btn ${canSearch ? 'pte-btn-primary' : 'pte-btn-disabled'}`}
+                      title={!canSearch ? 'Preencha o CPF e a data de nascimento para liberar o botão Continuar' : 'Continuar com a inscrição'}
+                    >
+                      {searching ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Consultando CPF...
+                        </>
+                      ) : (
+                        <>
+                          <Search size={18} />
+                          Continuar
+                        </>
+                      )}
+                    </button>
+                    {!canSearch && !searching && (
+                      <p style={{
+                        margin: '0.45rem 0 0',
+                        fontSize: '0.8rem',
+                        color: isDark ? '#94a3b8' : '#64748b',
+                        textAlign: 'center'
+                      }}>
+                        Preencha o CPF e a data de nascimento para liberar o botão Continuar.
+                      </p>
                     )}
-                  </button>
+                  </>
                 ) : (
                   <button
                     type="button"
