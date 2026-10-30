@@ -134,6 +134,11 @@ const CATEGORIES = [
   'Laboratorial', 'Urina/Fezes', 'Microbiologia', 'Sorologia', 'Imunologia'
 ];
 
+// Helper to format currency (module-level to avoid TDZ / initialization order issues)
+const formatBRL = (val) => {
+  return Number(val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
 const ExamsBudgetPage = () => {
   const { activeLink } = useAuth();
   
@@ -526,11 +531,6 @@ const ExamsBudgetPage = () => {
   }
 
   const grandTotal = Math.max(0, subtotal - calculatedDiscount);
-
-  // Helper to format currency
-  const formatBRL = (val) => {
-    return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
 
   // Generate Budget Text
   const generateBudgetText = () => {
