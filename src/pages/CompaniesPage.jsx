@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import {
   Building2, Plus, ChevronDown, ChevronRight, Search,
   Trash2, Users, FileText, MapPin, Edit2, UserCheck, LifeBuoy,
-  ShieldCheck, Clock, CheckCircle2
+  ShieldCheck, Clock, CheckCircle2, Download
 } from 'lucide-react';
 import { getGroups, getCompanies, addGroup, updateGroup, addCompany, deleteGroup, deleteCompany } from '../services/storageService';
 import AddGroupModal from '../components/AddGroupModal';
 import AddCompanyModal from '../components/AddCompanyModal';
+import ExportCompaniesModal from '../components/ExportCompaniesModal';
 
 const CompaniesPage = () => {
   const [groups, setGroups] = useState([]);
@@ -18,6 +19,7 @@ const CompaniesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [editingGroup, setEditingGroup] = useState(null);
@@ -97,9 +99,20 @@ const CompaniesPage = () => {
           <h1 className="text-h1">Empresas por Grupo</h1>
           <p className="text-subtitle">Gerencie os grupos econômicos e suas empresas com CNPJ.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowGroupModal(true)} id="btn-add-group">
-          <Plus size={18} /> Novo Grupo
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowExportModal(true)}
+            id="btn-export-companies"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            title="Exportar lista de empresas com opção TotalSafety em Excel/CSV ou PDF"
+          >
+            <Download size={18} /> Exportar Empresas
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowGroupModal(true)} id="btn-add-group">
+            <Plus size={18} /> Novo Grupo
+          </button>
+        </div>
       </header>
 
       {/* Search */}
@@ -384,6 +397,15 @@ const CompaniesPage = () => {
             setSelectedGroup(null);
           }} 
           onSave={handleAddCompany} 
+        />
+      )}
+      {showExportModal && (
+        <ExportCompaniesModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          groups={groups}
+          allCompanies={allCompanies}
+          currentSearchTerm={searchTerm}
         />
       )}
     </div>
