@@ -40,7 +40,7 @@ const FALLBACK_PROFILES = OFFICIAL_INSTRUCTORS;
 
 const DEFAULT_TECH_LEAD = {
   name: '',
-  role: 'Responsável Técnico / Engenheiro de Segurança',
+  role: 'Responsável Técnico',
   registration: ''
 };
 const DEFAULT_COORDINATOR = {
@@ -50,8 +50,45 @@ const DEFAULT_COORDINATOR = {
 };
 const DEFAULT_APH_COORDINATOR = {
   name: '',
-  role: 'Coordenação Técnica / Instrutora de Saúde e APH',
+  role: 'Coordenação Técnica',
   registration: ''
+};
+
+const MONTHS_PT_BR = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+];
+
+export const formatDateLongPtBr = (dateStr) => {
+  if (!dateStr) return 'Data';
+  const trimmed = String(dateStr).trim();
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const year = isoMatch[1];
+    const monthIndex = parseInt(isoMatch[2], 10) - 1;
+    const day = parseInt(isoMatch[3], 10);
+    if (monthIndex >= 0 && monthIndex < 12) {
+      return `${day} de ${MONTHS_PT_BR[monthIndex]} de ${year}`;
+    }
+  }
+  const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    const day = parseInt(brMatch[1], 10);
+    const monthIndex = parseInt(brMatch[2], 10) - 1;
+    const year = brMatch[3];
+    if (monthIndex >= 0 && monthIndex < 12) {
+      return `${day} de ${MONTHS_PT_BR[monthIndex]} de ${year}`;
+    }
+  }
+  return trimmed;
+};
+
+export const formatSignerRegistration = (registration, includePrefix = true) => {
+  if (!registration) return '';
+  const trimmed = String(registration).trim();
+  if (!trimmed) return '';
+  if (/^(?:registro|cpf)\b/i.test(trimmed)) return trimmed;
+  return includePrefix ? `Registro: ${trimmed}` : trimmed;
 };
 
 const getDefaultCoordinator = () => null;
@@ -248,7 +285,9 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
 
   if (visualWeight > 380) {
     return {
-      headerMaxHeight: '44px',
+      headerMaxHeight: '46px',
+      bodySize: '0.54rem',
+      bodyLineHeight: '1.42',
       subTitleSize: '0.60rem',
       subTitleMargin: '0.10rem',
       studentNameSize: nameLen > 30 ? '0.92rem' : '1.04rem',
@@ -260,18 +299,20 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
       descSize: '0.47rem',
       descLineHeight: '1.20',
       descMargin: '0.10rem auto',
-      dateSize: '0.53rem',
-      dateMarginTop: '0.18rem',
-      sigHeight: '18px',
+      dateSize: '0.54rem',
+      dateMarginTop: '0.45rem',
+      sigHeight: '22px',
       sigTitleSize: '0.46rem',
-      sigNameSize: '0.44rem',
-      sigRegSize: '0.41rem',
-      sigGap: '0.3rem'
+      sigNameSize: '0.46rem',
+      sigRegSize: '0.44rem',
+      sigGap: '0.35rem'
     };
   }
   if (visualWeight > 230) {
     return {
-      headerMaxHeight: '48px',
+      headerMaxHeight: '52px',
+      bodySize: '0.59rem',
+      bodyLineHeight: '1.48',
       subTitleSize: '0.65rem',
       subTitleMargin: '0.16rem',
       studentNameSize: nameLen > 30 ? '1.02rem' : '1.14rem',
@@ -283,17 +324,19 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
       descSize: '0.53rem',
       descLineHeight: '1.26',
       descMargin: '0.15rem auto',
-      dateSize: '0.57rem',
-      dateMarginTop: '0.25rem',
-      sigHeight: '20px',
-      sigTitleSize: '0.50rem',
-      sigNameSize: '0.47rem',
-      sigRegSize: '0.44rem',
-      sigGap: '0.35rem'
+      dateSize: '0.59rem',
+      dateMarginTop: '0.55rem',
+      sigHeight: '24px',
+      sigTitleSize: '0.48rem',
+      sigNameSize: '0.48rem',
+      sigRegSize: '0.46rem',
+      sigGap: '0.4rem'
     };
   }
   return {
-    headerMaxHeight: '54px',
+    headerMaxHeight: '56px',
+    bodySize: '0.63rem',
+    bodyLineHeight: '1.55',
     subTitleSize: '0.70rem',
     subTitleMargin: '0.24rem',
     studentNameSize: nameLen > 30 ? '1.10rem' : '1.22rem',
@@ -305,11 +348,11 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
     descSize: '0.58rem',
     descLineHeight: '1.34',
     descMargin: '0.20rem auto',
-    dateSize: '0.62rem',
-    dateMarginTop: '0.32rem',
-    sigHeight: '24px',
-    sigTitleSize: '0.54rem',
-    sigNameSize: '0.51rem',
+    dateSize: '0.63rem',
+    dateMarginTop: '0.65rem',
+    sigHeight: '26px',
+    sigTitleSize: '0.50rem',
+    sigNameSize: '0.50rem',
     sigRegSize: '0.48rem',
     sigGap: '0.45rem'
   };
@@ -435,6 +478,7 @@ const TrainingCertificatesPage = () => {
     course_name: '',
     duration: '8 horas',
     validade: '24 meses',
+    periodo: '',
     start_date: new Date().toISOString().split('T')[0],
     location: 'Mossoró - RN',
     company: 'EcoClinic',
@@ -473,6 +517,7 @@ const TrainingCertificatesPage = () => {
   const [formData, setFormData] = useState({
     curso: defaultOfficialModel ? (defaultOfficialModel.title || defaultOfficialModel.name) : 'NR-35 – TRABALHO EM ALTURA – NÍVEL BÁSICO',
     descricao: defaultOfficialModel ? defaultOfficialModel.description : 'Projeto de treinamento com carga horária de 8 horas, desenvolvido em conformidade com a Norma Regulamentadora nº 35 (NR-35) e requisitos técnicos aplicáveis.',
+    periodo: '',
     data: new Date().toISOString().split('T')[0],
     duracao: defaultOfficialModel ? defaultOfficialModel.duration : '8 horas',
     validade: defaultOfficialModel ? defaultOfficialModel.validade : '24 meses',
@@ -927,6 +972,7 @@ const TrainingCertificatesPage = () => {
       course_name: defaultModel.title || defaultModel.name || 'NR-35 – TRABALHO EM ALTURA – NÍVEL BÁSICO',
       duration: defaultModel.duration || '8 horas',
       validade: defaultModel.validade || '24 meses',
+      periodo: '',
       start_date: new Date().toISOString().split('T')[0],
       location: 'Mossoró - RN',
       company: 'EcoClinic',
@@ -988,6 +1034,7 @@ const TrainingCertificatesPage = () => {
       course_name: turma.course_name || '',
       duration: turma.duration || '8 horas',
       validade: turma.validade || '24 meses',
+      periodo: turma.periodo || turma.tech_lead?.periodo || '',
       start_date: turma.start_date || new Date().toISOString().split('T')[0],
       location: turma.location || 'Mossoró - RN',
       company: turma.company || '',
@@ -1338,6 +1385,7 @@ const TrainingCertificatesPage = () => {
       curso: turma.course_name || turma.name,
       duracao: turma.duration || prev.duracao,
       validade: turma.validade || prev.validade || '24 meses',
+      periodo: turma.periodo || turma.tech_lead?.periodo || '',
       data: turma.start_date || prev.data,
       local: turma.location || prev.local,
       empresa: turma.company || prev.empresa,
@@ -1360,6 +1408,7 @@ const TrainingCertificatesPage = () => {
     // Carrega a lista de colaboradores se houver inscritos (todos selecionados por padrão)
     if (studentsInTurma.length > 0) {
       setColaboradores(studentsInTurma.map(s => ({
+        id: s.id,
         nome: s.nome,
         cpf: s.cpf,
         matricula: s.matricula || '',
@@ -1388,6 +1437,7 @@ const TrainingCertificatesPage = () => {
       const studentsInTurma = (allStudents || []).filter(e => String(e.turma_id) === String(selectedTurmaIdInGenerator));
       if (studentsInTurma.length > 0) {
         setColaboradores(studentsInTurma.map(s => ({
+          id: s.id,
           nome: s.nome,
           cpf: s.cpf,
           matricula: s.matricula || '',
@@ -1444,6 +1494,13 @@ const TrainingCertificatesPage = () => {
     loadData();
   };
 
+  // Edição inline de nome/CPF/matrícula de um inscrito na aba de Turmas
+  const handleStudentFieldChange = (studentId, field, value) => {
+    setEnrollments(prev => prev.map(e => String(e.id) === String(studentId) ? { ...e, [field]: value } : e));
+    setColaboradores(prev => prev.map(c => String(c.id) === String(studentId) ? { ...c, [field]: value } : c));
+    updateStudent(studentId, { [field]: value });
+  };
+
   const handleDeleteStudent = async (studentId, studentName) => {
     if (!window.confirm(`Deseja remover ${studentName} da lista de presença?`)) return;
     await deleteStudent(studentId);
@@ -1459,11 +1516,16 @@ const TrainingCertificatesPage = () => {
   };
 
   const handleColabChange = (index, field, value) => {
+    const targetId = colaboradores[index]?.id;
     setColaboradores(prev => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: value };
       return copy;
     });
+    if (targetId && ['nome', 'cpf', 'matricula'].includes(field)) {
+      setEnrollments(prev => prev.map(e => String(e.id) === String(targetId) ? { ...e, [field]: value } : e));
+      updateStudent(targetId, { [field]: value });
+    }
   };
 
   const addColaborador = () => {
@@ -1840,18 +1902,18 @@ const TrainingCertificatesPage = () => {
   if (activeTechLead && activeTechLead.name?.trim()) {
     m1SignerColumns.push({
       key: 'tech_lead',
-      roleLabel: (activeTechLead.role || 'RESPONSÁVEL TÉCNICO').toUpperCase(),
-      name: activeTechLead.name,
-      registration: activeTechLead.registration ? `Registro: ${activeTechLead.registration}` : '',
+      roleLabel: 'RESPONSÁVEL TÉCNICO',
+      name: activeTechLead.name.trim(),
+      registration: formatSignerRegistration(activeTechLead.registration, true),
       sigImg: currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)
     });
   }
   if (activeCoordinator && activeCoordinator.name?.trim()) {
     m1SignerColumns.push({
       key: 'coordinator',
-      roleLabel: (activeCoordinator.role || 'COORDENAÇÃO TÉCNICA').toUpperCase(),
-      name: activeCoordinator.name,
-      registration: activeCoordinator.registration ? `Registro: ${activeCoordinator.registration}` : '',
+      roleLabel: 'COORDENAÇÃO TÉCNICA',
+      name: activeCoordinator.name.trim(),
+      registration: formatSignerRegistration(activeCoordinator.registration, true),
       sigImg: currentTurmaSignatures?.coordinator?.dataUrl || getInstructorSignatureUrl(activeCoordinator.name)
     });
   }
@@ -1859,7 +1921,7 @@ const TrainingCertificatesPage = () => {
     key: 'aluno',
     isStudent: true,
     roleLabel: 'ALUNO:',
-    name: firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'PARTICIPANTE',
+    name: firstStudent?.nome ? firstStudent.nome.trim().toUpperCase() : 'PARTICIPANTE',
     registration: ''
   });
   activeInstructors.forEach((inst, idx) => {
@@ -1868,8 +1930,8 @@ const TrainingCertificatesPage = () => {
     m1SignerColumns.push({
       key: sigKey,
       roleLabel: activeInstructors.length > 1 ? `INSTRUTOR #${idx + 1}:` : 'INSTRUTOR:',
-      name: inst.name,
-      registration: inst.registration ? `Registro: ${inst.registration}` : '',
+      name: inst.name ? inst.name.trim().toUpperCase() : '',
+      registration: formatSignerRegistration(inst.registration, true),
       sigImg
     });
   });
@@ -1879,26 +1941,26 @@ const TrainingCertificatesPage = () => {
   if (activeTechLead && activeTechLead.name?.trim()) {
     m2SignerColumns.push({
       key: 'tech_lead',
-      roleLabel: (activeTechLead.role || 'RESPONSÁVEL TÉCNICO').toUpperCase(),
-      name: activeTechLead.name,
-      registration: activeTechLead.registration || '',
+      roleLabel: 'RESPONSÁVEL TÉCNICO',
+      name: activeTechLead.name.trim(),
+      registration: formatSignerRegistration(activeTechLead.registration, true),
       sigImg: currentTurmaSignatures?.tech_lead?.dataUrl || getInstructorSignatureUrl(activeTechLead.name)
     });
   }
   if (activeCoordinator && activeCoordinator.name?.trim()) {
     m2SignerColumns.push({
       key: 'coordinator',
-      roleLabel: (activeCoordinator.role || 'COORDENAÇÃO TÉCNICA').toUpperCase(),
-      name: activeCoordinator.name,
-      registration: activeCoordinator.registration || '',
+      roleLabel: 'COORDENAÇÃO TÉCNICA',
+      name: activeCoordinator.name.trim(),
+      registration: formatSignerRegistration(activeCoordinator.registration, true),
       sigImg: currentTurmaSignatures?.coordinator?.dataUrl || getInstructorSignatureUrl(activeCoordinator.name)
     });
   }
   m2SignerColumns.push({
     key: 'aluno',
     isStudent: true,
-    roleLabel: 'ALUNO',
-    name: firstStudent?.nome || 'Participante',
+    roleLabel: 'ALUNO:',
+    name: firstStudent?.nome ? firstStudent.nome.trim().toUpperCase() : 'PARTICIPANTE',
     registration: ''
   });
   activeInstructors.forEach((inst, idx) => {
@@ -1906,9 +1968,9 @@ const TrainingCertificatesPage = () => {
     const sigImg = currentTurmaSignatures?.[sigKey]?.dataUrl || (idx === 0 ? currentTurmaSignatures?.instructor?.dataUrl : null) || getInstructorSignatureUrl(inst.name);
     m2SignerColumns.push({
       key: sigKey,
-      roleLabel: activeInstructors.length > 1 ? `INSTRUTOR #${idx + 1}` : 'INSTRUTOR',
-      name: inst.name,
-      registration: inst.registration || '',
+      roleLabel: activeInstructors.length > 1 ? `INSTRUTOR #${idx + 1}:` : 'INSTRUTOR:',
+      name: inst.name ? inst.name.trim().toUpperCase() : '',
+      registration: formatSignerRegistration(inst.registration, true),
       sigImg
     });
   });
@@ -2118,8 +2180,8 @@ const TrainingCertificatesPage = () => {
                 )}
               </div>
 
-              {/* Carga horária, data e cidade */}
-              <div className="tc-grid-3">
+              {/* Carga horária, período do treinamento, data de conclusão e cidade */}
+              <div className="tc-grid-2">
                 <div className="tc-field">
                   <label htmlFor="tc-duracao">Carga horária *</label>
                   <input
@@ -2129,7 +2191,20 @@ const TrainingCertificatesPage = () => {
                     className="tc-input"
                     value={formData.duracao}
                     onChange={handleChange}
-                    placeholder="Ex: 8 horas"
+                    placeholder="Ex: 40 horas"
+                  />
+                </div>
+                <div className="tc-field">
+                  <label htmlFor="tc-periodo">Período do treinamento</label>
+                  <input
+                    id="tc-periodo"
+                    type="text"
+                    name="periodo"
+                    className="tc-input"
+                    value={formData.periodo || ''}
+                    onChange={handleChange}
+                    placeholder="Ex: 24 e 25 de agosto de 2026"
+                    title="Dias em que o treinamento foi realizado (exibido no texto do certificado)"
                   />
                 </div>
                 <div className="tc-field">
@@ -2141,6 +2216,7 @@ const TrainingCertificatesPage = () => {
                     className="tc-input"
                     value={formData.data}
                     onChange={handleChange}
+                    title="Data final exibida no rodapé do certificado"
                   />
                 </div>
                 <div className="tc-field">
@@ -2152,7 +2228,7 @@ const TrainingCertificatesPage = () => {
                     className="tc-input"
                     value={formData.local}
                     onChange={handleChange}
-                    placeholder="Ex: Mossoró - RN"
+                    placeholder="Ex: TERESINA/PI"
                   />
                 </div>
               </div>
@@ -2505,6 +2581,7 @@ const TrainingCertificatesPage = () => {
                   <span>#</span>
                   <span>Nome completo</span>
                   <span>CPF</span>
+                  <span>Matrícula</span>
                   <span />
                 </div>
                 <div className="tc-students-body">
@@ -2546,6 +2623,14 @@ const TrainingCertificatesPage = () => {
                           />
                           {isCpfValid && <Check size={13} className="tc-cpf-ok" />}
                         </div>
+                        <input
+                          id={`student-matricula-${idx}`}
+                          type="text"
+                          className="tc-input"
+                          placeholder="Matrícula (opc.)"
+                          value={colab.matricula || ''}
+                          onChange={(e) => handleColabChange(idx, 'matricula', e.target.value)}
+                        />
                         <button
                           type="button"
                           className="tc-icon-btn tc-icon-btn--sm tc-icon-btn--danger"
@@ -2801,171 +2886,312 @@ const TrainingCertificatesPage = () => {
                   }}
                 >
                   {/* ========================================================================= */}
-                  {/* RENDERIZAÇÃO: MODELO 1 (EcoCurvas Laterais - Roxo Oficial EcoSafety)       */}
+                  {/* RENDERIZAÇÃO: MODELO 1 (EcoCurvas Laterais - Padrão Oficial EcoSafety)    */}
                   {/* ========================================================================= */}
-                  {certModel === 'modelo1' ? (
-                    previewTab === 'frente' ? (
-                      /* MODELO 1 - FRENTE */
-                      <div className="tc-certificate-front" style={{ fontFamily: "'Roboto', sans-serif" }}>
-                        {/* Topo: Header Banner Oficial com Logomarca EcoSafety e Título */}
-                        <div style={{ textAlign: 'center' }}>
-                          <img 
-                            src="/certificate-templates/m1_header_transparent.png" 
-                            alt="EcoSafety Certificado de Capacitação" 
-                            style={{ 
-                              height: m1FrenteStyles.headerMaxHeight, 
-                              maxWidth: '100%', 
-                              width: 'auto', 
-                              objectFit: 'contain', 
-                              display: 'inline-block' 
-                            }} 
-                          />
-                        </div>
+                  {(() => {
+                    const periodoDisplay = formData.periodo?.trim()
+                      ? formData.periodo.trim()
+                      : formatDateLongPtBr(formData.data);
+                    const dataConclusaoDisplay = formatDateLongPtBr(formData.data);
+                    const studentMatricula = firstStudent?.matricula ? String(firstStudent.matricula).trim() : '';
 
-                        {/* Corpo: Conteúdo Centralizado com Hierarquia Visual e Identidade Oficial EcoSafety */}
-                        <div className="tc-certificate-main" style={{
-                          textAlign: 'center',
-                          maxHeight: certificateFrontGeometry.previewContentMaxHeight,
-                          fontFamily: "'Roboto', sans-serif"
-                        }}>
-                          {/* 1. Subtítulo */}
-                          <div style={{
-                            fontSize: m1FrenteStyles.subTitleSize,
-                            fontWeight: '500',
-                            color: '#374151',
-                            letterSpacing: '0.3px',
-                            marginTop: m1FrenteStyles.subTitleMargin
-                          }}>
-                            A ECOSAFETY certifica que:
+                    return certModel === 'modelo1' ? (
+                      previewTab === 'frente' ? (
+                        /* MODELO 1 - FRENTE (Nomenclatura e Estrutura Padrão Oficial .DOCX) */
+                        <div className="tc-certificate-front" style={{ fontFamily: "'Roboto', sans-serif" }}>
+                          {/* Topo: Header Banner Oficial com Logomarca EcoSafety e Título */}
+                          <div style={{ textAlign: 'center' }}>
+                            <img 
+                              src="/certificate-templates/m1_header_transparent.png" 
+                              alt="EcoSafety Certificado de Capacitação" 
+                              style={{ 
+                                height: m1FrenteStyles.headerMaxHeight, 
+                                maxWidth: '100%', 
+                                width: 'auto', 
+                                objectFit: 'contain', 
+                                display: 'inline-block' 
+                              }} 
+                            />
                           </div>
 
-                          {/* 2. Nome do Participante em Destaque (Roxo Oficial EcoSafety #64268a) */}
-                          <div style={{
-                            fontSize: m1FrenteStyles.studentNameSize,
-                            fontWeight: '800',
-                            color: '#64268a',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            margin: m1FrenteStyles.studentNameMargin
+                          {/* Corpo: Parágrafo Justificado e Data por Extenso conforme Padrão Oficial */}
+                          <div className="tc-certificate-main" style={{
+                            maxHeight: certificateFrontGeometry.previewContentMaxHeight,
+                            fontFamily: "'Roboto', sans-serif"
                           }}>
-                            {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
-                          </div>
-
-                          {/* 3. Conclusão, CPF, Período e Cidade */}
-                          <div style={{
-                            fontSize: m1FrenteStyles.cpfTextSize,
-                            color: '#111827',
-                            lineHeight: m1FrenteStyles.cpfLineHeight,
-                            maxWidth: '96%',
-                            margin: '0 auto'
-                          }}>
-                            portador(a) do CPF <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
-                            <strong style={{ color: '#000000' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na cidade de <strong style={{ color: '#000000' }}>{formData.local || 'Mossoró - RN'}</strong>, o treinamento de:
-                          </div>
-
-                          {/* 4. Nome do Curso / Treinamento em Destaque */}
-                          <div style={{
-                            fontSize: m1FrenteStyles.courseSize,
-                            fontWeight: '800',
-                            color: '#64268a',
-                            margin: m1FrenteStyles.courseMargin,
-                            letterSpacing: '0.3px',
-                            textTransform: 'uppercase'
-                          }}>
-                            {formData.curso}
-                          </div>
-
-                          {/* 5. Embasamento Normativo e Descrição */}
-                          {cleanDescricao && (
                             <div style={{
-                              fontSize: m1FrenteStyles.descSize,
-                              color: '#374151',
+                              fontSize: m1FrenteStyles.bodySize,
+                              color: '#000000',
                               textAlign: 'justify',
-                              lineHeight: m1FrenteStyles.descLineHeight,
-                              maxWidth: '94%',
-                              margin: m1FrenteStyles.descMargin
+                              lineHeight: m1FrenteStyles.bodyLineHeight,
+                              width: '92%',
+                              margin: '0 auto'
                             }}>
-                              {cleanDescricao}
+                              A ECOSAFETY certifica que: <strong style={{ fontWeight: '700', color: '#000000' }}>{firstStudent?.nome ? firstStudent.nome.trim().toUpperCase() : 'NOME DO PARTICIPANTE'}</strong>. Portador do CPF: <strong style={{ fontWeight: '700', color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>{studentMatricula ? ` e Matricula: ${studentMatricula}` : ''}, completou com aprovação no período de <strong style={{ fontWeight: '700', color: '#000000' }}>{periodoDisplay}</strong> na cidade de {formData.local || 'Mossoró - RN'}, o treinamento de <strong style={{ fontWeight: '700', color: '#000000' }}>{formData.curso}</strong>{cleanDescricao ? ` ${cleanDescricao}` : '.'}
                             </div>
-                          )}
 
-                          {/* 6. Localidade e Data */}
+                            <div style={{
+                              fontSize: m1FrenteStyles.dateSize,
+                              color: '#000000',
+                              textAlign: 'left',
+                              width: '92%',
+                              margin: `${m1FrenteStyles.dateMarginTop} auto 0 auto`,
+                              fontWeight: '400'
+                            }}>
+                              {formData.local || 'Mossoró - RN'}, Brasil, {dataConclusaoDisplay}.
+                            </div>
+                          </div>
+
+                          {/* Rodapé: Assinaturas Alinhadas pelo Topo da Linha (Sem desalinhar o Aluno) */}
                           <div style={{
-                            fontSize: m1FrenteStyles.dateSize,
-                            color: '#111827',
-                            marginTop: m1FrenteStyles.dateMarginTop,
-                            fontWeight: '500'
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(${Math.max(1, m1SignerColumns.length)}, 1fr)`,
+                            gap: m1FrenteStyles.sigGap,
+                            alignItems: 'start',
+                            textAlign: 'center',
+                            marginTop: '0.25rem',
+                            fontFamily: "'Lato', sans-serif"
                           }}>
-                            {formData.local || 'Mossoró - RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}.
+                            {m1SignerColumns.map((col) => (
+                              <div key={col.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{
+                                  height: m1FrenteStyles.sigHeight,
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'flex-end',
+                                  justifyContent: 'center',
+                                  marginBottom: '2px'
+                                }}>
+                                  {!col.isStudent && col.sigImg ? (
+                                    <img src={col.sigImg} alt="Assinatura" style={{ maxHeight: m1FrenteStyles.sigHeight, maxWidth: '100%', objectFit: 'contain', display: 'block' }} />
+                                  ) : null}
+                                </div>
+                                <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '3px', lineHeight: '1.22' }}>
+                                  <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', letterSpacing: '0.2px' }}>
+                                    {col.roleLabel}
+                                  </div>
+                                  <div style={{ fontSize: m1FrenteStyles.sigNameSize, fontWeight: '700', color: '#64268a' }}>
+                                    {col.name}
+                                  </div>
+                                  {col.registration ? (
+                                    <div style={{ fontSize: m1FrenteStyles.sigRegSize, fontWeight: '700', color: '#64268a' }}>
+                                      {col.registration}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-
-                        {/* Rodapé: Assinaturas Dinâmicas com Traços e Tipografia em Roxo Oficial EcoSafety #64268a */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: `repeat(${Math.max(1, m1SignerColumns.length)}, 1fr)`,
-                          gap: m1FrenteStyles.sigGap,
-                          alignItems: 'end',
-                          textAlign: 'center',
-                          marginTop: '0.25rem',
-                          fontFamily: "'Lato', sans-serif"
-                        }}>
-                          {m1SignerColumns.map((col) => (
-                            <div key={col.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              {col.isStudent ? (
-                                <div style={{ height: m1FrenteStyles.sigHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: m1FrenteStyles.sigRegSize, letterSpacing: '0.3px' }}>[ Assinatura Pendente ]</span>
-                                </div>
-                              ) : col.sigImg ? (
-                                <img src={col.sigImg} alt="Assinatura" style={{ height: m1FrenteStyles.sigHeight, objectFit: 'contain', marginBottom: '2px' }} />
-                              ) : (
-                                <div style={{ height: m1FrenteStyles.sigHeight, marginBottom: '2px' }} />
-                              )}
-                              <div style={{ borderTop: '1px solid #64268a', width: '92%', paddingTop: '2px' }}>
-                                <div style={{ fontSize: m1FrenteStyles.sigTitleSize, fontWeight: '700', color: '#64268a', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
-                                  {col.roleLabel}
-                                </div>
-                                <div style={{ fontSize: m1FrenteStyles.sigNameSize, fontWeight: '700', color: '#64268a' }}>
-                                  {col.name}
-                                </div>
-                                {col.registration ? (
-                                  <div style={{ fontSize: m1FrenteStyles.sigRegSize, color: '#64268a' }}>
-                                    {col.registration}
-                                  </div>
-                                ) : null}
+                      ) : (
+                        /* MODELO 1 - VERSO (Padrão Oficial .DOCX) */
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ 
+                              paddingBottom: m1VersoStyles.headerPadding || '0.2rem', 
+                              marginBottom: m1VersoStyles.headerMargin || '0.25rem' 
+                            }}>
+                              <div style={{ fontSize: m1VersoStyles.headerSize, fontWeight: '400', color: '#595959' }}>
+                                Programa: <strong style={{ fontWeight: '700', color: '#595959' }}>{formData.curso}</strong>
+                              </div>
+                              <div style={{ fontSize: m1VersoStyles.headerSize, color: '#595959', fontWeight: '400', marginTop: '1px' }}>
+                                Carga horária: {formData.duracao}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      /* MODELO 1 - VERSO (Conteúdo Dinâmico sem barra de rolagem e sem cortes) */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Lato', sans-serif" }}>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ 
-                            borderBottom: '1px solid rgba(0,0,0,0.1)', 
-                            paddingBottom: m1VersoStyles.headerPadding || '0.2rem', 
-                            marginBottom: m1VersoStyles.headerMargin || '0.25rem' 
+
+                            {(() => {
+                              const balanced = balanceSyllabusColumns(formData.conteudo, 42);
+                              if (m1VersoStyles.useTwoCols) {
+                                return (
+                                  <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: m1VersoStyles.gap,
+                                    fontSize: m1VersoStyles.fontSize,
+                                    color: '#000000',
+                                    lineHeight: m1VersoStyles.lineHeight,
+                                    flex: 1,
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col1}</div>
+                                    <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col2}</div>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div style={{ 
+                                  fontSize: m1VersoStyles.fontSize, 
+                                  color: '#000000', 
+                                  lineHeight: m1VersoStyles.lineHeight, 
+                                  flex: 1,
+                                  overflow: 'hidden',
+                                  whiteSpace: 'pre-line',
+                                  wordBreak: 'break-word'
+                                }}>
+                                  {balanced.normalizedText}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          <div style={{
+                            textAlign: 'center',
+                            fontSize: m1VersoStyles.footerSize,
+                            color: '#595959',
+                            lineHeight: '1.25',
+                            paddingTop: '0.2rem'
                           }}>
-                            <div style={{ fontSize: m1VersoStyles.headerSize, fontWeight: '700', color: '#595959' }}>
-                              Programa: <span style={{ color: '#64268a' }}>{formData.curso}</span>
+                            <div style={{ fontWeight: '700' }}>ECOSAFETY</div>
+                            <div style={{ fontWeight: '400' }}>CNPJ 50.710.500/0001-95</div>
+                            <div style={{ fontWeight: '400' }}>
+                              ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
                             </div>
-                            <div style={{ fontSize: m1VersoStyles.headerDurationSize || '0.54rem', color: '#595959', fontWeight: '400', marginTop: '1px' }}>
-                              Carga horária: {formData.duracao}
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      /* ========================================================================= */
+                      /* RENDERIZAÇÃO: MODELO 2 (Ondas Diagonais & Colmeia Tech - Padrão Fiel PDF) */
+                      /* ========================================================================= */
+                      previewTab === 'frente' ? (
+                        /* MODELO 2 - FRENTE */
+                        <div className="tc-certificate-front" style={{ fontFamily: "'Lato', sans-serif" }}>
+                          {/* Topo: Header com Título Oficial e Subtítulo */}
+                          <div style={{ textAlign: 'center', paddingTop: m2FrenteStyles.topPadding }}>
+                            <div style={{ 
+                              fontFamily: "'Montserrat', sans-serif",
+                              fontSize: m2FrenteStyles.titleSize, 
+                              fontWeight: '800', 
+                              color: '#555555', 
+                              letterSpacing: m2FrenteStyles.titleLetterSpacing, 
+                              textTransform: 'uppercase' 
+                            }}>
+                              CERTIFICADO DE CAPACITAÇÃO
+                            </div>
+                            <div style={{ fontSize: m2FrenteStyles.subTitleSize, fontWeight: '400', color: '#000000', marginTop: m2FrenteStyles.subTitleMargin }}>
+                              A ECOSAFETY certifica que:
                             </div>
                           </div>
 
-                          {(() => {
-                            const balanced = balanceSyllabusColumns(formData.conteudo, 42);
-                            if (m1VersoStyles.useTwoCols) {
+                          {/* Conteúdo centralizado dentro da área útil, com densidade adaptativa */}
+                          <div className="tc-certificate-main" style={{ textAlign: 'center', maxHeight: certificateFrontGeometry.previewContentMaxHeight }}>
+                            {/* Destaque do Nome em Azul Real Oficial #3340e6 com Lato Black 900 */}
+                            <div style={{ 
+                              fontFamily: "'Lato', sans-serif",
+                              fontSize: m2FrenteStyles.studentNameSize, 
+                              fontWeight: '900', 
+                              color: '#3340e6', 
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              margin: m2FrenteStyles.studentNameMargin
+                            }}>
+                              {firstStudent?.nome ? firstStudent.nome.trim().toUpperCase() : 'NOME DO PARTICIPANTE'}
+                            </div>
+
+                            <div style={{ fontSize: m2FrenteStyles.cpfTextSize, color: '#000000', lineHeight: m2FrenteStyles.cpfLineHeight, maxWidth: '96%', margin: '0 auto' }}>
+                              Portador do CPF: <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>{studentMatricula ? ` e Matricula: ${studentMatricula}` : ''}, completou com aprovação no período de{' '}
+                              <strong style={{ color: '#000000' }}>{periodoDisplay}</strong> na cidade de {formData.local || 'Mossoró - RN'}, o treinamento de:
+                            </div>
+
+                            <div style={{ 
+                              fontSize: m2FrenteStyles.courseSize, 
+                              fontWeight: '800', 
+                              color: '#3340e6', 
+                              margin: m2FrenteStyles.courseMargin 
+                            }}>
+                              {formData.curso}
+                            </div>
+
+                            {cleanDescricao && (
+                              <div style={{ 
+                                fontSize: m2FrenteStyles.descSize, 
+                                color: '#000000', 
+                                textAlign: 'justify', 
+                                lineHeight: m2FrenteStyles.descLineHeight, 
+                                maxWidth: '94%', 
+                                margin: m2FrenteStyles.descMargin 
+                              }}>
+                                {cleanDescricao}
+                              </div>
+                            )}
+
+                            <div style={{ fontSize: m2FrenteStyles.dateSize, color: '#000000', marginTop: m2FrenteStyles.dateMarginTop }}>
+                              {formData.local || 'Mossoró - RN'}, Brasil, {dataConclusaoDisplay}.
+                            </div>
+                          </div>
+
+                          {/* Rodapé: Assinaturas Alinhadas pelo Topo da Linha */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(${Math.max(1, m2SignerColumns.length)}, 1fr)`,
+                            gap: m2FrenteStyles.sigGap,
+                            alignItems: 'start',
+                            textAlign: 'center',
+                            marginTop: '0.2rem',
+                            paddingBottom: m2FrenteStyles.sigPaddingBottom,
+                            paddingLeft: m2FrenteStyles.sigPaddingX,
+                            paddingRight: m2FrenteStyles.sigPaddingX,
+                            fontFamily: "'Lato', sans-serif"
+                          }}>
+                            {m2SignerColumns.map((col) => (
+                              <div key={col.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{
+                                  height: m2FrenteStyles.sigImageHeight,
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'flex-end',
+                                  justifyContent: 'center',
+                                  marginBottom: '2px'
+                                }}>
+                                  {!col.isStudent && col.sigImg ? (
+                                    <img src={col.sigImg} alt="Assinatura" style={{ maxHeight: m2FrenteStyles.sigImageHeight, maxWidth: '100%', objectFit: 'contain', display: 'block' }} />
+                                  ) : null}
+                                </div>
+                                <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px', lineHeight: '1.22' }}>
+                                  <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>
+                                    {col.roleLabel}
+                                  </div>
+                                  <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: col.isStudent ? '#3340e6' : '#000000', fontWeight: '700' }}>
+                                    {col.name}
+                                  </div>
+                                  {col.registration ? (
+                                    <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959', fontWeight: '600' }}>
+                                      {col.registration}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        /* MODELO 2 - VERSO (Conteúdo em 2 Colunas Balanceadas - Calibri & Times New Roman sem corte e sem scroll) */
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Calibri', 'Lato', sans-serif" }}>
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ 
+                              paddingBottom: m2VersoStyles.headerPadding, 
+                              marginBottom: m2VersoStyles.headerMargin 
+                            }}>
+                              <div style={{ fontSize: m2VersoStyles.headerTitleSize, fontWeight: '400', color: '#595959' }}>
+                                Programa: <strong style={{ fontWeight: '700', color: '#595959' }}>{formData.curso}</strong>
+                              </div>
+                              <div style={{ fontSize: m2VersoStyles.headerDurationSize, color: '#595959', fontWeight: '400', marginTop: '1px' }}>
+                                Carga horária: {formData.duracao}
+                              </div>
+                            </div>
+
+                            {/* 2 Colunas de Conteúdo com Times New Roman Balanceadas */}
+                            {(() => {
+                              const balanced = balanceSyllabusColumns(formData.conteudo, 38);
                               return (
                                 <div style={{
                                   display: 'grid',
                                   gridTemplateColumns: '1fr 1fr',
-                                  gap: m1VersoStyles.gap,
-                                  fontSize: m1VersoStyles.fontSize,
+                                  gap: m2VersoStyles.gap,
+                                  fontFamily: "'Times New Roman', Times, serif",
+                                  fontSize: m2VersoStyles.fontSize,
                                   color: '#000000',
-                                  lineHeight: m1VersoStyles.lineHeight,
+                                  lineHeight: m2VersoStyles.lineHeight,
                                   flex: 1,
                                   overflow: 'hidden'
                                 }}>
@@ -2973,201 +3199,26 @@ const TrainingCertificatesPage = () => {
                                   <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col2}</div>
                                 </div>
                               );
-                            }
-                            return (
-                              <div style={{ 
-                                fontSize: m1VersoStyles.fontSize, 
-                                color: '#000000', 
-                                lineHeight: m1VersoStyles.lineHeight, 
-                                flex: 1,
-                                overflow: 'hidden',
-                                whiteSpace: 'pre-line',
-                                wordBreak: 'break-word'
-                              }}>
-                                {balanced.normalizedText}
-                              </div>
-                            );
-                          })()}
-                        </div>
+                            })()}
+                          </div>
 
-                        <div style={{
-                          textAlign: 'center',
-                          fontSize: m1VersoStyles.footerSize,
-                          fontWeight: '700',
-                          color: '#595959',
-                          letterSpacing: '0.4px',
-                          borderTop: '1px solid #e2e8f0',
-                          paddingTop: '0.25rem'
-                        }}>
-                          ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
-                        </div>
-                      </div>
-                    )
-                  ) : (
-                    /* ========================================================================= */
-                    /* RENDERIZAÇÃO: MODELO 2 (Ondas Diagonais & Colmeia Tech - Padrão Fiel PDF) */
-                    /* ========================================================================= */
-                    previewTab === 'frente' ? (
-                      /* MODELO 2 - FRENTE */
-                      <div className="tc-certificate-front" style={{ fontFamily: "'Lato', sans-serif" }}>
-                        {/* Topo: Header com Título Oficial e Subtítulo */}
-                        <div style={{ textAlign: 'center', paddingTop: m2FrenteStyles.topPadding }}>
-                          <div style={{ 
-                            fontFamily: "'Montserrat', sans-serif",
-                            fontSize: m2FrenteStyles.titleSize, 
-                            fontWeight: '800', 
-                            color: '#555555', 
-                            letterSpacing: m2FrenteStyles.titleLetterSpacing, 
-                            textTransform: 'uppercase' 
+                          <div style={{
+                            textAlign: 'center',
+                            fontSize: m2VersoStyles.footerSize,
+                            color: '#595959',
+                            lineHeight: '1.25',
+                            paddingTop: m2VersoStyles.footerPadding
                           }}>
-                            CERTIFICADO DE CAPACITAÇÃO
-                          </div>
-                          <div style={{ fontSize: m2FrenteStyles.subTitleSize, fontWeight: '400', color: '#000000', marginTop: m2FrenteStyles.subTitleMargin }}>
-                            A ECOSAFETY certifica que:
-                          </div>
-                        </div>
-
-                        {/* Conteúdo centralizado dentro da área útil, com densidade adaptativa */}
-                        <div className="tc-certificate-main" style={{ textAlign: 'center', maxHeight: certificateFrontGeometry.previewContentMaxHeight }}>
-                          {/* Destaque do Nome em Azul Real Oficial #3340e6 com Lato Black 900 */}
-                          <div style={{ 
-                            fontFamily: "'Lato', sans-serif",
-                            fontSize: m2FrenteStyles.studentNameSize, 
-                            fontWeight: '900', 
-                            color: '#3340e6', 
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            margin: m2FrenteStyles.studentNameMargin
-                          }}>
-                            {firstStudent?.nome ? firstStudent.nome.toUpperCase() : 'NOME DO PARTICIPANTE'}
-                          </div>
-
-                          <div style={{ fontSize: m2FrenteStyles.cpfTextSize, color: '#000000', lineHeight: m2FrenteStyles.cpfLineHeight, maxWidth: '96%', margin: '0 auto' }}>
-                            Portador do CPF: <strong style={{ color: '#000000' }}>{firstStudent?.cpf ? firstStudent.cpf : '000.000.000-00'}</strong>, completou com aprovação no período de{' '}
-                            <strong style={{ color: '#000000' }}>{formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}</strong> na ECOSAFETY TREINAMENTOS, o treinamento de:
-                          </div>
-
-                          <div style={{ 
-                            fontSize: m2FrenteStyles.courseSize, 
-                            fontWeight: '800', 
-                            color: '#3340e6', 
-                            margin: m2FrenteStyles.courseMargin 
-                          }}>
-                            {formData.curso}
-                          </div>
-
-                          {cleanDescricao && (
-                            <div style={{ 
-                              fontSize: m2FrenteStyles.descSize, 
-                              color: '#000000', 
-                              textAlign: 'justify', 
-                              lineHeight: m2FrenteStyles.descLineHeight, 
-                              maxWidth: '94%', 
-                              margin: m2FrenteStyles.descMargin 
-                            }}>
-                              {cleanDescricao}
-                            </div>
-                          )}
-
-                          <div style={{ fontSize: m2FrenteStyles.dateSize, color: '#000000', marginTop: m2FrenteStyles.dateMarginTop }}>
-                            {formData.local || 'Mossoró, RN'}, Brasil, {formData.data ? new Date(formData.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data'}.
-                          </div>
-                        </div>
-
-                        {/* Rodapé: Assinaturas Dinâmicas com Linhas e Textos em Preto Oficial #000000 (Afastado da onda roxa) */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: `repeat(${Math.max(1, m2SignerColumns.length)}, 1fr)`,
-                          gap: m2FrenteStyles.sigGap,
-                          alignItems: 'end',
-                          textAlign: 'center',
-                          marginTop: '0.2rem',
-                          paddingBottom: m2FrenteStyles.sigPaddingBottom,
-                          paddingLeft: m2FrenteStyles.sigPaddingX,
-                          paddingRight: m2FrenteStyles.sigPaddingX,
-                          fontFamily: "'Lato', sans-serif"
-                        }}>
-                          {m2SignerColumns.map((col) => (
-                            <div key={col.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              {col.isStudent ? (
-                                <div style={{ height: m2FrenteStyles.sigImageHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <span style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#94a3b8', fontStyle: 'italic' }}>[ Assinatura Pendente ]</span>
-                                </div>
-                              ) : col.sigImg ? (
-                                <img src={col.sigImg} alt="Assinatura" style={{ height: m2FrenteStyles.sigImageHeight, objectFit: 'contain', marginBottom: '1px' }} />
-                              ) : (
-                                <div style={{ height: m2FrenteStyles.sigImageHeight, marginBottom: '1px' }} />
-                              )}
-                              <div style={{ borderTop: '1px solid #000000', width: '92%', paddingTop: '2px' }}>
-                                <div style={{ fontSize: m2FrenteStyles.sigLabelSize, fontWeight: '800', color: '#000000' }}>
-                                  {col.roleLabel}
-                                </div>
-                                <div style={{ fontSize: m2FrenteStyles.sigNameSize, color: col.isStudent ? '#3340e6' : '#000000', fontWeight: col.isStudent ? '700' : '600' }}>
-                                  {col.name}
-                                </div>
-                                {col.registration ? (
-                                  <div style={{ fontSize: m2FrenteStyles.sigRegSize, color: '#595959' }}>
-                                    {col.registration}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      /* MODELO 2 - VERSO (Conteúdo em 2 Colunas Balanceadas - Calibri & Times New Roman sem corte e sem scroll) */
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontFamily: "'Calibri', 'Lato', sans-serif" }}>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ 
-                            borderBottom: '1px solid rgba(0,0,0,0.08)', 
-                            paddingBottom: m2VersoStyles.headerPadding, 
-                            marginBottom: m2VersoStyles.headerMargin 
-                          }}>
-                            <div style={{ fontSize: m2VersoStyles.headerTitleSize, fontWeight: '700', color: '#595959' }}>
-                              Programa: <span style={{ color: '#3340e6' }}>{formData.curso}</span>
-                            </div>
-                            <div style={{ fontSize: m2VersoStyles.headerDurationSize, color: '#595959', fontWeight: '400', marginTop: '1px' }}>
-                              Carga horária: {formData.duracao}
+                            <div style={{ fontWeight: '700' }}>ECOSAFETY</div>
+                            <div style={{ fontWeight: '400' }}>CNPJ 50.710.500/0001-95</div>
+                            <div style={{ fontWeight: '400' }}>
+                              ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
                             </div>
                           </div>
-
-                          {/* 2 Colunas de Conteúdo com Times New Roman Balanceadas */}
-                          {(() => {
-                            const balanced = balanceSyllabusColumns(formData.conteudo, 38);
-                            return (
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: m2VersoStyles.gap,
-                                fontFamily: "'Times New Roman', Times, serif",
-                                fontSize: m2VersoStyles.fontSize,
-                                color: '#000000',
-                                lineHeight: m2VersoStyles.lineHeight,
-                                flex: 1,
-                                overflow: 'hidden'
-                              }}>
-                                <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col1}</div>
-                                <div style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{balanced.col2}</div>
-                              </div>
-                            );
-                          })()}
                         </div>
-
-                        <div style={{
-                          textAlign: 'center',
-                          fontSize: m2VersoStyles.footerSize,
-                          fontWeight: '600',
-                          color: '#595959',
-                          letterSpacing: '0.4px',
-                          borderTop: '1px solid #e2e8f0',
-                          paddingTop: m2VersoStyles.footerPadding
-                        }}>
-                          ECOSAFETY • CNPJ 50.710.500/0001-95 • ESSE TREINAMENTO TEM VALIDADE DE {formData.validade ? formData.validade.toUpperCase() : '24 MESES'}
-                        </div>
-                      </div>
-                    )
-                  )}
+                      )
+                    );
+                  })()}
                 </div>
 
               {/* EMISSÃO */}
@@ -3385,10 +3436,16 @@ const TrainingCertificatesPage = () => {
                             <span><strong>Empresa:</strong> {turma.company}</span>
                           </li>
                         )}
+                        {(turma.periodo || turma.tech_lead?.periodo) && (
+                          <li>
+                            <Calendar size={14} />
+                            <span><strong>Período:</strong> {turma.periodo || turma.tech_lead?.periodo}</span>
+                          </li>
+                        )}
                         {turma.start_date && (
                           <li>
                             <Calendar size={14} />
-                            <span><strong>Data:</strong> {new Date(turma.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} • {turma.duration || '8h'}</span>
+                            <span><strong>{(turma.periodo || turma.tech_lead?.periodo) ? 'Conclusão:' : 'Data:'}</strong> {new Date(turma.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} • {turma.duration || '8h'}</span>
                           </li>
                         )}
                       </ul>
@@ -3577,18 +3634,44 @@ const TrainingCertificatesPage = () => {
                               <div className="tc-avatar">
                                 {student.nome?.charAt(0)?.toUpperCase() || 'P'}
                               </div>
-                              <div>
-                                <div className="tc-person-name">{student.nome}</div>
+                              <div style={{ flex: 1, minWidth: '160px' }}>
+                                <input
+                                  type="text"
+                                  value={student.nome || ''}
+                                  onChange={(e) => handleStudentFieldChange(student.id, 'nome', e.target.value)}
+                                  className="tc-input"
+                                  style={{ padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.86rem', width: '100%' }}
+                                  aria-label={`Nome do participante ${student.nome || ''}`}
+                                />
                                 {student.empresa && (
-                                   <div className="tc-person-sub">
+                                   <div className="tc-person-sub" style={{ paddingLeft: '0.45rem' }}>
                                     {student.empresa} {student.telefone ? `• ${student.telefone}` : ''}
                                   </div>
                                 )}
                               </div>
                             </div>
                           </td>
-                          <td className="tc-cell-mono">{student.cpf}</td>
-                          <td className="tc-cell-mono">{student.matricula || '-'}</td>
+                          <td className="tc-cell-mono">
+                            <input
+                              type="text"
+                              value={student.cpf || ''}
+                              onChange={(e) => handleStudentFieldChange(student.id, 'cpf', formatCPF(e.target.value))}
+                              className="tc-input"
+                              style={{ padding: '0.25rem 0.45rem', fontSize: '0.82rem', width: '132px', fontFamily: 'inherit' }}
+                              aria-label={`CPF de ${student.nome || 'participante'}`}
+                            />
+                          </td>
+                          <td className="tc-cell-mono">
+                            <input
+                              type="text"
+                              value={student.matricula || ''}
+                              placeholder="-"
+                              onChange={(e) => handleStudentFieldChange(student.id, 'matricula', e.target.value)}
+                              className="tc-input"
+                              style={{ padding: '0.25rem 0.45rem', fontSize: '0.82rem', width: '100px', fontFamily: 'inherit' }}
+                              aria-label={`Matrícula de ${student.nome || 'participante'}`}
+                            />
+                          </td>
                           <td className="tc-cell-muted">
                             {student.data_nascimento ? new Date(student.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
                           </td>
@@ -3907,19 +3990,23 @@ const TrainingCertificatesPage = () => {
                     </div>
                     <div className="tc-modal-field">
                       <label htmlFor="tc-turma-duration">Carga horária</label>
-                      <input id="tc-turma-duration" type="text" className="tc-input" placeholder="Ex: 8 horas" value={turmaFormData.duration} onChange={event => setTurmaFormData(prev => ({ ...prev, duration: event.target.value }))} />
+                      <input id="tc-turma-duration" type="text" className="tc-input" placeholder="Ex: 40 horas" value={turmaFormData.duration} onChange={event => setTurmaFormData(prev => ({ ...prev, duration: event.target.value }))} />
                     </div>
                     <div className="tc-modal-field">
                       <label htmlFor="tc-turma-validade">Validade</label>
                       <input id="tc-turma-validade" type="text" className="tc-input" placeholder="Ex: 24 meses" value={turmaFormData.validade || ''} onChange={event => setTurmaFormData(prev => ({ ...prev, validade: event.target.value }))} />
                     </div>
                     <div className="tc-modal-field">
-                      <label htmlFor="tc-turma-date">Data de realização</label>
-                      <input id="tc-turma-date" type="date" className="tc-input" value={turmaFormData.start_date} onChange={event => setTurmaFormData(prev => ({ ...prev, start_date: event.target.value }))} />
+                      <label htmlFor="tc-turma-periodo">Período do treinamento</label>
+                      <input id="tc-turma-periodo" type="text" className="tc-input" placeholder="Ex: 24 e 25 de agosto de 2026" value={turmaFormData.periodo || ''} onChange={event => setTurmaFormData(prev => ({ ...prev, periodo: event.target.value }))} />
                     </div>
                     <div className="tc-modal-field">
-                      <label htmlFor="tc-turma-location">Local</label>
-                      <input id="tc-turma-location" type="text" className="tc-input" placeholder="Ex: Mossoró - RN" value={turmaFormData.location} onChange={event => setTurmaFormData(prev => ({ ...prev, location: event.target.value }))} />
+                      <label htmlFor="tc-turma-date">Data de conclusão</label>
+                      <input id="tc-turma-date" type="date" className="tc-input" value={turmaFormData.start_date} onChange={event => setTurmaFormData(prev => ({ ...prev, start_date: event.target.value }))} />
+                    </div>
+                    <div className="tc-modal-field tc-modal-span-2">
+                      <label htmlFor="tc-turma-location">Local / Cidade</label>
+                      <input id="tc-turma-location" type="text" className="tc-input" placeholder="Ex: TERESINA/PI" value={turmaFormData.location} onChange={event => setTurmaFormData(prev => ({ ...prev, location: event.target.value }))} />
                     </div>
                   </div>
                 </section>

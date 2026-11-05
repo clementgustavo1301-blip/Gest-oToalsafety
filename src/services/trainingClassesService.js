@@ -37,6 +37,7 @@ const normalizeTrainingClass = (trainingClass) => {
     }] : [];
   }
   c.coordinator = c.coordinator || c.tech_lead?.coordinator || null;
+  c.periodo = c.periodo !== undefined ? c.periodo : (c.tech_lead?.periodo || '');
   return c;
 };
 
@@ -118,13 +119,21 @@ export async function saveTrainingClass(turma) {
       ];
 
   const coordinator = turma.coordinator || turma.tech_lead?.coordinator || null;
+  const periodo = String(turma.periodo !== undefined ? turma.periodo : (turma.tech_lead?.periodo || '')).trim();
+  const hasTechLead = Boolean(
+    (turma.tech_lead && (turma.tech_lead.name?.trim() || turma.tech_lead.registration?.trim())) ||
+    turma.tech_lead_name?.trim()
+  );
   const techLead = {
-    ...(turma.tech_lead || {
-    name: (turma.tech_lead_name || 'Eider Gomes do Nascimento').trim(),
-    role: (turma.tech_lead_role || 'Responsável Técnico / Engenheiro de Segurança').trim(),
-    registration: (turma.tech_lead_registration || 'CREA 210874512-0 / MTE 0009995/RN').trim()
-    }),
-    coordinator
+    ...(hasTechLead
+      ? (turma.tech_lead || {
+          name: (turma.tech_lead_name || '').trim(),
+          role: (turma.tech_lead_role || 'Responsável Técnico').trim(),
+          registration: (turma.tech_lead_registration || '').trim()
+        })
+      : { name: '', role: '', registration: '' }),
+    coordinator,
+    periodo
   };
   const primaryInstructor = (instructors && instructors.length > 0) ? instructors[0] : {};
 

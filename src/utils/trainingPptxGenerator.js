@@ -207,6 +207,7 @@ export async function generateTrainingPPTX({
   curso,
   descricao,
   data,
+  periodo,
   duracao,
   validade,
   local,
@@ -407,9 +408,15 @@ export async function generateTrainingPPTX({
       }
 
       // 6. Data / Período
+      const effectivePeriodo = (periodo && String(periodo).trim()) ? String(periodo).trim() : formattedDate;
+      if (effectivePeriodo) {
+        xml = replaceText(xml, [
+          '{{PERIODO}}', '[PERIODO]'
+        ], effectivePeriodo);
+      }
       if (formattedDate) {
         xml = replaceText(xml, [
-          '{{DATA}}', '{{PERIODO}}', '[DATA]', '[PERIODO]',
+          '{{DATA}}', '[DATA]',
           '07/08/2026', '09/08/2026', 'DD/MM/AAAA'
         ], formattedDate);
       }
