@@ -18,6 +18,7 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
   const isInitialProgram = (deliverable?.type === 'programa') && isProgram(deliverable);
   const [dataEnvio, setDataEnvio] = useState(deliverable?.dataEmissao || deliverable?.dataEnvio || deliverable?.dueDate || '');
   const [validityDate, setValidityDate] = useState(isInitialProgram ? (deliverable?.validityDate || '') : '');
+  const [manualValidity, setManualValidity] = useState(false);
   const [ultimaRevisao, setUltimaRevisao] = useState(deliverable?.ultimaRevisao || '');
   const [deliveredDate, setDeliveredDate] = useState(deliverable?.deliveredDate || '');
   const [status, setStatus] = useState(deliverable?.status || 'pendente');
@@ -239,7 +240,21 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                     id="dlv-envio"
                     type="date"
                     value={dataEnvio}
-                    onChange={(e) => setDataEnvio(e.target.value)}
+                    onChange={(e) => {
+                      const newEmissao = e.target.value;
+                      setDataEnvio(newEmissao);
+                      if (newEmissao && type === 'programa' && isProgram({ title, type }) && !manualValidity) {
+                        const months = getDefaultValidityMonths({ title, type });
+                        if (months) {
+                          const base = parseSafeDate(newEmissao);
+                          if (base) {
+                            const calc = new Date(base.getTime());
+                            calc.setMonth(calc.getMonth() + months);
+                            setValidityDate(calc.toISOString().split('T')[0]);
+                          }
+                        }
+                      }
+                    }}
                     className="modal-input"
                     required
                     disabled={saving}
@@ -300,7 +315,10 @@ const EditDeliverableModal = ({ deliverable, companyId, onClose, onSave }) => {
                         id="dlv-validity"
                         type="date"
                         value={validityDate}
-                        onChange={(e) => setValidityDate(e.target.value)}
+                        onChange={(e) => {
+                          setValidityDate(e.target.value);
+                          setManualValidity(true);
+                        }}
                         className="modal-input"
                         disabled={saving}
                       />

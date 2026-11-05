@@ -10,5 +10,4 @@ export const STANDARD_DELIVERABLES = [
   { value: 'PCA', label: 'PCA', defaultType: 'programa' },
   { value: 'PPR', label: 'PPR', defaultType: 'programa' },
   { value: 'AET', label: 'AET', defaultType: 'laudo' },
-  { value: 'eSocial S-2240', label: 'eSocial S-2240', defaultType: 'documento' },
 ];

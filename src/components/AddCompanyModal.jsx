@@ -27,6 +27,7 @@ const AddCompanyModal = ({ onClose, onSave, group = null }) => {
   );
   const [gestaoCipa, setGestaoCipa] = useState('pendente');
   const [gestaoEpi, setGestaoEpi] = useState('pendente');
+  const [gestaoS2240, setGestaoS2240] = useState('pendente');
   const [contact, setContact] = useState('');
   const [profiles, setProfiles] = useState([]);
   const [phone, setPhone] = useState('');
@@ -188,10 +189,12 @@ const AddCompanyModal = ({ onClose, onSave, group = null }) => {
       visitasTecnicas,
       gestaoCipa,
       gestaoEpi,
+      gestaoS2240,
       gestaoPgr: gestaoCipa,
       gestaoSipat: gestaoEpi,
       gestao_cipa: gestaoCipa,
       gestao_epi: gestaoEpi,
+      gestao_s2240: gestaoS2240,
       gestao_pgr: gestaoCipa,
       gestao_sipat: gestaoEpi,
       phone: phone.trim(), 
@@ -390,6 +393,21 @@ const AddCompanyModal = ({ onClose, onSave, group = null }) => {
                     <option value="pendente">Pendente</option>
                     <option value="implementado">Implementado</option>
                     <option value="nao_implementado">Não Implementado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-gestao-s2240">
+                    S-2240
+                  </label>
+                  <select
+                    id="company-gestao-s2240"
+                    value={gestaoS2240}
+                    onChange={(e) => setGestaoS2240(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="enviado">Enviado</option>
                   </select>
                 </div>
               </div>

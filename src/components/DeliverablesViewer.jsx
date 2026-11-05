@@ -34,7 +34,7 @@ const STATUS_CONFIG = {
   nao_se_aplica: { label: 'Não Se Aplica', icon: <AlertTriangle size={14} />, color: '#4b5563', bg: '#f3f4f6' },
 };
 
-const DeliverablesViewer = ({ companyId }) => {
+const DeliverablesViewer = ({ companyId, onUpdate }) => {
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterContract, setFilterContract] = useState('all');
@@ -92,6 +92,7 @@ const DeliverablesViewer = ({ companyId }) => {
 
     setShowModal(false);
     await loadData(false);
+    if (onUpdate) onUpdate();
   };
 
   const handleChangeStatus = async (deliverableId, newStatus) => {
@@ -102,6 +103,7 @@ const DeliverablesViewer = ({ companyId }) => {
     }
     await updateDeliverable(deliverableId, { status: newStatus, reason });
     await loadData(false);
+    if (onUpdate) onUpdate();
   };
 
   const handleFileUpload = async (deliverableId, file, destCompanyId) => {
@@ -112,6 +114,7 @@ const DeliverablesViewer = ({ companyId }) => {
     if (filePath) {
       await updateDeliverable(deliverableId, { fileName: filePath, status: 'entregue', deliveredDate: new Date().toISOString() });
       await loadData(false);
+      if (onUpdate) onUpdate();
     } else {
       alert('Erro ao fazer upload do arquivo.');
     }
@@ -123,6 +126,7 @@ const DeliverablesViewer = ({ companyId }) => {
       await deleteDeliverable(id);
       setSelectedIds(prev => prev.filter(x => x !== id));
       await loadData(false);
+      if (onUpdate) onUpdate();
     }
   };
 
@@ -154,6 +158,7 @@ const DeliverablesViewer = ({ companyId }) => {
       await deleteDeliverables(selectedIds);
       setSelectedIds([]);
       await loadData(false);
+      if (onUpdate) onUpdate();
     } catch (err) {
       console.error('Erro ao excluir entregáveis:', err);
       alert('Erro ao excluir os entregáveis selecionados.');
@@ -166,6 +171,7 @@ const DeliverablesViewer = ({ companyId }) => {
     await updateDeliverable(id, updates);
     setEditingDeliverable(null);
     await loadData(false);
+    if (onUpdate) onUpdate();
   };
 
   if (loading) {

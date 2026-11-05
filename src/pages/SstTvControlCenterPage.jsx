@@ -375,7 +375,6 @@ const SstTvControlCenterPage = () => {
       { key: 'PCMSO', match: (t) => t.toUpperCase() === 'PCMSO' || (t.toUpperCase().includes('PCMSO') && !t.toUpperCase().includes('ANAL')) },
       { key: 'Rel. Analítico', match: (t) => t.toUpperCase().includes('ANALÍTICO') || t.toUpperCase().includes('ANALITICO') },
       { key: 'LTCAT', match: (t) => t.toUpperCase().includes('LTCAT') },
-      { key: 'eSocial', match: (t) => t.toUpperCase().includes('ESOCIAL') || t.toUpperCase().includes('2240') },
       { key: 'Psicossocial', match: (t) => t.toUpperCase().includes('PSICOSSOCIAL') },
       { key: 'LI / LP', match: (t) => ['LI', 'LP'].includes(t.toUpperCase().trim()) || t.toUpperCase().includes('INSALUBRIDADE') || t.toUpperCase().includes('PERICULOSIDADE') },
       { key: 'OS / Outros', match: () => true }

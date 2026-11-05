@@ -65,12 +65,15 @@ const CompanyDetailsPage = () => {
     loadData(true);
   }, [companyId]);
 
-  const handleAddDeliverable = async (deliverableData) => {
-    let fileName = null;
-    if (deliverableData.file) {
-      fileName = await uploadDocument(deliverableData.file, `deliverables/${companyId}`);
+  const handleAddDeliverable = async (dataOrArray) => {
+    const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
+    for (const item of items) {
+      let fileName = null;
+      if (item.file) {
+        fileName = await uploadDocument(item.file, `deliverables/${companyId}`);
+      }
+      await addDeliverable({ ...item, fileName, companyId });
     }
-    await addDeliverable({ ...deliverableData, fileName, companyId });
     await loadData(false);
     setShowDeliverableModal(false);
   };
@@ -163,12 +166,17 @@ const CompanyDetailsPage = () => {
       updates.gestaoSipat = value;
       updates.gestao_sipat = value;
     }
+    if (field === 'gestaoS2240') {
+      updates.gestaoS2240 = value;
+      updates.gestao_s2240 = value;
+    }
     await updateCompany(companyId, updates);
     setCompany(prev => ({
       ...prev,
       [field]: value,
       ...(field === 'gestaoCipa' ? { gestaoPgr: value, gestaoCipa: value } : {}),
-      ...(field === 'gestaoEpi' ? { gestaoSipat: value, gestaoEpi: value } : {})
+      ...(field === 'gestaoEpi' ? { gestaoSipat: value, gestaoEpi: value } : {}),
+      ...(field === 'gestaoS2240' ? { gestaoS2240: value } : {})
     }));
   };
 
@@ -403,12 +411,13 @@ const CompanyDetailsPage = () => {
               </div>
             </div>
 
-            {/* Cards de Gestão de CIPA e Gestão de EPI */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+            {/* Cards de Gestão de CIPA, Gestão de EPI e S-2240 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
               {/* Card Gestão de CIPA */}
               {(() => {
                 const cipaStatus = company.gestaoCipa || company.gestaoPgr || 'pendente';
                 const epiStatus = company.gestaoEpi || company.gestaoSipat || 'pendente';
+                const s2240Status = company.gestaoS2240 === 'enviado' ? 'enviado' : 'pendente';
                 return (
                   <>
                     <div style={{
@@ -545,6 +554,61 @@ const CompanyDetailsPage = () => {
                         </button>
                       </div>
                     </div>
+
+                    {/* Card S-2240 */}
+                    <div style={{
+                      padding: '1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--surface)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>eSocial / Mensal (Todo dia 1º)</span>
+                          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>S-2240</h3>
+                        </div>
+                        <span style={{
+                          fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', padding: '0.25rem 0.625rem', borderRadius: '1rem',
+                          backgroundColor: s2240Status === 'enviado' ? '#dcfce7' : '#fef3c7',
+                          color: s2240Status === 'enviado' ? '#15803d' : '#b45309',
+                          border: `1px solid ${s2240Status === 'enviado' ? '#86efac' : '#fde68a'}`
+                        }}>
+                          {s2240Status === 'enviado' ? 'Enviado' : 'Pendente'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoS2240', 'pendente')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: s2240Status === 'pendente' ? '2px solid #b45309' : '1px solid var(--border)',
+                            backgroundColor: s2240Status === 'pendente' ? '#fef3c7' : 'var(--background)',
+                            color: s2240Status === 'pendente' ? '#b45309' : 'var(--text-secondary)',
+                            fontWeight: s2240Status === 'pendente' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Pendente
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateGestao('gestaoS2240', 'enviado')}
+                          style={{
+                            flex: 1, padding: '0.375rem 0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm, 6px)',
+                            border: s2240Status === 'enviado' ? '2px solid #15803d' : '1px solid var(--border)',
+                            backgroundColor: s2240Status === 'enviado' ? '#dcfce7' : 'var(--background)',
+                            color: s2240Status === 'enviado' ? '#15803d' : 'var(--text-secondary)',
+                            fontWeight: s2240Status === 'enviado' ? '700' : '500', cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          Enviado
+                        </button>
+                      </div>
+                    </div>
                   </>
                 );
               })()}
@@ -666,7 +730,7 @@ const CompanyDetailsPage = () => {
       )}
 
       {activeTab === 'deliverables' && (
-        <DeliverablesViewer companyId={companyId} />
+        <DeliverablesViewer companyId={companyId} onUpdate={() => loadData(false)} />
       )}
 
       {showDeliverableModal && (

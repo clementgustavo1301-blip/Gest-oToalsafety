@@ -55,6 +55,7 @@ const EditCompanyModal = ({ company, group = null, onClose, onSave }) => {
   const [visitasTecnicas, setVisitasTecnicas] = useState('N/A');
   const [gestaoCipa, setGestaoCipa] = useState('pendente');
   const [gestaoEpi, setGestaoEpi] = useState('pendente');
+  const [gestaoS2240, setGestaoS2240] = useState('pendente');
   const [contact, setContact] = useState('');
   const [profiles, setProfiles] = useState([]);
   const [phone, setPhone] = useState('');
@@ -203,6 +204,7 @@ const EditCompanyModal = ({ company, group = null, onClose, onSave }) => {
       setVisitasTecnicas(effVis);
       setGestaoCipa(company.gestaoCipa || company.gestaoPgr || 'pendente');
       setGestaoEpi(company.gestaoEpi || company.gestaoSipat || 'pendente');
+      setGestaoS2240(company.gestaoS2240 === 'enviado' ? 'enviado' : 'pendente');
       setContact(company.contact || '');
       setPhone(company.phone || '');
       setAddress(company.address || '');
@@ -234,6 +236,8 @@ const EditCompanyModal = ({ company, group = null, onClose, onSave }) => {
       gestao_cipa: gestaoCipa,
       gestaoEpi,
       gestao_epi: gestaoEpi,
+      gestaoS2240,
+      gestao_s2240: gestaoS2240,
       gestaoPgr: gestaoCipa,
       gestao_pgr: gestaoCipa,
       gestaoSipat: gestaoEpi,
@@ -446,6 +450,21 @@ const EditCompanyModal = ({ company, group = null, onClose, onSave }) => {
                     <option value="pendente">Pendente</option>
                     <option value="implementado">Implementado</option>
                     <option value="nao_implementado">Não Implementado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="modal-label" htmlFor="company-gestao-s2240">
+                    S-2240
+                  </label>
+                  <select
+                    id="company-gestao-s2240"
+                    value={gestaoS2240}
+                    onChange={(e) => setGestaoS2240(e.target.value)}
+                    className="modal-input"
+                    disabled={loading}
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="enviado">Enviado</option>
                   </select>
                 </div>
               </div>

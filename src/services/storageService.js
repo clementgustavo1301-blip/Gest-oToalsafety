@@ -3,8 +3,14 @@ import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram } from '../
 
 // --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
 
+export function getCurrentCompetencia(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
 export function parseContactData(rawContact) {
-  if (!rawContact) return { contact: '', responsible: '', supportResponsible: '', responsibleId: '', supportResponsibleId: '' };
+  if (!rawContact) return { contact: '', responsible: '', supportResponsible: '', responsibleId: '', supportResponsibleId: '', gestaoS2240: '', s2240Month: '' };
   try {
     if (typeof rawContact === 'string' && rawContact.trim().startsWith('{') && rawContact.trim().endsWith('}')) {
       const parsed = JSON.parse(rawContact);
@@ -14,16 +20,18 @@ export function parseContactData(rawContact) {
         supportResponsible: parsed.supportResponsible || '',
         responsibleId: parsed.responsibleId || '',
         supportResponsibleId: parsed.supportResponsibleId || '',
+        gestaoS2240: parsed.gestaoS2240 || '',
+        s2240Month: parsed.s2240Month || '',
       };
     }
   } catch (e) {
     // fallback
   }
-  return { contact: rawContact, responsible: '', supportResponsible: '', responsibleId: '', supportResponsibleId: '' };
+  return { contact: rawContact, responsible: '', supportResponsible: '', responsibleId: '', supportResponsibleId: '', gestaoS2240: '', s2240Month: '' };
 }
 
-export function serializeContactData({ contact, responsible, supportResponsible, responsibleId, supportResponsibleId }) {
-  if (!responsible && !supportResponsible && !responsibleId && !supportResponsibleId) {
+export function serializeContactData({ contact, responsible, supportResponsible, responsibleId, supportResponsibleId, gestaoS2240, s2240Month }) {
+  if (!responsible && !supportResponsible && !responsibleId && !supportResponsibleId && !gestaoS2240 && !s2240Month) {
     return contact || '';
   }
   return JSON.stringify({
@@ -32,6 +40,8 @@ export function serializeContactData({ contact, responsible, supportResponsible,
     supportResponsible: supportResponsible || '',
     responsibleId: responsibleId || '',
     supportResponsibleId: supportResponsibleId || '',
+    gestaoS2240: gestaoS2240 || 'pendente',
+    s2240Month: s2240Month || '',
   });
 }
 
@@ -79,6 +89,14 @@ function mapCompany(row) {
   const regName = parts.length > 1 ? parts[1] : 'Natal';
   const contactInfo = parseContactData(row.contact);
 
+  const currentMonth = getCurrentCompetencia();
+  const rawS2240 = row.gestao_s2240 || contactInfo.gestaoS2240 || 'pendente';
+  const rawS2240Month = row.s2240_month || contactInfo.s2240Month || '';
+  // Todo dia 1º do mês (nova competência YYYY-MM), o S-2240 fica automaticamente como 'pendente'
+  const effectiveS2240 = (rawS2240 === 'enviado' && rawS2240Month === currentMonth)
+    ? 'enviado'
+    : 'pendente';
+
   return {
     id: row.id,
     groupId: row.group_id,
@@ -96,6 +114,8 @@ function mapCompany(row) {
     gestaoEpi: row.gestao_epi || row.gestao_sipat || 'pendente',
     gestaoPgr: row.gestao_cipa || row.gestao_pgr || 'pendente',
     gestaoSipat: row.gestao_epi || row.gestao_sipat || 'pendente',
+    gestaoS2240: effectiveS2240,
+    s2240Month: rawS2240Month,
     phone: row.phone,
     category: catName,
     region: regName,
@@ -260,6 +280,8 @@ export async function updateGroup(groupId, updates) {
             responsibleId: tecProf?.id || (newTecnico !== undefined ? '' : info.responsibleId),
             supportResponsible: newSupervisor !== undefined ? newSupervisor : info.supportResponsible,
             supportResponsibleId: supProf?.id || (newSupervisor !== undefined ? '' : info.supportResponsibleId),
+            gestaoS2240: info.gestaoS2240,
+            s2240Month: info.s2240Month,
           });
           await supabase.from('companies').update({ contact: serialized }).eq('id', comp.id);
         }
@@ -327,12 +349,17 @@ export async function addCompany(company) {
     }
   }
 
+  const initS2240 = company.gestaoS2240 || company.gestao_s2240 || 'pendente';
+  const initS2240Month = initS2240 === 'enviado' ? getCurrentCompetencia() : '';
+
   const contactStr = serializeContactData({
     contact: company.contact,
     responsible: effTecnico,
     supportResponsible: effSupervisor,
     responsibleId: effRespId,
     supportResponsibleId: effSuppId,
+    gestaoS2240: initS2240,
+    s2240Month: initS2240Month,
   });
 
   const basePayload = {
@@ -442,7 +469,9 @@ export async function updateCompany(companyId, updates) {
     updates.responsible !== undefined ||
     updates.supportResponsible !== undefined ||
     updates.responsibleId !== undefined ||
-    updates.supportResponsibleId !== undefined
+    updates.supportResponsibleId !== undefined ||
+    updates.gestaoS2240 !== undefined ||
+    updates.gestao_s2240 !== undefined
   ) {
     const { data: current } = await supabase.from('companies').select('contact').eq('id', companyId).single();
     const currentInfo = parseContactData(current?.contact);
@@ -451,6 +480,11 @@ export async function updateCompany(companyId, updates) {
     const newRespId = updates.responsibleId !== undefined ? updates.responsibleId : currentInfo.responsibleId;
     const newSupp = updates.supportResponsible !== undefined ? updates.supportResponsible : (updates.supervisor !== undefined ? updates.supervisor : currentInfo.supportResponsible);
     const newSuppId = updates.supportResponsibleId !== undefined ? updates.supportResponsibleId : currentInfo.supportResponsibleId;
+    const rawNewS2240 = updates.gestaoS2240 !== undefined ? updates.gestaoS2240 : updates.gestao_s2240;
+    const newS2240 = rawNewS2240 !== undefined ? rawNewS2240 : (currentInfo.gestaoS2240 || 'pendente');
+    const newS2240Month = rawNewS2240 !== undefined
+      ? (rawNewS2240 === 'enviado' ? getCurrentCompetencia() : '')
+      : currentInfo.s2240Month;
 
     snakeUpdates.contact = serializeContactData({
       contact: newContact,
@@ -458,6 +492,8 @@ export async function updateCompany(companyId, updates) {
       supportResponsible: newSupp,
       responsibleId: newRespId,
       supportResponsibleId: newSuppId,
+      gestaoS2240: newS2240,
+      s2240Month: newS2240Month,
     });
   }
   if (updates.address !== undefined) snakeUpdates.address = updates.address;
@@ -556,6 +592,8 @@ export async function updateCompany(companyId, updates) {
             responsibleId: tecProf?.id || (newTecnico !== undefined ? '' : info.responsibleId),
             supportResponsible: newSupervisor !== undefined ? newSupervisor : info.supportResponsible,
             supportResponsibleId: supProf?.id || (newSupervisor !== undefined ? '' : info.supportResponsibleId),
+            gestaoS2240: info.gestaoS2240,
+            s2240Month: info.s2240Month,
           });
           await supabase.from('companies').update({ contact: serialized }).eq('id', sib.id);
         }
@@ -771,22 +809,27 @@ export async function updateContract(contractId, updates) {
 }
 
 // --- Deliverables ---
+function isS2240Row(row) {
+  const t = String(row?.title || '').toUpperCase();
+  return t.includes('2240');
+}
+
 export async function getDeliverables() {
   const { data, error } = await supabase.from('deliverables').select('*').order('due_date', { ascending: true });
   if (error) { console.error('Error fetching deliverables:', error); return []; }
-  return data.map(mapDeliverable);
+  return data.filter(row => !isS2240Row(row)).map(mapDeliverable);
 }
 
 export async function getDeliverablesByCompany(companyId) {
   const { data, error } = await supabase.from('deliverables').select('*').eq('company_id', companyId);
   if (error) { console.error('Error fetching deliverables by company:', error); return []; }
-  return data.map(mapDeliverable);
+  return data.filter(row => !isS2240Row(row)).map(mapDeliverable);
 }
 
 export async function getDeliverablesByContract(contractId) {
   const { data, error } = await supabase.from('deliverables').select('*').eq('contract_id', contractId);
   if (error) { console.error('Error fetching deliverables by contract:', error); return []; }
-  return data.map(mapDeliverable);
+  return data.filter(row => !isS2240Row(row)).map(mapDeliverable);
 }
 
 export async function addDeliverable(deliverable) {
@@ -808,111 +851,46 @@ export async function addDeliverable(deliverable) {
   }
   const revisaoVal = deliverable.ultimaRevisao || null;
 
-  // 1. Get the company's group_id
-  const { data: company } = await supabase.from('companies').select('group_id').eq('id', deliverable.companyId).single();
-  
-  if (company && company.group_id) {
-    // 2. Get all companies in the same group
-    const { data: groupCompanies } = await supabase.from('companies').select('id').eq('group_id', company.group_id);
-    
-    if (groupCompanies && groupCompanies.length > 0) {
-      let createdDeliverable = null;
-      for (const gc of groupCompanies) {
-        // Check if exists
-        const { data: existing } = await supabase.from('deliverables')
-          .select('id')
-          .eq('company_id', gc.id)
-          .eq('title', deliverable.title)
-          .eq('type', deliverable.type)
-          .maybeSingle();
-          
-        if (!existing) {
-          const insertPayload = {
-            company_id: gc.id,
-            contract_id: gc.id === deliverable.companyId ? deliverable.contractId : null,
-            title: deliverable.title,
-            type: deliverable.type,
-            status: deliverable.status || 'pendente',
-            due_date: emissaoVal,
-            data_envio: emissaoVal,
-            data_emissao: emissaoVal,
-            validity_date: validityVal,
-            ultima_revisao: revisaoVal,
-            delivered_date: deliverable.deliveredDate,
-            file_name: deliverable.fileName,
-            reason: deliverable.reason,
-            description: deliverable.description,
-            responsible_id: deliverable.responsibleId || null,
-          };
-          
-          let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
-          if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
-            delete insertPayload.data_emissao;
-            insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
-          }
+  // Cada empresa (CNPJ) tem seus próprios programas e entregáveis de forma independente.
+  // Se já existir o mesmo programa/documento na MESMA empresa (exceto treinamentos e visitas técnicas), atualiza apenas o registro desta empresa.
+  if (deliverable.companyId && deliverable.type !== 'treinamento' && deliverable.type !== 'visita_tecnica') {
+    const { data: existingList } = await supabase.from('deliverables')
+      .select('id')
+      .eq('company_id', deliverable.companyId)
+      .eq('title', deliverable.title)
+      .eq('type', deliverable.type)
+      .limit(1);
 
-          if (insRes.error) console.error('Error adding deliverable to group company:', insRes.error);
-          
-          if (gc.id === deliverable.companyId && insRes.data) {
-            createdDeliverable = insRes.data;
-          }
-        } else {
-          // Já existe entregável com este título no grupo: atualiza emissão, validade e status
-          const updatePayload = {
-            due_date: emissaoVal,
-            data_envio: emissaoVal,
-            data_emissao: emissaoVal,
-            validity_date: validityVal,
-            ultima_revisao: revisaoVal,
-            status: deliverable.status || 'pendente',
-          };
-          if (deliverable.description !== undefined) updatePayload.description = deliverable.description;
-          if (deliverable.responsibleId !== undefined) updatePayload.responsible_id = deliverable.responsibleId;
-          if (deliverable.fileName) updatePayload.file_name = deliverable.fileName;
-          if (deliverable.deliveredDate) updatePayload.delivered_date = deliverable.deliveredDate;
+    const existing = existingList && existingList.length > 0 ? existingList[0] : null;
+    if (existing) {
+      const updatePayload = {
+        due_date: emissaoVal,
+        data_envio: emissaoVal,
+        data_emissao: emissaoVal,
+        validity_date: validityVal,
+        ultima_revisao: revisaoVal,
+        status: deliverable.status || 'pendente',
+      };
+      if (deliverable.contractId !== undefined) updatePayload.contract_id = deliverable.contractId;
+      if (deliverable.description !== undefined) updatePayload.description = deliverable.description;
+      if (deliverable.responsibleId !== undefined) updatePayload.responsible_id = deliverable.responsibleId;
+      if (deliverable.fileName) updatePayload.file_name = deliverable.fileName;
+      if (deliverable.deliveredDate) updatePayload.delivered_date = deliverable.deliveredDate;
+      if (deliverable.reason !== undefined) updatePayload.reason = deliverable.reason;
 
-          let upRes = await supabase.from('deliverables').update(updatePayload).eq('id', existing.id).select().single();
-          if (upRes.error && upRes.error.message && (upRes.error.message.includes('column') || upRes.error.code === 'PGRST204')) {
-            delete updatePayload.data_emissao;
-            upRes = await supabase.from('deliverables').update(updatePayload).eq('id', existing.id).select().single();
-          }
-
-          if (gc.id === deliverable.companyId) {
-            createdDeliverable = upRes.data || existing;
-          }
-        }
+      let upRes = await supabase.from('deliverables').update(updatePayload).eq('id', existing.id).select().single();
+      if (upRes.error && upRes.error.message && (upRes.error.message.includes('column') || upRes.error.code === 'PGRST204')) {
+        delete updatePayload.data_emissao;
+        upRes = await supabase.from('deliverables').update(updatePayload).eq('id', existing.id).select().single();
       }
-      
-      if (!createdDeliverable) {
-         const insertPayload = {
-            company_id: deliverable.companyId,
-            contract_id: deliverable.contractId,
-            title: deliverable.title,
-            type: deliverable.type,
-            status: deliverable.status || 'pendente',
-            due_date: emissaoVal,
-            data_envio: emissaoVal,
-            data_emissao: emissaoVal,
-            validity_date: validityVal,
-            ultima_revisao: revisaoVal,
-            delivered_date: deliverable.deliveredDate,
-            file_name: deliverable.fileName,
-            reason: deliverable.reason,
-            description: deliverable.description,
-            responsible_id: deliverable.responsibleId || null,
-         };
-         let insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
-         if (insRes.error && insRes.error.message && (insRes.error.message.includes('column') || insRes.error.code === 'PGRST204')) {
-            delete insertPayload.data_emissao;
-            insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
-         }
-         createdDeliverable = insRes.data;
+      if (upRes.error) {
+        console.error('Error updating existing deliverable for company:', upRes.error);
+        return null;
       }
-      return mapDeliverable(createdDeliverable);
+      return mapDeliverable(upRes.data);
     }
   }
 
-  // Fallback
   const insertPayload = {
     company_id: deliverable.companyId,
     contract_id: deliverable.contractId,
