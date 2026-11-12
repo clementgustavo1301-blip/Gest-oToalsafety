@@ -1,4 +1,5 @@
-// Relatório de Programas e Laudos (por Empresa ou por Responsável) em planilha Excel
+// Relatório de Programas e Laudos (por Empresa, por Responsável ou Empresa e Responsável,
+// nos modelos Analítico, Sintético ou Ambos) em planilha Excel (.xlsx)
 import {
   isItemExpired, isDelivered, isProgram, getEffectiveValidityDate,
   isItemExpiring30, isItemExpiring60, parseSafeDate
@@ -92,11 +93,23 @@ export function buildReportRows({ deliverables, companies, contracts, profiles, 
 
 const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 
+function compareResponsible(a, b) {
+  if (a === b) return 0;
+  if (a === NO_RESPONSIBLE) return 1;
+  if (b === NO_RESPONSIBLE) return -1;
+  return collator.compare(a, b);
+}
+
 function sortRows(rows, groupBy) {
   return [...rows].sort((a, b) => {
-    const primary = groupBy === 'responsavel'
-      ? collator.compare(a.responsible, b.responsible) || collator.compare(a.companyName, b.companyName)
-      : collator.compare(a.companyName, b.companyName);
+    let primary = 0;
+    if (groupBy === 'responsavel') {
+      primary = compareResponsible(a.responsible, b.responsible) || collator.compare(a.companyName, b.companyName);
+    } else if (groupBy === 'empresa_responsavel') {
+      primary = collator.compare(a.companyName, b.companyName) || compareResponsible(a.responsible, b.responsible);
+    } else {
+      primary = collator.compare(a.companyName, b.companyName);
+    }
     return primary || collator.compare(a.typeLabel, b.typeLabel) || collator.compare(a.title, b.title);
   });
 }
@@ -130,22 +143,49 @@ function accumulate(counter, r) {
   if (r.validity.label.startsWith('A vencer')) counter.aVencer++;
 }
 
-function groupRows(rows, groupBy) {
+export function groupRows(rows, groupBy) {
   const groups = new Map();
   rows.forEach(r => {
-    const key = groupBy === 'responsavel' ? r.responsible : r.companyName;
-    if (!groups.has(key)) groups.set(key, { key, rows: [], counters: emptyCounters(), companies: new Set(), responsibles: new Set() });
+    let key;
+    if (groupBy === 'responsavel') {
+      key = r.responsible;
+    } else if (groupBy === 'empresa_responsavel') {
+      key = `${r.companyName}|||${r.responsible}`;
+    } else {
+      key = r.companyName;
+    }
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        companyName: r.companyName,
+        cnpj: r.cnpj,
+        responsible: r.responsible,
+        sheetLabel: groupBy === 'empresa_responsavel'
+          ? `${r.companyName} - ${r.responsible}`
+          : (groupBy === 'responsavel' ? r.responsible : r.companyName),
+        rows: [],
+        counters: emptyCounters(),
+        companies: new Set(),
+        responsibles: new Set(),
+      });
+    }
     const g = groups.get(key);
     g.rows.push(r);
+    if (!g.cnpj && r.cnpj) g.cnpj = r.cnpj;
     g.companies.add(r.companyName);
     g.responsibles.add(r.responsible);
     accumulate(g.counters, r);
   });
+
   return [...groups.values()].sort((a, b) => {
-    // "Sem responsável" sempre por último
-    if (a.key === NO_RESPONSIBLE) return 1;
-    if (b.key === NO_RESPONSIBLE) return -1;
-    return collator.compare(a.key, b.key);
+    if (groupBy === 'responsavel') {
+      return compareResponsible(a.responsible, b.responsible);
+    }
+    if (groupBy === 'empresa_responsavel') {
+      return collator.compare(a.companyName, b.companyName) || compareResponsible(a.responsible, b.responsible);
+    }
+    return collator.compare(a.companyName, b.companyName);
   });
 }
 
@@ -166,12 +206,20 @@ function headerBlock(title, subtitle, colCount) {
 }
 
 function buildSummarySheet(groups, groupBy, title, subtitle) {
-  const byResp = groupBy === 'responsavel';
-  const headers = byResp
-    ? ['Responsável', 'Empresas', 'Total', 'Programas', 'Laudos', 'Entregues', 'Pendentes', 'Em Elaboração', 'Vencidos', 'A Vencer (≤60d)', 'Canc. / N.A.', '% Entregue']
-    : ['Empresa', 'Responsável(is)', 'Total', 'Programas', 'Laudos', 'Entregues', 'Pendentes', 'Em Elaboração', 'Vencidos', 'A Vencer (≤60d)', 'Canc. / N.A.', '% Entregue'];
+  const isResp = groupBy === 'responsavel';
+  const isBoth = groupBy === 'empresa_responsavel';
+
+  const leadingHeaders = isBoth
+    ? ['Empresa', 'CNPJ', 'Responsável']
+    : isResp
+      ? ['Responsável', 'Empresas']
+      : ['Empresa', 'CNPJ', 'Responsável(is)'];
+
+  const metricHeaders = ['Total', 'Programas', 'Laudos', 'Entregues', 'Pendentes', 'Em Elaboração', 'Vencidos', 'A Vencer (≤60d)', 'Canc. / N.A.', '% Entregue'];
+  const headers = [...leadingHeaders, ...metricHeaders];
 
   const head = headerBlock(title, subtitle, headers.length);
+  const headerRowIndex = head.rows.length + 1;
   const rows = [...head.rows, headers.map(h => ({ v: h, s: S.HEADER }))];
   const totals = emptyCounters();
 
@@ -183,9 +231,15 @@ function buildSummarySheet(groups, groupBy, title, subtitle) {
   groups.forEach(g => {
     const c = g.counters;
     Object.keys(totals).forEach(k => { totals[k] += c[k] || 0; });
+
+    const leadingCells = isBoth
+      ? [{ v: g.companyName, s: S.CELL }, { v: g.cnpj, s: S.CELL }, { v: g.responsible, s: S.CELL }]
+      : isResp
+        ? [{ v: g.responsible, s: S.CELL }, { v: g.companies.size, s: S.CENTER }]
+        : [{ v: g.companyName, s: S.CELL }, { v: g.cnpj, s: S.CELL }, { v: [...g.responsibles].join(', '), s: S.CELL }];
+
     rows.push([
-      { v: g.key, s: S.CELL },
-      byResp ? { v: g.companies.size, s: S.CENTER } : { v: [...g.responsibles].join(', '), s: S.CELL },
+      ...leadingCells,
       { v: c.total, s: S.TOTAL },
       { v: c.programas, s: S.CENTER },
       { v: c.laudos, s: S.CENTER },
@@ -200,9 +254,16 @@ function buildSummarySheet(groups, groupBy, title, subtitle) {
   });
 
   const allCompanies = new Set(groups.flatMap(g => [...g.companies]));
+  const allResponsibles = new Set(groups.flatMap(g => [...g.responsibles]));
+
+  const totalLeadingCells = isBoth
+    ? [{ v: `TOTAL GERAL (${allCompanies.size} emp.)`, s: S.GROUP }, { v: '', s: S.GROUP }, { v: `${allResponsibles.size} resp.`, s: S.TOTAL }]
+    : isResp
+      ? [{ v: 'TOTAL GERAL', s: S.GROUP }, { v: allCompanies.size, s: S.TOTAL }]
+      : [{ v: 'TOTAL GERAL', s: S.GROUP }, { v: '', s: S.GROUP }, { v: `${allResponsibles.size} resp.`, s: S.TOTAL }];
+
   rows.push([
-    { v: 'TOTAL GERAL', s: S.GROUP },
-    byResp ? { v: allCompanies.size, s: S.TOTAL } : { v: '', s: S.GROUP },
+    ...totalLeadingCells,
     { v: totals.total, s: S.TOTAL },
     { v: totals.programas, s: S.TOTAL },
     { v: totals.laudos, s: S.TOTAL },
@@ -215,22 +276,31 @@ function buildSummarySheet(groups, groupBy, title, subtitle) {
     { v: pct(totals), s: S.TOTAL },
   ]);
 
+  const leadingCols = isBoth
+    ? [{ width: 42 }, { width: 20 }, { width: 28 }]
+    : isResp
+      ? [{ width: 34 }, { width: 12 }]
+      : [{ width: 42 }, { width: 20 }, { width: 30 }];
+
+  const metricCols = [{ width: 9 }, { width: 12 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 11 }, { width: 16 }, { width: 13 }, { width: 12 }];
+  const lastDataRow = headerRowIndex + Math.max(groups.length, 1);
+
   return {
-    name: 'Resumo',
+    name: 'Sintético',
     rows,
     merges: head.merges,
-    freezeRow: 4,
-    columns: [{ width: 44 }, { width: byResp ? 12 : 32 }, { width: 9 }, { width: 12 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 11 }, { width: 16 }, { width: 13 }, { width: 12 }],
+    freezeRow: headerRowIndex,
+    autoFilter: `A${headerRowIndex}:${columnLetter(headers.length - 1)}${lastDataRow}`,
+    columns: [...leadingCols, ...metricCols],
   };
 }
 
 function detailColumns(groupBy) {
   const first = groupBy === 'responsavel'
-    ? [{ h: 'Responsável', w: 30 }, { h: 'Empresa', w: 44 }]
-    : [{ h: 'Empresa', w: 44 }, { h: 'Responsável', w: 30 }];
+    ? [{ h: 'Responsável', w: 30 }, { h: 'Empresa', w: 44 }, { h: 'CNPJ', w: 20 }]
+    : [{ h: 'Empresa', w: 44 }, { h: 'CNPJ', w: 20 }, { h: 'Responsável', w: 30 }];
   return [
     ...first,
-    { h: 'CNPJ', w: 20 },
     { h: 'Tipo', w: 11 },
     { h: 'Entregável', w: 40 },
     { h: 'Status', w: 15 },
@@ -246,11 +316,10 @@ function detailColumns(groupBy) {
 
 function detailRow(r, groupBy) {
   const first = groupBy === 'responsavel'
-    ? [{ v: r.responsible, s: S.CELL }, { v: r.companyName, s: S.CELL }]
-    : [{ v: r.companyName, s: S.CELL }, { v: r.responsible, s: S.CELL }];
+    ? [{ v: r.responsible, s: S.CELL }, { v: r.companyName, s: S.CELL }, { v: r.cnpj, s: S.CELL }]
+    : [{ v: r.companyName, s: S.CELL }, { v: r.cnpj, s: S.CELL }, { v: r.responsible, s: S.CELL }];
   return [
     ...first,
-    { v: r.cnpj, s: S.CELL },
     { v: r.typeLabel, s: S.CENTER },
     { v: r.title, s: S.CELL },
     { v: r.situation.label, s: statusStyle(r.situation.key) },
@@ -294,40 +363,71 @@ function slugify(text) {
 /**
  * Gera e baixa a planilha do relatório.
  * @param {object} opts
- * @param {'empresa'|'responsavel'} opts.groupBy
+ * @param {'empresa'|'responsavel'|'empresa_responsavel'} opts.groupBy
+ * @param {'analitico'|'sintetico'|'ambos'} [opts.reportFormat='ambos']
  * @param {Array} opts.rows - linhas de buildReportRows (já filtradas)
- * @param {boolean} opts.sheetPerGroup - cria uma aba por empresa/responsável
- * @param {string} [opts.selectionLabel] - nome da empresa/responsável quando filtrado
+ * @param {boolean} opts.sheetPerGroup - cria uma aba por grupo
+ * @param {string} [opts.selectionLabel] - descrição do filtro selecionado
  * @param {string[]} opts.types
  */
-export async function generateDeliverablesReport({ groupBy, rows, sheetPerGroup = false, selectionLabel = '', types = REPORT_TYPES }) {
+export async function generateDeliverablesReport({
+  groupBy,
+  reportFormat = 'ambos',
+  rows,
+  sheetPerGroup = false,
+  selectionLabel = '',
+  types = REPORT_TYPES,
+}) {
   const sorted = sortRows(rows, groupBy);
   const groups = groupRows(sorted, groupBy);
 
   const typesLabel = types.length === 2 ? 'Programas e Laudos' : (types[0] === 'programa' ? 'Programas' : 'Laudos');
-  const groupLabel = groupBy === 'responsavel' ? 'Responsável' : 'Empresa';
-  const title = `Relatório de ${typesLabel} por ${groupLabel}${selectionLabel ? ` — ${selectionLabel}` : ''}`;
-  const subtitle = `Gerado em ${formatNow()} • ${sorted.length} entregável(is) • ${groups.length} ${groupBy === 'responsavel' ? 'responsável(is)' : 'empresa(s)'}`;
+  const groupLabelMap = {
+    empresa: 'Empresa',
+    responsavel: 'Responsável',
+    empresa_responsavel: 'Empresa e Responsável',
+  };
+  const groupCountMap = {
+    empresa: 'empresa(s)',
+    responsavel: 'responsável(is)',
+    empresa_responsavel: 'vínculo(s) empresa × responsável',
+  };
+  const formatLabelMap = {
+    sintetico: 'Sintético',
+    analitico: 'Analítico',
+    ambos: 'Sintético e Analítico',
+  };
 
-  const sheets = [
-    buildSummarySheet(groups, groupBy, title, subtitle),
-    buildDetailSheet('Detalhado', sorted, groupBy, title, subtitle),
-  ];
+  const groupLabel = groupLabelMap[groupBy] || 'Empresa';
+  const formatLabel = formatLabelMap[reportFormat] || 'Sintético e Analítico';
+  const title = `Relatório ${formatLabel} de ${typesLabel} por ${groupLabel}${selectionLabel ? ` — ${selectionLabel}` : ''}`;
+  const subtitle = `Gerado em ${formatNow()} • ${sorted.length} entregável(is) • ${groups.length} ${groupCountMap[groupBy] || 'grupo(s)'}`;
 
-  if (sheetPerGroup) {
-    groups.forEach(g => {
-      sheets.push(buildDetailSheet(
-        g.key,
-        g.rows,
-        groupBy,
-        `${typesLabel} — ${g.key}`,
-        `Gerado em ${formatNow()} • ${g.rows.length} entregável(is)`
-      ));
-    });
+  const sheets = [];
+
+  if (reportFormat === 'sintetico' || reportFormat === 'ambos') {
+    sheets.push(buildSummarySheet(groups, groupBy, title, subtitle));
+  }
+
+  if (reportFormat === 'analitico' || reportFormat === 'ambos') {
+    sheets.push(buildDetailSheet('Analítico', sorted, groupBy, title, subtitle));
+
+    if (sheetPerGroup) {
+      groups.forEach(g => {
+        sheets.push(buildDetailSheet(
+          g.sheetLabel,
+          g.rows,
+          groupBy,
+          `${typesLabel} — ${g.sheetLabel}`,
+          `Gerado em ${formatNow()} • ${g.rows.length} entregável(is)`
+        ));
+      });
+    }
   }
 
   const blob = await buildXlsxBlob(sheets);
   const dateStr = new Date().toISOString().slice(0, 10);
   const suffix = selectionLabel ? `-${slugify(selectionLabel)}` : '';
-  downloadBlob(blob, `relatorio-${slugify(typesLabel)}-por-${groupBy}${suffix}-${dateStr}.xlsx`);
+  const fmtSlug = reportFormat === 'ambos' ? '' : `-${reportFormat}`;
+  downloadBlob(blob, `relatorio${fmtSlug}-${slugify(typesLabel)}-por-${slugify(groupBy)}${suffix}-${dateStr}.xlsx`);
 }

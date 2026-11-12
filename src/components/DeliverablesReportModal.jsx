@@ -1,17 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, FileSpreadsheet, Building2, UserCheck, Download, Check } from 'lucide-react';
+import { X, FileSpreadsheet, Building2, UserCheck, Users, Download, Check, ListTree, BarChart3, Layers } from 'lucide-react';
 import { getProfiles } from '../services/storageService';
-import { buildReportRows, generateDeliverablesReport, REPORT_TYPES } from '../utils/deliverablesReport';
+import { buildReportRows, generateDeliverablesReport, groupRows, REPORT_TYPES, NO_RESPONSIBLE } from '../utils/deliverablesReport';
 
 const GROUP_OPTIONS = [
-  { id: 'empresa', label: 'Por Empresa', desc: 'Programas e laudos agrupados por empresa', icon: Building2 },
-  { id: 'responsavel', label: 'Por Responsável', desc: 'Programas e laudos agrupados por técnico responsável', icon: UserCheck },
+  { id: 'empresa', label: 'Por Empresa', desc: 'Agrupado por empresa', icon: Building2 },
+  { id: 'responsavel', label: 'Por Responsável', desc: 'Agrupado por técnico', icon: UserCheck },
+  { id: 'empresa_responsavel', label: 'Empresa e Responsável', desc: 'Por empresa × responsável', icon: Users },
+];
+
+const FORMAT_OPTIONS = [
+  { id: 'analitico', label: 'Analítico', desc: 'Lista detalhada de cada programa e laudo com datas e validade', icon: ListTree },
+  { id: 'sintetico', label: 'Sintético', desc: 'Quadro consolidado com totais, pendentes, vencidos e % entregue', icon: BarChart3 },
+  { id: 'ambos', label: 'Analítico + Sintético', desc: 'Planilha completa com as duas abas (Sintético e Analítico)', icon: Layers },
 ];
 
 const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 
 const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }) => {
-  const [groupBy, setGroupBy] = useState('empresa');
+  const [groupBy, setGroupBy] = useState('empresa_responsavel');
+  const [reportFormat, setReportFormat] = useState('analitico');
   const [selectedCompany, setSelectedCompany] = useState('all');
   const [selectedResponsible, setSelectedResponsible] = useState('all');
   const [types, setTypes] = useState(REPORT_TYPES);
@@ -36,27 +44,37 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
 
   const companyOptions = useMemo(() => {
     const map = new Map();
-    baseRows.forEach(r => { if (!map.has(r.companyId)) map.set(r.companyId, r.companyName); });
+    baseRows.forEach(r => {
+      if (selectedResponsible === 'all' || r.responsible === selectedResponsible) {
+        if (!map.has(r.companyId)) map.set(r.companyId, r.companyName);
+      }
+    });
     return [...map.entries()].sort((a, b) => collator.compare(a[1], b[1]));
-  }, [baseRows]);
+  }, [baseRows, selectedResponsible]);
 
   const responsibleOptions = useMemo(() => {
-    return [...new Set(baseRows.map(r => r.responsible))].sort(collator.compare);
-  }, [baseRows]);
+    const set = new Set();
+    baseRows.forEach(r => {
+      if (selectedCompany === 'all' || r.companyId === selectedCompany) {
+        set.add(r.responsible);
+      }
+    });
+    return [...set].sort((a, b) => {
+      if (a === NO_RESPONSIBLE) return 1;
+      if (b === NO_RESPONSIBLE) return -1;
+      return collator.compare(a, b);
+    });
+  }, [baseRows, selectedCompany]);
 
   const filteredRows = useMemo(() => {
-    if (groupBy === 'empresa' && selectedCompany !== 'all') {
-      return baseRows.filter(r => r.companyId === selectedCompany);
-    }
-    if (groupBy === 'responsavel' && selectedResponsible !== 'all') {
-      return baseRows.filter(r => r.responsible === selectedResponsible);
-    }
-    return baseRows;
-  }, [baseRows, groupBy, selectedCompany, selectedResponsible]);
+    return baseRows.filter(r => {
+      const matchCompany = selectedCompany === 'all' || r.companyId === selectedCompany;
+      const matchResp = selectedResponsible === 'all' || r.responsible === selectedResponsible;
+      return matchCompany && matchResp;
+    });
+  }, [baseRows, selectedCompany, selectedResponsible]);
 
-  const groupCount = useMemo(() => new Set(
-    filteredRows.map(r => (groupBy === 'responsavel' ? r.responsible : r.companyId))
-  ).size, [filteredRows, groupBy]);
+  const groupCount = useMemo(() => groupRows(filteredRows, groupBy).length, [filteredRows, groupBy]);
 
   const toggleType = (t) => {
     setTypes(prev => {
@@ -65,9 +83,13 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
     });
   };
 
-  const selectionLabel = groupBy === 'empresa'
-    ? (selectedCompany !== 'all' ? (companyOptions.find(([id]) => id === selectedCompany)?.[1] || '') : '')
-    : (selectedResponsible !== 'all' ? selectedResponsible : '');
+  const selectedCompanyName = selectedCompany !== 'all'
+    ? (companies.find(c => c.id === selectedCompany)?.name || '')
+    : '';
+  const selectedResponsibleName = selectedResponsible !== 'all' ? selectedResponsible : '';
+
+  const selectionLabel = [selectedCompanyName, selectedResponsibleName].filter(Boolean).join(' • ');
+  const canSplitSheets = reportFormat !== 'sintetico' && groupCount > 1;
 
   const handleGenerate = async () => {
     if (filteredRows.length === 0) return;
@@ -75,8 +97,9 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
     try {
       await generateDeliverablesReport({
         groupBy,
+        reportFormat,
         rows: filteredRows,
-        sheetPerGroup: sheetPerGroup && !selectionLabel,
+        sheetPerGroup: sheetPerGroup && canSplitSheets,
         selectionLabel,
         types,
       });
@@ -88,11 +111,21 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
     }
   };
 
-  const groupNoun = groupBy === 'responsavel' ? 'responsável' : 'empresa';
+  const groupNoun = groupBy === 'responsavel'
+    ? 'responsável'
+    : groupBy === 'empresa_responsavel'
+      ? 'empresa × responsável'
+      : 'empresa';
+
+  const sheetsDescription = reportFormat === 'sintetico'
+    ? 'aba "Sintético"'
+    : reportFormat === 'analitico'
+      ? `aba "Analítico"${sheetPerGroup && canSplitSheets ? ` + ${groupCount} aba(s) individuais` : ''}`
+      : `abas "Sintético" e "Analítico"${sheetPerGroup && canSplitSheets ? ` + ${groupCount} aba(s) individuais` : ''}`;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
@@ -105,7 +138,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
             <div>
               <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Relatório de Programas e Laudos</h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.125rem' }}>
-                Gera uma planilha Excel (.xlsx) com resumo e detalhamento
+                Exporte em planilha Excel (.xlsx) nos formatos Analítico ou Sintético
               </p>
             </div>
           </div>
@@ -115,10 +148,10 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
         </div>
 
         <div className="modal-body">
-          {/* Agrupamento */}
+          {/* 1. Agrupamento */}
           <div>
-            <span className="modal-label">Tipo de relatório</span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.625rem', marginTop: '0.375rem' }}>
+            <span className="modal-label">Agrupamento do relatório</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '0.5rem', marginTop: '0.375rem' }}>
               {GROUP_OPTIONS.map(opt => {
                 const Icon = opt.icon;
                 const active = groupBy === opt.id;
@@ -128,26 +161,57 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
                     type="button"
                     onClick={() => setGroupBy(opt.id)}
                     style={{
-                      display: 'flex', alignItems: 'flex-start', gap: '0.625rem', textAlign: 'left',
-                      padding: '0.75rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'flex-start', gap: '0.5rem', textAlign: 'left',
+                      padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
                       border: active ? '2px solid var(--primary)' : '1px solid var(--border)',
                       backgroundColor: active ? 'var(--primary-light)' : 'var(--surface)',
                     }}
                   >
-                    <Icon size={18} color={active ? 'var(--primary)' : 'var(--text-secondary)'} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <Icon size={17} color={active ? 'var(--primary)' : 'var(--text-secondary)'} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <span style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', flex: 1 }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: active ? 'var(--primary)' : 'var(--text-primary)' }}>{opt.label}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{opt.desc}</span>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: active ? 'var(--primary)' : 'var(--text-primary)' }}>{opt.label}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{opt.desc}</span>
                     </span>
-                    {active && <Check size={16} color="var(--primary)" />}
+                    {active && <Check size={15} color="var(--primary)" style={{ flexShrink: 0 }} />}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Seleção de empresa / responsável */}
-          {groupBy === 'empresa' ? (
+          {/* 2. Modelo: Analítico / Sintético / Ambos */}
+          <div>
+            <span className="modal-label">Modelo de relatório</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '0.5rem', marginTop: '0.375rem' }}>
+              {FORMAT_OPTIONS.map(opt => {
+                const Icon = opt.icon;
+                const active = reportFormat === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setReportFormat(opt.id)}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: '0.5rem', textAlign: 'left',
+                      padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                      border: active ? '2px solid #15803d' : '1px solid var(--border)',
+                      backgroundColor: active ? '#dcfce7' : 'var(--surface)',
+                    }}
+                  >
+                    <Icon size={17} color={active ? '#15803d' : 'var(--text-secondary)'} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', flex: 1 }}>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: active ? '#15803d' : 'var(--text-primary)' }}>{opt.label}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>{opt.desc}</span>
+                    </span>
+                    {active && <Check size={15} color="#15803d" style={{ flexShrink: 0 }} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Filtros de Empresa e Responsável */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label className="modal-label" htmlFor="report-company">Empresa</label>
               <select
@@ -162,7 +226,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
                 ))}
               </select>
             </div>
-          ) : (
+
             <div>
               <label className="modal-label" htmlFor="report-responsible">Responsável</label>
               <select
@@ -177,15 +241,12 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
                   <option key={name} value={name}>{name}</option>
                 ))}
               </select>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.375rem' }}>
-                Usa o responsável definido no entregável; se não houver, o técnico responsável da empresa.
-              </p>
             </div>
-          )}
+          </div>
 
-          {/* Tipos */}
+          {/* 4. Tipos */}
           <div>
-            <span className="modal-label">Incluir</span>
+            <span className="modal-label">Incluir tipos</span>
             <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.375rem' }}>
               {[{ id: 'programa', label: 'Programas' }, { id: 'laudo', label: 'Laudos' }].map(t => (
                 <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
@@ -201,7 +262,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
             </div>
           </div>
 
-          {/* Opções */}
+          {/* 5. Opções adicionais */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
               <input
@@ -212,19 +273,21 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
               />
               Incluir itens cancelados e "não se aplica"
             </label>
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem',
-              cursor: selectionLabel ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)', opacity: selectionLabel ? 0.5 : 1
-            }}>
-              <input
-                type="checkbox"
-                checked={sheetPerGroup && !selectionLabel}
-                disabled={!!selectionLabel}
-                onChange={(e) => setSheetPerGroup(e.target.checked)}
-                style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
-              />
-              Criar uma aba separada para cada {groupNoun}
-            </label>
+            {reportFormat !== 'sintetico' && (
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem',
+                cursor: canSplitSheets ? 'pointer' : 'not-allowed', color: 'var(--text-secondary)', opacity: canSplitSheets ? 1 : 0.5
+              }}>
+                <input
+                  type="checkbox"
+                  checked={sheetPerGroup && canSplitSheets}
+                  disabled={!canSplitSheets}
+                  onChange={(e) => setSheetPerGroup(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                />
+                Criar uma aba separada para cada {groupNoun}
+              </label>
+            )}
           </div>
 
           {/* Prévia */}
@@ -235,7 +298,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
             fontSize: '0.8125rem', fontWeight: '500'
           }}>
             {filteredRows.length
-              ? <>A planilha terá <strong>{filteredRows.length}</strong> entregável(is) em <strong>{groupCount}</strong> {groupBy === 'responsavel' ? 'responsável(is)' : 'empresa(s)'}, com as abas "Resumo" e "Detalhado"{sheetPerGroup && !selectionLabel ? ` + ${groupCount} aba(s) individuais` : ''}.</>
+              ? <>A planilha terá <strong>{filteredRows.length}</strong> entregável(is) em <strong>{groupCount}</strong> grupo(s) ({groupNoun}), com {sheetsDescription}.</>
               : 'Nenhum programa ou laudo encontrado para os filtros selecionados.'}
           </div>
         </div>
