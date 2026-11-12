@@ -12,6 +12,7 @@ import {
 import { isItemExpired, isDelivered, getEffectiveValidityDate, isLaudo, isProgram } from '../utils/deliverableTiming';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
+import DeliverablesReportModal from './DeliverablesReportModal';
 
 const TYPE_CONFIG = {
   programa: { label: 'Programa', icon: <FileSpreadsheet size={16} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
@@ -51,6 +52,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
   const [editingDeliverable, setEditingDeliverable] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [deletingBulk, setDeletingBulk] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -338,6 +340,17 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
               style={{ marginLeft: 'auto' }}
             >
               Registrar Entregável
+            </button>
+          )}
+          {!companyId && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowReportModal(true)}
+              style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
+              title="Gerar relatório de programas e laudos por empresa ou por responsável em planilha"
+            >
+              <FileSpreadsheet size={16} /> Relatório (Planilha)
             </button>
           )}
         </div>
@@ -773,6 +786,15 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
           companyId={companyId}
           onClose={() => setEditingDeliverable(null)}
           onSave={handleEditSave}
+        />
+      )}
+
+      {showReportModal && (
+        <DeliverablesReportModal
+          deliverables={deliverables}
+          companies={companies}
+          contracts={contracts}
+          onClose={() => setShowReportModal(false)}
         />
       )}
     </div>
