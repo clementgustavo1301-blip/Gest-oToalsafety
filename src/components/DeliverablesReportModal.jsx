@@ -1,7 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, FileSpreadsheet, Building2, UserCheck, Users, Download, Check, ListTree, BarChart3, Layers } from 'lucide-react';
 import { getProfiles } from '../services/storageService';
-import { buildReportRows, generateDeliverablesReport, groupRows, REPORT_TYPES, NO_RESPONSIBLE } from '../utils/deliverablesReport';
+import {
+  buildReportRows,
+  generateDeliverablesReport,
+  groupRows,
+  REPORT_DOC_ITEMS,
+  REPORT_DOC_KEYS,
+  REPORT_STATUS_ITEMS,
+  REPORT_STATUS_KEYS,
+  NO_RESPONSIBLE,
+} from '../utils/deliverablesReport';
 
 const GROUP_OPTIONS = [
   { id: 'empresa', label: 'Por Empresa', desc: 'Agrupado por empresa', icon: Building2 },
@@ -10,8 +19,8 @@ const GROUP_OPTIONS = [
 ];
 
 const FORMAT_OPTIONS = [
-  { id: 'analitico', label: 'Analítico', desc: 'Lista detalhada de cada programa e laudo com datas e validade', icon: ListTree },
-  { id: 'sintetico', label: 'Sintético', desc: 'Quadro consolidado com totais, pendentes, vencidos e % entregue', icon: BarChart3 },
+  { id: 'analitico', label: 'Analítico', desc: 'Lista detalhada de cada documento com datas e validade', icon: ListTree },
+  { id: 'sintetico', label: 'Sintético', desc: 'Quadro consolidado (PGR, PCMSO, LTCAT, LI, LP) e totais', icon: BarChart3 },
   { id: 'ambos', label: 'Analítico + Sintético', desc: 'Planilha completa com as duas abas (Sintético e Analítico)', icon: Layers },
 ];
 
@@ -22,7 +31,8 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
   const [reportFormat, setReportFormat] = useState('analitico');
   const [selectedCompany, setSelectedCompany] = useState('all');
   const [selectedResponsible, setSelectedResponsible] = useState('all');
-  const [types, setTypes] = useState(REPORT_TYPES);
+  const [docKeys, setDocKeys] = useState(REPORT_DOC_KEYS);
+  const [statusKeys, setStatusKeys] = useState(REPORT_STATUS_KEYS);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [sheetPerGroup, setSheetPerGroup] = useState(false);
   const [profiles, setProfiles] = useState([]);
@@ -37,24 +47,36 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
     return () => { active = false; };
   }, []);
 
-  // Linhas base (apenas programas/laudos selecionados), antes do filtro por empresa/responsável
-  const baseRows = useMemo(() => buildReportRows({
-    deliverables, companies, contracts, profiles, types, includeInactive,
-  }), [deliverables, companies, contracts, profiles, types, includeInactive]);
+  // Linhas base filtradas por documentos (PGR, PCMSO, LTCAT, LI, LP), antes do filtro de status
+  const rowsByDocs = useMemo(() => buildReportRows({
+    deliverables,
+    companies,
+    contracts,
+    profiles,
+    docKeys,
+    statusKeys: REPORT_STATUS_KEYS,
+    includeInactive,
+  }), [deliverables, companies, contracts, profiles, docKeys, includeInactive]);
+
+  // Linhas filtradas também pelos status selecionados (Vencido, Próximos a Vencer, Pendente, Entregue)
+  const baseRows = useMemo(() => {
+    const allowedStatuses = new Set(statusKeys);
+    return rowsByDocs.filter(r => r.situation.filterKey === 'inativo' || allowedStatuses.has(r.situation.filterKey));
+  }, [rowsByDocs, statusKeys]);
 
   const companyOptions = useMemo(() => {
     const map = new Map();
-    baseRows.forEach(r => {
+    rowsByDocs.forEach(r => {
       if (selectedResponsible === 'all' || r.responsible === selectedResponsible) {
         if (!map.has(r.companyId)) map.set(r.companyId, r.companyName);
       }
     });
     return [...map.entries()].sort((a, b) => collator.compare(a[1], b[1]));
-  }, [baseRows, selectedResponsible]);
+  }, [rowsByDocs, selectedResponsible]);
 
   const responsibleOptions = useMemo(() => {
     const set = new Set();
-    baseRows.forEach(r => {
+    rowsByDocs.forEach(r => {
       if (selectedCompany === 'all' || r.companyId === selectedCompany) {
         set.add(r.responsible);
       }
@@ -64,7 +86,20 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
       if (b === NO_RESPONSIBLE) return -1;
       return collator.compare(a, b);
     });
-  }, [baseRows, selectedCompany]);
+  }, [rowsByDocs, selectedCompany]);
+
+  // Contagem por status considerando empresa e responsável selecionados
+  const statusCounts = useMemo(() => {
+    const counts = { vencido: 0, a_vencer: 0, pendente: 0, entregue: 0 };
+    rowsByDocs.forEach(r => {
+      const matchCompany = selectedCompany === 'all' || r.companyId === selectedCompany;
+      const matchResp = selectedResponsible === 'all' || r.responsible === selectedResponsible;
+      if (matchCompany && matchResp && counts[r.situation.filterKey] !== undefined) {
+        counts[r.situation.filterKey]++;
+      }
+    });
+    return counts;
+  }, [rowsByDocs, selectedCompany, selectedResponsible]);
 
   const filteredRows = useMemo(() => {
     return baseRows.filter(r => {
@@ -76,19 +111,31 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
 
   const groupCount = useMemo(() => groupRows(filteredRows, groupBy).length, [filteredRows, groupBy]);
 
-  const toggleType = (t) => {
-    setTypes(prev => {
-      if (prev.includes(t)) return prev.length === 1 ? prev : prev.filter(x => x !== t);
-      return REPORT_TYPES.filter(x => x === t || prev.includes(x));
+  const toggleDocKey = (key) => {
+    setDocKeys(prev => {
+      if (prev.includes(key)) return prev.length === 1 ? prev : prev.filter(x => x !== key);
+      return REPORT_DOC_KEYS.filter(x => x === key || prev.includes(x));
     });
   };
+
+  const toggleStatusKey = (key) => {
+    setStatusKeys(prev => {
+      if (prev.includes(key)) return prev.length === 1 ? prev : prev.filter(x => x !== key);
+      return REPORT_STATUS_KEYS.filter(x => x === key || prev.includes(x));
+    });
+  };
+
+  const allStatusesSelected = statusKeys.length === REPORT_STATUS_KEYS.length;
 
   const selectedCompanyName = selectedCompany !== 'all'
     ? (companies.find(c => c.id === selectedCompany)?.name || '')
     : '';
   const selectedResponsibleName = selectedResponsible !== 'all' ? selectedResponsible : '';
+  const selectedStatusLabel = !allStatusesSelected
+    ? REPORT_STATUS_ITEMS.filter(s => statusKeys.includes(s.key)).map(s => s.label).join(', ')
+    : '';
 
-  const selectionLabel = [selectedCompanyName, selectedResponsibleName].filter(Boolean).join(' • ');
+  const selectionLabel = [selectedCompanyName, selectedResponsibleName, selectedStatusLabel].filter(Boolean).join(' • ');
   const canSplitSheets = reportFormat !== 'sintetico' && groupCount > 1;
 
   const handleGenerate = async () => {
@@ -101,7 +148,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
         rows: filteredRows,
         sheetPerGroup: sheetPerGroup && canSplitSheets,
         selectionLabel,
-        types,
+        docKeys,
       });
     } catch (err) {
       console.error('Erro ao gerar relatório de entregáveis:', err);
@@ -125,7 +172,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
@@ -138,7 +185,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
             <div>
               <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Relatório de Programas e Laudos</h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.125rem' }}>
-                Exporte em planilha Excel (.xlsx) nos formatos Analítico ou Sintético
+                PGR, PCMSO, LTCAT, Laudo de Insalubridade e Laudo de Periculosidade (.xlsx)
               </p>
             </div>
           </div>
@@ -244,25 +291,90 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
             </div>
           </div>
 
-          {/* 4. Tipos */}
+          {/* 4. Status: Vencido, Próximos a Vencer, Pendente, Entregue */}
           <div>
-            <span className="modal-label">Incluir tipos</span>
-            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.375rem' }}>
-              {[{ id: 'programa', label: 'Programas' }, { id: 'laudo', label: 'Laudos' }].map(t => (
-                <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+              <span className="modal-label" style={{ marginBottom: 0 }}>Status dos entregáveis</span>
+              {!allStatusesSelected && (
+                <button
+                  type="button"
+                  onClick={() => setStatusKeys(REPORT_STATUS_KEYS)}
+                  style={{
+                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                    fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary)', textDecoration: 'underline'
+                  }}
+                >
+                  Selecionar todos os status
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {REPORT_STATUS_ITEMS.map(st => {
+                const active = statusKeys.includes(st.key);
+                const count = statusCounts[st.key] || 0;
+                return (
+                  <label
+                    key={st.key}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                      fontSize: '0.8125rem', cursor: 'pointer',
+                      padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-md)',
+                      border: active ? `1.5px solid ${st.color}` : '1px solid var(--border)',
+                      backgroundColor: active ? st.bg : 'var(--surface)',
+                      color: active ? st.color : 'var(--text-secondary)',
+                      fontWeight: active ? '600' : '500',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => toggleStatusKey(st.key)}
+                      style={{ width: '15px', height: '15px', accentColor: st.color }}
+                    />
+                    <span>{st.label}</span>
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: '700',
+                      padding: '0.05rem 0.4rem', borderRadius: '999px',
+                      backgroundColor: active ? 'rgba(255,255,255,0.75)' : 'var(--background)',
+                      color: active ? st.color : 'var(--text-secondary)',
+                    }}>
+                      {count}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 5. Documentos contemplados: PGR, PCMSO, LTCAT, LI, LP */}
+          <div>
+            <span className="modal-label">Programas e Laudos contemplados</span>
+            <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', marginTop: '0.375rem' }}>
+              {REPORT_DOC_ITEMS.map(item => (
+                <label
+                  key={item.key}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                    fontSize: '0.8125rem', cursor: 'pointer',
+                    padding: '0.35rem 0.65rem', borderRadius: 'var(--radius-md)',
+                    border: docKeys.includes(item.key) ? '1px solid var(--primary)' : '1px solid var(--border)',
+                    backgroundColor: docKeys.includes(item.key) ? 'var(--primary-light)' : 'var(--surface)',
+                    fontWeight: docKeys.includes(item.key) ? '600' : '500',
+                  }}
+                >
                   <input
                     type="checkbox"
-                    checked={types.includes(t.id)}
-                    onChange={() => toggleType(t.id)}
-                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                    checked={docKeys.includes(item.key)}
+                    onChange={() => toggleDocKey(item.key)}
+                    style={{ width: '15px', height: '15px', accentColor: 'var(--primary)' }}
                   />
-                  {t.label}
+                  {item.label}
                 </label>
               ))}
             </div>
           </div>
 
-          {/* 5. Opções adicionais */}
+          {/* 6. Opções adicionais */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
               <input
@@ -299,7 +411,7 @@ const DeliverablesReportModal = ({ deliverables, companies, contracts, onClose }
           }}>
             {filteredRows.length
               ? <>A planilha terá <strong>{filteredRows.length}</strong> entregável(is) em <strong>{groupCount}</strong> grupo(s) ({groupNoun}), com {sheetsDescription}.</>
-              : 'Nenhum programa ou laudo encontrado para os filtros selecionados.'}
+              : 'Nenhum item encontrado para os filtros selecionados.'}
           </div>
         </div>
 
