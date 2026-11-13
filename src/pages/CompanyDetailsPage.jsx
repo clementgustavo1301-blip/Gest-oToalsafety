@@ -1,17 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText,
   Phone, User, Hash, Edit3, UserCheck,
-  ShieldCheck, Clock, CheckCircle2, AlertTriangle
+  ShieldCheck, Clock, CheckCircle2, AlertTriangle, MessageSquare
 } from 'lucide-react';
 import {
   getCompanyById, getGroups, getTrainingsByCompany,
   getDeliverablesByCompany, uploadDocument, getDocumentUrl, addDeliverable,
   updateCompany, updateDeliverable
 } from '../services/storageService';
+import { useAuth } from '../context/AuthContext';
+import {
+  getCompanyChatSummary,
+  markCompanyChatAsRead,
+  subscribeToCompanyMessages
+} from '../services/companyChatService';
 import TrainingCalendar from '../components/TrainingCalendar';
 import DeliverablesViewer from '../components/DeliverablesViewer';
+import CompanyChat from '../components/CompanyChat';
 import AddDeliverableModal from '../components/AddDeliverableModal';
 import EditDeliverableModal from '../components/EditDeliverableModal';
 import EditCompanyModal from '../components/EditCompanyModal';
@@ -22,7 +29,6 @@ import {
   isItemExpiring60,
   getDeliverableTimingInfo,
   getEffectiveValidityDate,
-  isLaudo,
   isProgram
 } from '../utils/deliverableTiming';
 
@@ -30,11 +36,16 @@ const TABS = [
   { id: 'overview', label: 'Visão Geral', icon: <Building2 size={16} /> },
   { id: 'calendar', label: 'Calendário', icon: <Calendar size={16} /> },
   { id: 'deliverables', label: 'Entregáveis', icon: <FileText size={16} /> },
+  { id: 'chat', label: 'Chat', icon: <MessageSquare size={16} /> },
 ];
+const VALID_TAB_IDS = new Set(TABS.map(tab => tab.id));
 
 const CompanyDetailsPage = () => {
   const { companyId } = useParams();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  const paramTab = searchParams.get('tab');
+  const activeTab = VALID_TAB_IDS.has(paramTab) ? paramTab : 'overview';
   
   const [company, setCompany] = useState(null);
   const [group, setGroup] = useState(null);
@@ -44,6 +55,7 @@ const CompanyDetailsPage = () => {
   const [showDeliverableModal, setShowDeliverableModal] = useState(false);
   const [editingDeliverable, setEditingDeliverable] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [chatSummary, setChatSummary] = useState({ totalCount: 0, unreadCount: 0, tableMissing: false });
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -64,6 +76,63 @@ const CompanyDetailsPage = () => {
   useEffect(() => {
     loadData(true);
   }, [companyId]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadSummary() {
+      if (!companyId) return;
+      const summary = await getCompanyChatSummary(companyId, user?.id);
+      if (!active) return;
+      setChatSummary(summary);
+    }
+    loadSummary();
+    return () => {
+      active = false;
+    };
+  }, [companyId, user?.id]);
+
+  useEffect(() => {
+    if (!companyId || activeTab === 'chat' || chatSummary.tableMissing) return undefined;
+
+    const unsubscribe = subscribeToCompanyMessages(companyId, {
+      onInsert: (incoming) => {
+        setChatSummary(prev => ({
+          ...prev,
+          totalCount: prev.totalCount + 1,
+          unreadCount: incoming.userId !== user?.id ? prev.unreadCount + 1 : prev.unreadCount,
+        }));
+      },
+      onDelete: () => {
+        getCompanyChatSummary(companyId, user?.id).then((summary) => {
+          setChatSummary(summary);
+        });
+      },
+    });
+
+    return unsubscribe;
+  }, [companyId, activeTab, chatSummary.tableMissing, user?.id]);
+
+  const handleSelectTab = (tabId) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (tabId === 'overview') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', tabId);
+    }
+    setSearchParams(nextParams, { replace: true });
+    if (tabId === 'chat' && user?.id && companyId) {
+      markCompanyChatAsRead(user.id, companyId);
+      setChatSummary(prev => ({ ...prev, unreadCount: 0 }));
+    }
+  };
+
+  const handleMessagesSync = useCallback((meta) => {
+    setChatSummary(prev => ({
+      ...prev,
+      ...(meta.totalCount !== undefined ? { totalCount: meta.totalCount } : {}),
+      ...(meta.unreadCount !== undefined ? { unreadCount: meta.unreadCount } : {}),
+    }));
+  }, []);
 
   const handleAddDeliverable = async (dataOrArray) => {
     const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
@@ -261,18 +330,32 @@ const CompanyDetailsPage = () => {
       </div>
 
       {/* Tabs */}
-      <div className="tabs-container">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={activeTab === tab.id ? 'active' : ''}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
+      <div className="tabs-container" role="tablist" aria-label="Abas da empresa">
+        {TABS.map(tab => {
+          const unreadCount = activeTab === 'chat' ? 0 : chatSummary.unreadCount;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleSelectTab(tab.id)}
+              className={activeTab === tab.id ? 'active' : ''}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+            >
+              {tab.icon} {tab.label}
+              {tab.id === 'chat' && unreadCount > 0 && (
+                <span className="company-chat-tab-badge is-unread" title="Mensagens não lidas">
+                  {unreadCount}
+                </span>
+              )}
+              {tab.id === 'chat' && unreadCount === 0 && chatSummary.totalCount > 0 && (
+                <span className="company-chat-tab-badge" title="Mensagens no chat">
+                  {chatSummary.totalCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Content */}
@@ -731,6 +814,15 @@ const CompanyDetailsPage = () => {
 
       {activeTab === 'deliverables' && (
         <DeliverablesViewer companyId={companyId} onUpdate={() => loadData(false)} />
+      )}
+
+      {activeTab === 'chat' && (
+        <CompanyChat
+          key={company.id}
+          company={company}
+          group={group}
+          onMessagesSync={handleMessagesSync}
+        />
       )}
 
       {showDeliverableModal && (
