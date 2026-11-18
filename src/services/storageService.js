@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram } from '../utils/deliverableTiming';
+import { compressFileForUpload } from '../utils/fileCompressor';
 
 // --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
 
@@ -1018,20 +1019,47 @@ export async function getAllDeliverablesSummary() {
 }
 
 // --- Storage (Arquivos) ---
-export async function uploadDocument(file, folderPath) {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+export async function uploadDocument(file, folderPath, options = {}) {
+  let fileToUpload = file;
+  if (options.skipCompression !== true) {
+    const compressed = await compressFileForUpload(file);
+    fileToUpload = compressed.file || file;
+  }
+
+  const nameParts = (fileToUpload.name || '').split('.');
+  const rawExt = nameParts.length > 1 ? nameParts.pop() : '';
+  const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const extSuffix = safeExt ? `.${safeExt}` : '';
+  const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}${extSuffix}`;
   const filePath = `${folderPath}/${fileName}`;
 
   const { error } = await supabase.storage
     .from('documents')
-    .upload(filePath, file);
+    .upload(filePath, fileToUpload, {
+      contentType: fileToUpload.type || undefined,
+      upsert: false,
+    });
 
   if (error) {
     console.error('Error uploading file:', error);
     return null;
   }
   return filePath;
+}
+
+export async function deleteDocumentFromStorage(filePath) {
+  if (!filePath) return false;
+  try {
+    const { error } = await supabase.storage.from('documents').remove([filePath]);
+    if (error) {
+      console.warn('Erro ao remover arquivo do Storage:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Falha ao remover arquivo do Storage:', err);
+    return false;
+  }
 }
 
 export function getDocumentUrl(filePath) {

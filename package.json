@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
     "@types/leaflet-routing-machine": "^3.2.9",
+    "browser-image-compression": "^2.0.2",
     "date-fns": "^4.4.0",
     "docx": "^9.8.0",
     "file-saver": "^2.0.5",

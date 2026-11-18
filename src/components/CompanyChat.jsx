@@ -17,11 +17,15 @@ import {
   ExternalLink,
   Download,
   ChevronUp,
+  Eye,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 import { getDocumentUrl } from '../services/storageService';
+import { compressFileForUpload, formatFileSize } from '../utils/fileCompressor';
 import {
   getCompanyMessages,
   sendCompanyMessage,
@@ -31,18 +35,22 @@ import {
   markCompanyChatAsRead,
 } from '../services/companyChatService';
 
-const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_ATTACHMENT_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB (antes da compressão)
+const ACCEPTED_ATTACHMENT_TYPES =
+  'image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.csv,.txt,.rtf,.zip';
 
 const CATEGORY_OPTIONS = [
   { id: 'geral', label: 'Mensagem', shortLabel: 'Geral' },
   { id: 'visita', label: 'Visita Técnica', shortLabel: 'Visita' },
   { id: 'pendencia', label: 'Pendência / Alerta', shortLabel: 'Pendência' },
+  { id: 'documento', label: 'Documento / Laudo', shortLabel: 'Documento' },
 ];
 
 const CATEGORY_META = {
   geral: { label: 'Geral', className: 'company-chat__tag--geral' },
   visita: { label: 'Visita Técnica', className: 'company-chat__tag--visita', icon: ClipboardCheck },
   pendencia: { label: 'Pendência', className: 'company-chat__tag--pendencia', icon: AlertTriangle },
+  documento: { label: 'Documento', className: 'company-chat__tag--documento', icon: FileText },
 };
 
 const AVATAR_PALETTE = [
@@ -98,6 +106,14 @@ function isImageFile(nameOrPath = '') {
   return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(nameOrPath);
 }
 
+function getFileBadgeLabel(nameOrPath = '') {
+  const clean = nameOrPath.split('?')[0];
+  const idx = clean.lastIndexOf('.');
+  if (idx === -1) return 'DOC';
+  const ext = clean.slice(idx + 1).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return ext.slice(0, 5) || 'DOC';
+}
+
 const CompanyChat = ({ company, group, onMessagesSync }) => {
   const { user, userProfile, activeLink } = useAuth();
   const currentUserId = user?.id;
@@ -113,6 +129,9 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
   const [draft, setDraft] = useState('');
   const [category, setCategory] = useState('geral');
   const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentMeta, setAttachmentMeta] = useState(null);
+  const [compressingFile, setCompressingFile] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -131,6 +150,8 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const isNearBottomRef = useRef(true);
+  const dragCounterRef = useRef(0);
+  const compressionReqRef = useRef(0);
 
   const authorName =
     userProfile?.name ||
@@ -269,23 +290,127 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
     setLoadingOlder(false);
   };
 
-  const handleAttachmentSelect = (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
+  const processSelectedFile = useCallback(async (file) => {
     if (!file) return;
 
     if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
-      setErrorMsg('O arquivo excede o limite de 10 MB.');
+      setErrorMsg('O arquivo excede o limite máximo de 25 MB.');
       return;
     }
 
+    const requestId = ++compressionReqRef.current;
     setErrorMsg('');
-    setAttachmentFile(file);
+    setAttachmentFile(null);
+    setAttachmentMeta(null);
+    setCompressingFile(true);
+
+    try {
+      const result = await compressFileForUpload(file);
+      if (compressionReqRef.current !== requestId) return;
+
+      setAttachmentFile(result.file);
+      setAttachmentMeta({
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize,
+        savedBytes: result.savedBytes,
+        savedPercent: result.savedPercent,
+        wasCompressed: result.wasCompressed,
+      });
+      setCategory((curr) => (curr === 'geral' ? 'documento' : curr));
+    } catch (err) {
+      if (compressionReqRef.current !== requestId) return;
+      console.warn('Erro ao processar anexo, usando arquivo original:', err);
+      setAttachmentFile(file);
+      setAttachmentMeta({
+        originalSize: file.size,
+        compressedSize: file.size,
+        savedBytes: 0,
+        savedPercent: 0,
+        wasCompressed: false,
+      });
+      setCategory((curr) => (curr === 'geral' ? 'documento' : curr));
+    } finally {
+      if (compressionReqRef.current === requestId) {
+        setCompressingFile(false);
+      }
+    }
+  }, []);
+
+  const handleAttachmentSelect = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) {
+      processSelectedFile(file);
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    compressionReqRef.current += 1;
+    setCompressingFile(false);
+    setAttachmentFile(null);
+    setAttachmentMeta(null);
+    if (category === 'documento') {
+      setCategory('geral');
+    }
+  };
+
+  const handleDragEnter = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current += 1;
+    if (event.dataTransfer?.types?.includes('Files')) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingOver(false);
+    if (sending || compressingFile) return;
+    const droppedFile = event.dataTransfer?.files?.[0];
+    if (droppedFile) {
+      processSelectedFile(droppedFile);
+    }
+  };
+
+  const handleDownloadAttachment = async (url, filename) => {
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Falha ao baixar');
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename || 'documento';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleSend = async (event) => {
     if (event) event.preventDefault();
-    if (sending) return;
+    if (sending || compressingFile) return;
     if (!draft.trim() && !attachmentFile) return;
     if (!user?.id) {
       setErrorMsg('Sessão expirada. Faça login novamente para enviar mensagens.');
@@ -305,6 +430,8 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
         category,
         message: draft,
         attachmentFile,
+        attachmentOriginalSize: attachmentMeta?.originalSize ?? null,
+        attachmentMimeType: attachmentFile?.type || null,
         replyToId: replyingTo?.id || null,
       });
 
@@ -316,6 +443,7 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
 
       setDraft('');
       setAttachmentFile(null);
+      setAttachmentMeta(null);
       setReplyingTo(null);
       setCategory('geral');
       if (textareaRef.current) {
@@ -377,7 +505,7 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
     setErrorMsg('');
 
     try {
-      await deleteCompanyMessage(msg.id);
+      await deleteCompanyMessage(msg.id, msg.attachmentPath);
       setMessages((prev) => prev.filter((m) => m.id !== msg.id));
     } catch (err) {
       console.error('Erro ao excluir mensagem:', err);
@@ -401,10 +529,11 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
   }, [messages]);
 
   const categoryCounts = useMemo(() => {
-    const counts = { visita: 0, pendencia: 0 };
+    const counts = { visita: 0, pendencia: 0, documento: 0 };
     messages.forEach((m) => {
       if (m.category === 'visita') counts.visita += 1;
       if (m.category === 'pendencia') counts.pendencia += 1;
+      if (m.category === 'documento' || m.attachmentPath) counts.documento += 1;
     });
     return counts;
   }, [messages]);
@@ -412,7 +541,11 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
   const filteredMessages = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return messages.filter((msg) => {
-      if (filterCategory !== 'all' && msg.category !== filterCategory) return false;
+      if (filterCategory === 'documento') {
+        if (msg.category !== 'documento' && !msg.attachmentPath) return false;
+      } else if (filterCategory !== 'all' && msg.category !== filterCategory) {
+        return false;
+      }
       if (!q) return true;
       return (
         msg.message.toLowerCase().includes(q) ||
@@ -448,7 +581,23 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
   }
 
   return (
-    <div className="card company-chat">
+    <div
+      className={`card company-chat ${isDraggingOver ? 'is-dragging-over' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingOver && (
+        <div className="company-chat__drop-overlay" aria-hidden="true">
+          <div className="company-chat__drop-box">
+            <Upload size={28} />
+            <strong>Solte o documento ou imagem aqui</strong>
+            <span>O arquivo será comprimido automaticamente antes do envio</span>
+          </div>
+        </div>
+      )}
+
       {/* Header do Chat */}
       <div className="company-chat__header">
         <div className="company-chat__title-group">
@@ -498,6 +647,13 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
               onClick={() => setFilterCategory('pendencia')}
             >
               Pendências ({categoryCounts.pendencia})
+            </button>
+            <button
+              type="button"
+              className={`company-chat__filter-btn ${filterCategory === 'documento' ? 'is-active' : ''}`}
+              onClick={() => setFilterCategory('documento')}
+            >
+              Documentos ({categoryCounts.documento})
             </button>
           </div>
 
@@ -731,19 +887,51 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
                                     />
                                     <span>
                                       <ExternalLink size={12} /> {msg.attachmentName || 'Imagem anexa'}
+                                      {msg.attachmentSize ? ` (${formatFileSize(msg.attachmentSize)})` : ''}
                                     </span>
                                   </a>
                                 ) : (
-                                  <a
-                                    href={attachmentUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="company-chat__file-chip"
-                                  >
-                                    <FileText size={15} />
-                                    <span>{msg.attachmentName || 'Documento anexo'}</span>
-                                    <Download size={13} />
-                                  </a>
+                                  <div className="company-chat__doc-card">
+                                    <div className="company-chat__doc-badge">
+                                      {getFileBadgeLabel(msg.attachmentName || msg.attachmentPath || '')}
+                                    </div>
+                                    <div className="company-chat__doc-info">
+                                      <span className="company-chat__doc-name" title={msg.attachmentName || 'Documento anexo'}>
+                                        {msg.attachmentName || 'Documento anexo'}
+                                      </span>
+                                      <span className="company-chat__doc-meta">
+                                        {msg.attachmentSize ? formatFileSize(msg.attachmentSize) : 'Documento'}
+                                        {msg.attachmentOriginalSize &&
+                                        msg.attachmentSize &&
+                                        msg.attachmentOriginalSize > msg.attachmentSize
+                                          ? ` (reduzido de ${formatFileSize(msg.attachmentOriginalSize)})`
+                                          : ''}
+                                      </span>
+                                    </div>
+                                    <div className="company-chat__doc-actions">
+                                      <a
+                                        href={attachmentUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="company-chat__doc-action"
+                                        title="Visualizar documento"
+                                      >
+                                        <Eye size={13} />
+                                        <span>Visualizar</span>
+                                      </a>
+                                      <button
+                                        type="button"
+                                        className="company-chat__doc-action is-primary"
+                                        onClick={() =>
+                                          handleDownloadAttachment(attachmentUrl, msg.attachmentName)
+                                        }
+                                        title="Baixar documento"
+                                      >
+                                        <Download size={13} />
+                                        <span>Baixar</span>
+                                      </button>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -828,13 +1016,27 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
           </div>
         )}
 
-        {attachmentFile && (
+        {compressingFile && (
+          <div className="company-chat__pending-file is-compressing">
+            <Loader2 size={15} className="spin" color="var(--primary)" />
+            <span>Comprimindo documento para reduzir o tamanho...</span>
+          </div>
+        )}
+
+        {!compressingFile && attachmentFile && (
           <div className="company-chat__pending-file">
             <FileText size={15} color="var(--primary)" />
-            <span>{attachmentFile.name}</span>
+            <span className="company-chat__pending-name">{attachmentFile.name}</span>
+            {attachmentMeta && (
+              <span className="company-chat__compression-badge">
+                {attachmentMeta.wasCompressed
+                  ? `${formatFileSize(attachmentMeta.originalSize)} → ${formatFileSize(attachmentMeta.compressedSize)} (-${attachmentMeta.savedPercent}%)`
+                  : `Tamanho otimizado: ${formatFileSize(attachmentMeta.compressedSize)}`}
+              </span>
+            )}
             <button
               type="button"
-              onClick={() => setAttachmentFile(null)}
+              onClick={handleRemoveAttachment}
               aria-label="Remover anexo"
             >
               <X size={14} />
@@ -843,26 +1045,39 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
         )}
 
         <div className="company-chat__composer-top">
-          <span className="company-chat__composer-label">Tipo:</span>
-          <div className="company-chat__category-pills">
-            {CATEGORY_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                className={`company-chat__cat-pill ${category === opt.id ? `is-active is-${opt.id}` : ''}`}
-                onClick={() => setCategory(opt.id)}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div className="company-chat__composer-types">
+            <span className="company-chat__composer-label">Tipo:</span>
+            <div className="company-chat__category-pills">
+              {CATEGORY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`company-chat__cat-pill ${category === opt.id ? `is-active is-${opt.id}` : ''}`}
+                  onClick={() => setCategory(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary company-chat__doc-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending || compressingFile}
+            title="Anexar PDF, Word, Excel, PowerPoint, imagem ou ZIP (com compressão automática)"
+          >
+            <Paperclip size={14} />
+            <span>Anexar Documento</span>
+          </button>
         </div>
 
         <div className="company-chat__input-row">
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            accept={ACCEPTED_ATTACHMENT_TYPES}
             style={{ display: 'none' }}
             onChange={handleAttachmentSelect}
           />
@@ -870,9 +1085,9 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
             type="button"
             className="icon-button company-chat__attach-btn"
             onClick={() => fileInputRef.current?.click()}
-            disabled={sending}
-            title="Anexar foto, PDF ou documento (máx. 10 MB)"
-            aria-label="Anexar arquivo"
+            disabled={sending || compressingFile}
+            title="Anexar documento ou foto (máx. 25 MB, compressão automática)"
+            aria-label="Anexar documento"
           >
             <Paperclip size={16} />
           </button>
@@ -883,7 +1098,7 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
             value={draft}
             onChange={handleTextareaChange}
             onKeyDown={handleTextareaKeyDown}
-            placeholder="Escreva uma mensagem para os técnicos desta empresa... (Enter envia, Shift+Enter quebra linha)"
+            placeholder="Escreva uma mensagem ou anexe um documento para os técnicos desta empresa... (Enter envia, Shift+Enter quebra linha)"
             disabled={sending}
             className="company-chat__textarea"
           />
@@ -891,10 +1106,10 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
           <button
             type="submit"
             className="btn btn-primary company-chat__send-btn"
-            disabled={sending || (!draft.trim() && !attachmentFile)}
+            disabled={sending || compressingFile || (!draft.trim() && !attachmentFile)}
           >
             <Send size={15} />
-            <span>{sending ? 'Enviando...' : 'Enviar'}</span>
+            <span>{sending ? 'Enviando...' : compressingFile ? 'Comprimindo...' : 'Enviar'}</span>
           </button>
         </div>
       </form>

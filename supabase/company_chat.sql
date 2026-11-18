@@ -1,5 +1,5 @@
 -- ==============================================================================
--- CHAT INTERNO POR EMPRESA (COMUNICAÇÃO ENTRE TÉCNICOS) - SUPABASE
+-- CHAT INTERNO POR EMPRESA (COM ANEXO DE DOCUMENTOS E COMPRESSÃO) - SUPABASE
 -- Execute este script no SQL Editor do Supabase (https://supabase.com/dashboard)
 -- Script idempotente (seguro para executar mais de uma vez sem apagar dados).
 -- ==============================================================================
@@ -19,25 +19,32 @@ CREATE TABLE IF NOT EXISTS public.company_messages (
     message TEXT NOT NULL DEFAULT '',
     attachment_path TEXT,
     attachment_name TEXT,
+    attachment_size INTEGER,
+    attachment_original_size INTEGER,
+    attachment_mime_type TEXT,
     reply_to_id UUID REFERENCES public.company_messages(id) ON DELETE SET NULL,
     edited_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Garantir constraints de forma idempotente
+-- Garantir colunas de anexo caso a tabela já exista de versões anteriores
+ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_path TEXT;
+ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT;
+ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_size INTEGER;
+ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_original_size INTEGER;
+ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_mime_type TEXT;
+
+-- Atualizar e garantir constraints de forma idempotente (incluindo categoria 'documento')
+ALTER TABLE public.company_messages
+    DROP CONSTRAINT IF EXISTS company_messages_category_check;
+
+ALTER TABLE public.company_messages
+    ADD CONSTRAINT company_messages_category_check
+    CHECK (category IN ('geral', 'visita', 'pendencia', 'documento'));
+
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'company_messages_category_check'
-          AND conrelid = 'public.company_messages'::regclass
-    ) THEN
-        ALTER TABLE public.company_messages
-            ADD CONSTRAINT company_messages_category_check
-            CHECK (category IN ('geral', 'visita', 'pendencia'));
-    END IF;
-
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
         WHERE conname = 'company_messages_content_check'
@@ -81,7 +88,7 @@ CREATE TRIGGER trg_company_messages_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION public.set_company_messages_updated_at();
 
--- 5. Segurança: Row Level Security (RLS) e Permissões
+-- 5. Segurança: Row Level Security (RLS) e Permissões da tabela company_messages
 ALTER TABLE public.company_messages ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON public.company_messages FROM anon;
@@ -157,7 +164,69 @@ CREATE POLICY "Authors or admins can delete company messages"
         )
     );
 
--- 6. Habilitar sincronização em tempo real (Supabase Realtime)
+-- 6. Storage: Bucket 'documents' e políticas RLS para documentos e imagens do chat
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('documents', 'documents', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Documents bucket public read" ON storage.objects;
+CREATE POLICY "Documents bucket public read"
+    ON storage.objects
+    FOR SELECT
+    TO anon, authenticated
+    USING (bucket_id = 'documents');
+
+DROP POLICY IF EXISTS "Approved users can upload documents" ON storage.objects;
+CREATE POLICY "Approved users can upload documents"
+    ON storage.objects
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        bucket_id = 'documents'
+        AND EXISTS (
+            SELECT 1 FROM public.user_links ul
+            WHERE ul.user_id = (select auth.uid())
+              AND ul.status = 'approved'
+        )
+    );
+
+DROP POLICY IF EXISTS "Approved users can update documents" ON storage.objects;
+CREATE POLICY "Approved users can update documents"
+    ON storage.objects
+    FOR UPDATE
+    TO authenticated
+    USING (
+        bucket_id = 'documents'
+        AND EXISTS (
+            SELECT 1 FROM public.user_links ul
+            WHERE ul.user_id = (select auth.uid())
+              AND ul.status = 'approved'
+        )
+    )
+    WITH CHECK (
+        bucket_id = 'documents'
+        AND EXISTS (
+            SELECT 1 FROM public.user_links ul
+            WHERE ul.user_id = (select auth.uid())
+              AND ul.status = 'approved'
+        )
+    );
+
+DROP POLICY IF EXISTS "Approved users can delete documents" ON storage.objects;
+CREATE POLICY "Approved users can delete documents"
+    ON storage.objects
+    FOR DELETE
+    TO authenticated
+    USING (
+        bucket_id = 'documents'
+        AND EXISTS (
+            SELECT 1 FROM public.user_links ul
+            WHERE ul.user_id = (select auth.uid())
+              AND ul.status = 'approved'
+        )
+    );
+
+-- 7. Habilitar sincronização em tempo real (Supabase Realtime)
 DO $$
 BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.company_messages;
@@ -165,5 +234,5 @@ EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
--- 7. Recarregar o cache do schema no PostgREST / Supabase
+-- 8. Recarregar o cache do schema no PostgREST / Supabase
 NOTIFY pgrst, 'reload schema';

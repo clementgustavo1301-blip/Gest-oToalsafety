@@ -1662,10 +1662,52 @@ table tbody tr:last-child td {
 }
 
 .company-chat {
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 0;
   overflow: hidden;
+}
+
+.company-chat.is-dragging-over {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.company-chat__drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: color-mix(in srgb, var(--primary) 12%, rgba(15, 23, 42, 0.45));
+  backdrop-filter: blur(3px);
+}
+
+.company-chat__drop-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.45rem;
+  padding: 2rem 2.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 2px dashed var(--primary);
+  color: var(--primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.company-chat__drop-box strong {
+  color: var(--text-primary);
+  font-size: 0.98rem;
+}
+
+.company-chat__drop-box span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
 }
 
 .company-chat:hover {
@@ -1741,6 +1783,7 @@ table tbody tr:last-child td {
 .company-chat__filters {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.2rem;
   padding: 0.2rem;
   background: var(--background);
@@ -2022,6 +2065,11 @@ table tbody tr:last-child td {
   background: var(--warning-light);
 }
 
+.company-chat__tag--documento {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
 .company-chat__time {
   font-size: 0.68rem;
   color: var(--text-tertiary);
@@ -2122,6 +2170,93 @@ table tbody tr:last-child td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.company-chat__doc-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  max-width: 100%;
+}
+
+.company-chat__doc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 36px;
+  padding: 0 0.4rem;
+  border-radius: 8px;
+  background: var(--primary-light);
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.company-chat__doc-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 160px;
+}
+
+.company-chat__doc-name {
+  font-size: 0.79rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.company-chat__doc-meta {
+  font-size: 0.69rem;
+  color: var(--text-secondary);
+}
+
+.company-chat__doc-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.company-chat__doc-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  transition: var(--transition);
+}
+
+.company-chat__doc-action:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.company-chat__doc-action.is-primary {
+  background: var(--primary-light);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  color: var(--primary);
+}
+
+.company-chat__doc-action.is-primary:hover {
+  background: var(--primary);
+  color: #ffffff;
 }
 
 .company-chat__msg-actions {
@@ -2244,10 +2379,11 @@ table tbody tr:last-child td {
 .company-chat__pending-file {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   width: fit-content;
   max-width: 100%;
-  padding: 0.35rem 0.65rem;
+  padding: 0.38rem 0.72rem;
   border-radius: 999px;
   background: var(--primary-light);
   border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
@@ -2256,17 +2392,51 @@ table tbody tr:last-child td {
   color: var(--text-primary);
 }
 
-.company-chat__pending-file span {
+.company-chat__pending-file.is-compressing {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.company-chat__pending-name {
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.company-chat__compression-badge {
+  padding: 0.1rem 0.48rem;
+  border-radius: 999px;
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 32%, var(--border));
+  font-size: 0.68rem;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .company-chat__composer-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.company-chat__composer-types {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.company-chat__doc-btn {
+  padding: 0.3rem 0.72rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 999px;
+  min-height: 30px;
 }
 
 .company-chat__composer-label {
@@ -2314,6 +2484,12 @@ table tbody tr:last-child td {
   color: var(--warning);
   background: var(--warning-light);
   border-color: var(--warning);
+}
+
+.company-chat__cat-pill.is-active.is-documento {
+  color: var(--primary);
+  background: var(--primary-light);
+  border-color: var(--primary);
 }
 
 .company-chat__input-row {

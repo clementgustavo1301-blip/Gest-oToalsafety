@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import { uploadDocument } from './storageService';
+import { uploadDocument, deleteDocumentFromStorage } from './storageService';
+import { compressFileForUpload } from '../utils/fileCompressor';
 
 const LAST_READ_PREFIX = 'ecoclinic_company_chat_read';
 
@@ -27,6 +28,9 @@ export function mapCompanyMessage(row) {
     message: row.message || '',
     attachmentPath: row.attachment_path || null,
     attachmentName: row.attachment_name || null,
+    attachmentSize: row.attachment_size || null,
+    attachmentOriginalSize: row.attachment_original_size || null,
+    attachmentMimeType: row.attachment_mime_type || null,
     replyToId: row.reply_to_id || null,
     editedAt: row.edited_at || null,
     createdAt: row.created_at,
@@ -125,6 +129,24 @@ export async function getCompanyChatSummary(companyId, userId = null) {
   return { totalCount, unreadCount, latestAt, tableMissing: false };
 }
 
+const VALID_CHAT_CATEGORIES = ['geral', 'visita', 'pendencia', 'documento'];
+
+function shouldFallbackLegacyInsert(error) {
+  if (!error) return false;
+  const code = String(error.code || '').toUpperCase();
+  const msg = String(error.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === '42703' ||
+    code === '23514' ||
+    msg.includes('column') ||
+    msg.includes('does not exist') ||
+    msg.includes('schema cache') ||
+    msg.includes('category_check') ||
+    msg.includes('check constraint')
+  );
+}
+
 export async function sendCompanyMessage({
   companyId,
   userId,
@@ -134,6 +156,8 @@ export async function sendCompanyMessage({
   category = 'geral',
   message = '',
   attachmentFile = null,
+  attachmentOriginalSize = null,
+  attachmentMimeType = null,
   replyToId = null,
 }) {
   const trimmedMessage = (message || '').trim();
@@ -143,39 +167,71 @@ export async function sendCompanyMessage({
 
   let attachmentPath = null;
   let attachmentName = null;
+  let attachmentSize = null;
+  let finalOriginalSize = attachmentOriginalSize;
+  let finalMimeType = attachmentMimeType;
 
   if (attachmentFile) {
-    attachmentPath = await uploadDocument(attachmentFile, `company-chat/${companyId}`);
-    if (!attachmentPath) {
-      throw new Error('Não foi possível enviar o arquivo anexo. Verifique sua conexão e tente novamente.');
+    let fileToUpload = attachmentFile;
+    if (finalOriginalSize === null) {
+      const compressed = await compressFileForUpload(attachmentFile);
+      fileToUpload = compressed.file || attachmentFile;
+      finalOriginalSize = compressed.originalSize;
     }
-    attachmentName = attachmentFile.name;
+
+    attachmentPath = await uploadDocument(fileToUpload, `company-chat/${companyId}`, {
+      skipCompression: true,
+    });
+    if (!attachmentPath) {
+      throw new Error('Não foi possível enviar o arquivo anexo. Verifique sua conexão e as permissões do Storage.');
+    }
+    attachmentName = fileToUpload.name;
+    attachmentSize = fileToUpload.size;
+    finalMimeType = finalMimeType || fileToUpload.type || null;
   }
 
-  const payload = {
+  const normalizedCategory = VALID_CHAT_CATEGORIES.includes(category) ? category : 'geral';
+
+  const basePayload = {
     company_id: companyId,
     user_id: userId,
     author_name: (authorName || 'Técnico').trim(),
     author_role: authorRole || null,
     author_sector: authorSector || null,
-    category: ['geral', 'visita', 'pendencia'].includes(category) ? category : 'geral',
+    category: normalizedCategory === 'documento' ? 'geral' : normalizedCategory,
     message: trimmedMessage,
     attachment_path: attachmentPath,
     attachment_name: attachmentName,
     reply_to_id: replyToId || null,
   };
 
-  const { data, error } = await supabase
+  const extendedPayload = {
+    ...basePayload,
+    category: normalizedCategory,
+    attachment_size: attachmentSize,
+    attachment_original_size: finalOriginalSize,
+    attachment_mime_type: finalMimeType,
+  };
+
+  let res = await supabase
     .from('company_messages')
-    .insert([payload])
+    .insert([extendedPayload])
     .select()
     .single();
 
-  if (error) {
-    throw error;
+  if (res.error && shouldFallbackLegacyInsert(res.error)) {
+    res = await supabase
+      .from('company_messages')
+      .insert([basePayload])
+      .select()
+      .single();
   }
 
-  return mapCompanyMessage(data);
+  if (res.error) {
+    throw res.error;
+  }
+
+  return mapCompanyMessage(res.data);
 }
 
 export async function updateCompanyMessage(messageId, newMessage) {
@@ -201,7 +257,7 @@ export async function updateCompanyMessage(messageId, newMessage) {
   return mapCompanyMessage(data);
 }
 
-export async function deleteCompanyMessage(messageId) {
+export async function deleteCompanyMessage(messageId, attachmentPath = null) {
   const { error } = await supabase
     .from('company_messages')
     .delete()
@@ -209,6 +265,10 @@ export async function deleteCompanyMessage(messageId) {
 
   if (error) {
     throw error;
+  }
+
+  if (attachmentPath) {
+    await deleteDocumentFromStorage(attachmentPath);
   }
 
   return true;
