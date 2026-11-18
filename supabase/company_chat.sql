@@ -22,18 +22,22 @@ CREATE TABLE IF NOT EXISTS public.company_messages (
     attachment_size INTEGER,
     attachment_original_size INTEGER,
     attachment_mime_type TEXT,
+    mentioned_user_ids UUID[] NOT NULL DEFAULT '{}',
+    mentions JSONB NOT NULL DEFAULT '[]'::jsonb,
     reply_to_id UUID REFERENCES public.company_messages(id) ON DELETE SET NULL,
     edited_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Garantir colunas de anexo caso a tabela já exista de versões anteriores
+-- Garantir colunas de anexo e menções caso a tabela já exista de versões anteriores
 ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_path TEXT;
 ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT;
 ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_size INTEGER;
 ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_original_size INTEGER;
 ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS attachment_mime_type TEXT;
+ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS mentioned_user_ids UUID[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.company_messages ADD COLUMN IF NOT EXISTS mentions JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 -- Atualizar e garantir constraints de forma idempotente (incluindo categoria 'documento')
 ALTER TABLE public.company_messages
@@ -66,6 +70,9 @@ CREATE INDEX IF NOT EXISTS idx_company_messages_user_id
 CREATE INDEX IF NOT EXISTS idx_company_messages_reply_to_id
     ON public.company_messages (reply_to_id)
     WHERE reply_to_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_company_messages_mentioned_users
+    ON public.company_messages USING GIN (mentioned_user_ids);
 
 CREATE INDEX IF NOT EXISTS idx_user_links_user_id_status
     ON public.user_links (user_id, status);
@@ -226,7 +233,75 @@ CREATE POLICY "Approved users can delete documents"
         )
     );
 
--- 7. Habilitar sincronização em tempo real (Supabase Realtime)
+-- 7. Notificações de menções (@pessoa) para usuários marcados no chat
+CREATE TABLE IF NOT EXISTS public.user_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    sender_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    sender_name TEXT NOT NULL,
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+    company_name TEXT,
+    message_id UUID REFERENCES public.company_messages(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'mention',
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_notifications_recipient_created
+    ON public.user_notifications (recipient_user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_notifications_unread
+    ON public.user_notifications (recipient_user_id)
+    WHERE read_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_user_notifications_message_id
+    ON public.user_notifications (message_id)
+    WHERE message_id IS NOT NULL;
+
+ALTER TABLE public.user_notifications ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON public.user_notifications FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_notifications TO authenticated;
+
+DROP POLICY IF EXISTS "Users can view own notifications" ON public.user_notifications;
+CREATE POLICY "Users can view own notifications"
+    ON public.user_notifications
+    FOR SELECT
+    TO authenticated
+    USING ((select auth.uid()) = recipient_user_id);
+
+DROP POLICY IF EXISTS "Approved users can send notifications" ON public.user_notifications;
+CREATE POLICY "Approved users can send notifications"
+    ON public.user_notifications
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        (select auth.uid()) = sender_user_id
+        AND EXISTS (
+            SELECT 1 FROM public.user_links ul
+            WHERE ul.user_id = (select auth.uid())
+              AND ul.status = 'approved'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can update own notifications" ON public.user_notifications;
+CREATE POLICY "Users can update own notifications"
+    ON public.user_notifications
+    FOR UPDATE
+    TO authenticated
+    USING ((select auth.uid()) = recipient_user_id)
+    WITH CHECK ((select auth.uid()) = recipient_user_id);
+
+DROP POLICY IF EXISTS "Users can delete own notifications" ON public.user_notifications;
+CREATE POLICY "Users can delete own notifications"
+    ON public.user_notifications
+    FOR DELETE
+    TO authenticated
+    USING ((select auth.uid()) = recipient_user_id);
+
+-- 8. Habilitar sincronização em tempo real (Supabase Realtime)
 DO $$
 BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.company_messages;
@@ -234,5 +309,12 @@ EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
--- 8. Recarregar o cache do schema no PostgREST / Supabase
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.user_notifications;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+-- 9. Recarregar o cache do schema no PostgREST / Supabase
 NOTIFY pgrst, 'reload schema';

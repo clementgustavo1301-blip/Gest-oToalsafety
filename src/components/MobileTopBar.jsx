@@ -1,10 +1,9 @@
 import React from 'react';
-import { Bell, Menu, Moon, Sun } from 'lucide-react';
-import { useAI } from '../context/AIContext';
+import { Menu, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import NotificationBell from './NotificationBell';
 
 const MobileTopBar = ({ onOpenSidebar }) => {
-  const { unreadCount } = useAI();
   const { isDark, toggleTheme } = useTheme();
 
   return (
@@ -19,10 +18,7 @@ const MobileTopBar = ({ onOpenSidebar }) => {
         <button className="mobile-topbar__action" onClick={toggleTheme} aria-label={isDark ? 'Usar tema claro' : 'Usar tema escuro'}>
           {isDark ? <Sun size={19} /> : <Moon size={19} />}
         </button>
-        <span className="mobile-topbar__notification" aria-label={`${unreadCount} notificações`}>
-          <Bell size={19} />
-          {unreadCount > 0 && <span className="mobile-topbar__notification-dot" />}
-        </span>
+        <NotificationBell variant="topbar" />
       </div>
     </header>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Send,
   Paperclip,
@@ -20,14 +21,18 @@ import {
   Eye,
   Upload,
   Loader2,
+  AtSign,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 import { getDocumentUrl } from '../services/storageService';
 import { compressFileForUpload, formatFileSize } from '../utils/fileCompressor';
+import NotificationBell from './NotificationBell';
 import {
   getCompanyMessages,
+  getMentionableUsers,
+  doesMessageMentionUser,
   sendCompanyMessage,
   updateCompanyMessage,
   deleteCompanyMessage,
@@ -114,8 +119,60 @@ function getFileBadgeLabel(nameOrPath = '') {
   return ext.slice(0, 5) || 'DOC';
 }
 
+function normalizeForMatch(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function escapeRegExp(str = '') {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isSamePersonName(nameA, nameB) {
+  const a = normalizeForMatch(nameA);
+  const b = normalizeForMatch(nameB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const partsA = a.split(/\s+/).filter(Boolean);
+  const partsB = b.split(/\s+/).filter(Boolean);
+  if (partsA[0] && partsA[0] === partsB[0]) {
+    if (partsA.length === 1 || partsB.length === 1) return true;
+    if (partsA[partsA.length - 1] === partsB[partsB.length - 1]) return true;
+  }
+  return false;
+}
+
+function findActiveMentionTrigger(text, cursorPos, users) {
+  if (typeof text !== 'string') return null;
+  const caret = typeof cursorPos === 'number' ? cursorPos : text.length;
+  const beforeCaret = text.slice(0, caret);
+  const match = beforeCaret.match(/(?:^|\s)@([^@\n\r]{0,35})$/);
+  if (!match) return null;
+
+  const query = match[1];
+  const atIndex = beforeCaret.lastIndexOf('@');
+  const normQuery = normalizeForMatch(query);
+
+  if (query.includes(' ')) {
+    const matchesAnyUser = users.some((u) =>
+      normalizeForMatch(u.name).includes(normQuery)
+    );
+    if (!matchesAnyUser) return null;
+  }
+
+  return {
+    atIndex,
+    endIndex: caret,
+    query,
+  };
+}
+
 const CompanyChat = ({ company, group, onMessagesSync }) => {
   const { user, userProfile, activeLink } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentUserId = user?.id;
   const companyId = company?.id;
 
@@ -145,6 +202,11 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedId, setHighlightedId] = useState(null);
 
+  const [mentionableUsers, setMentionableUsers] = useState([]);
+  const [mentionTrigger, setMentionTrigger] = useState(null);
+  const [manualMentionOpen, setManualMentionOpen] = useState(false);
+  const [mentionHighlightIdx, setMentionHighlightIdx] = useState(0);
+
   const messagesContainerRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -164,6 +226,57 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
 
   const effSupervisor = group?.supervisor || company?.supervisor || company?.supportResponsible || 'Não definido';
   const effTecnico = group?.tecnicoResponsavel || company?.tecnicoResponsavel || company?.responsible || 'Não definido';
+
+  useEffect(() => {
+    let active = true;
+    getMentionableUsers().then((users) => {
+      if (active) setMentionableUsers(users);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const sortedMentionableUsers = useMemo(() => {
+    const annotated = mentionableUsers.map((person) => {
+      const isTec = effTecnico !== 'Não definido' && isSamePersonName(person.name, effTecnico);
+      const isSup = effSupervisor !== 'Não definido' && isSamePersonName(person.name, effSupervisor);
+      let companyTag = '';
+      if (isTec && isSup) companyTag = 'Técnico / Supervisor';
+      else if (isTec) companyTag = 'Técnico da Empresa';
+      else if (isSup) companyTag = 'Supervisor';
+      return { ...person, companyTag, priority: isTec || isSup ? 0 : 1 };
+    });
+
+    return annotated.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [mentionableUsers, effTecnico, effSupervisor]);
+
+  const mentionSuggestions = useMemo(() => {
+    const queryNorm = normalizeForMatch(mentionTrigger?.query || '');
+    if (!queryNorm) return sortedMentionableUsers;
+    return sortedMentionableUsers.filter(
+      (person) =>
+        normalizeForMatch(person.name).includes(queryNorm) ||
+        normalizeForMatch(person.sector).includes(queryNorm) ||
+        normalizeForMatch(person.role).includes(queryNorm)
+    );
+  }, [sortedMentionableUsers, mentionTrigger]);
+
+  const isMentionMenuOpen = Boolean(mentionTrigger) || manualMentionOpen;
+
+  const selectedMentions = useMemo(() => {
+    const normDraft = normalizeForMatch(draft);
+    if (!normDraft.includes('@')) return [];
+    return sortedMentionableUsers.filter((person) => {
+      const normName = normalizeForMatch(person.name);
+      if (!normName) return false;
+      const regex = new RegExp(`(?:^|\\s)@${escapeRegExp(normName)}(?=$|[\\s.,;:!?()\\]])`, 'i');
+      return regex.test(normDraft);
+    });
+  }, [draft, sortedMentionableUsers]);
 
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
@@ -423,6 +536,7 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
     try {
       const created = await sendCompanyMessage({
         companyId,
+        companyName: company?.name || '',
         userId: user.id,
         authorName,
         authorRole,
@@ -432,6 +546,7 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
         attachmentFile,
         attachmentOriginalSize: attachmentMeta?.originalSize ?? null,
         attachmentMimeType: attachmentFile?.type || null,
+        mentions: selectedMentions,
         replyToId: replyingTo?.id || null,
       });
 
@@ -444,6 +559,8 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
       setDraft('');
       setAttachmentFile(null);
       setAttachmentMeta(null);
+      setMentionTrigger(null);
+      setManualMentionOpen(false);
       setReplyingTo(null);
       setCategory('geral');
       if (textareaRef.current) {
@@ -458,7 +575,94 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
     }
   };
 
+  const insertMentionIntoDraft = useCallback(
+    (person) => {
+      if (!person) return;
+      const el = textareaRef.current;
+      const mentionText = `@${person.name} `;
+      let nextDraft = draft;
+      let nextCursorPos = draft.length;
+
+      if (mentionTrigger) {
+        const before = draft.slice(0, mentionTrigger.atIndex);
+        const after = draft.slice(mentionTrigger.endIndex).replace(/^\s+/, '');
+        nextDraft = `${before}${mentionText}${after}`;
+        nextCursorPos = before.length + mentionText.length;
+      } else {
+        const caret = el && typeof el.selectionStart === 'number' ? el.selectionStart : draft.length;
+        const before = draft.slice(0, caret);
+        const after = draft.slice(caret);
+        const needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
+        const prefix = needsLeadingSpace ? ' ' : '';
+        nextDraft = `${before}${prefix}${mentionText}${after}`;
+        nextCursorPos = before.length + prefix.length + mentionText.length;
+      }
+
+      setDraft(nextDraft);
+      setMentionTrigger(null);
+      setManualMentionOpen(false);
+      setMentionHighlightIdx(0);
+
+      requestAnimationFrame(() => {
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(nextCursorPos, nextCursorPos);
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+      });
+    },
+    [draft, mentionTrigger]
+  );
+
+  const removeMentionFromDraft = useCallback(
+    (person) => {
+      if (!person?.name) return;
+      const regex = new RegExp(`(^|\\s)@${escapeRegExp(person.name)}\\s?`, 'gi');
+      const cleaned = draft.replace(regex, '$1').replace(/\s{2,}/g, ' ').trimStart();
+      setDraft(cleaned);
+    },
+    [draft]
+  );
+
+  const handleToggleMentionPicker = () => {
+    if (isMentionMenuOpen) {
+      setManualMentionOpen(false);
+      setMentionTrigger(null);
+      return;
+    }
+    setMentionHighlightIdx(0);
+    setManualMentionOpen(true);
+    textareaRef.current?.focus();
+  };
+
   const handleTextareaKeyDown = (event) => {
+    if (isMentionMenuOpen && mentionSuggestions.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setMentionHighlightIdx((prev) => (prev + 1) % mentionSuggestions.length);
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setMentionHighlightIdx(
+          (prev) => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length
+        );
+        return;
+      }
+      if ((event.key === 'Enter' || event.key === 'Tab') && !event.shiftKey) {
+        event.preventDefault();
+        const chosen = mentionSuggestions[mentionHighlightIdx] || mentionSuggestions[0];
+        insertMentionIntoDraft(chosen);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMentionTrigger(null);
+        setManualMentionOpen(false);
+        return;
+      }
+    }
+
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       handleSend();
@@ -466,7 +670,17 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
   };
 
   const handleTextareaChange = (event) => {
-    setDraft(event.target.value);
+    const val = event.target.value;
+    const cursorPos = event.target.selectionStart;
+    setDraft(val);
+
+    const trigger = findActiveMentionTrigger(val, cursorPos, sortedMentionableUsers);
+    setMentionTrigger(trigger);
+    if (trigger) {
+      setManualMentionOpen(false);
+      setMentionHighlightIdx(0);
+    }
+
     const el = event.target;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
@@ -513,14 +727,83 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
     }
   };
 
-  const jumpToMessage = (targetId) => {
+  const jumpToMessage = useCallback((targetId) => {
     if (!targetId) return;
     const el = document.getElementById(`company-msg-${targetId}`);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setHighlightedId(targetId);
-    setTimeout(() => setHighlightedId((curr) => (curr === targetId ? null : curr)), 1600);
-  };
+    setTimeout(() => setHighlightedId((curr) => (curr === targetId ? null : curr)), 2000);
+  }, []);
+
+  const targetMsgParam = searchParams.get('msg');
+  useEffect(() => {
+    if (loading || !targetMsgParam) return undefined;
+    const exists = messages.some((m) => m.id === targetMsgParam);
+    if (!exists) return undefined;
+
+    const timer = setTimeout(() => {
+      jumpToMessage(targetMsgParam);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('msg');
+      setSearchParams(nextParams, { replace: true });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [loading, targetMsgParam, messages, jumpToMessage, searchParams, setSearchParams]);
+
+  const renderMessageWithMentions = useCallback(
+    (msg) => {
+      const text = msg?.message || '';
+      if (!text) return null;
+
+      const knownPeople = [];
+      const seenNames = new Set();
+      [...(msg.mentions || []), ...mentionableUsers].forEach((p) => {
+        if (!p?.name) return;
+        const norm = normalizeForMatch(p.name);
+        if (!norm || seenNames.has(norm)) return;
+        seenNames.add(norm);
+        knownPeople.push(p);
+      });
+
+      if (knownPeople.length === 0) return text;
+
+      knownPeople.sort((a, b) => b.name.length - a.name.length);
+      const pattern = knownPeople.map((p) => `@${escapeRegExp(p.name)}`).join('|');
+      const regex = new RegExp(`(${pattern})(?=$|[\\s.,;:!?()\\]])`, 'gi');
+      const parts = text.split(regex);
+
+      return parts.map((part, idx) => {
+        if (!part.startsWith('@')) {
+          return <React.Fragment key={idx}>{part}</React.Fragment>;
+        }
+        const rawMention = part.slice(1);
+        const normMention = normalizeForMatch(rawMention);
+        const matched = knownPeople.find((p) => normalizeForMatch(p.name) === normMention);
+        if (!matched) {
+          return <React.Fragment key={idx}>{part}</React.Fragment>;
+        }
+        const isCurrentUser =
+          matched.id === currentUserId ||
+          (authorName && normalizeForMatch(authorName) === normMention);
+
+        return (
+          <span
+            key={idx}
+            className={`company-chat__mention-pill ${isCurrentUser ? 'is-me' : ''}`}
+            title={
+              isCurrentUser
+                ? 'Você foi marcado nesta mensagem'
+                : `${matched.name}${matched.sector ? ` (${matched.sector})` : ''}`
+            }
+          >
+            @{matched.name}
+          </span>
+        );
+      });
+    },
+    [mentionableUsers, currentUserId, authorName]
+  );
 
   const messagesById = useMemo(() => {
     const map = new Map();
@@ -658,6 +941,7 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
           </div>
 
           <div className="company-chat__toolbar-actions">
+            <NotificationBell variant="compact" />
             <button
               type="button"
               className={`icon-button company-chat__tool-btn ${showSearch ? 'is-active' : ''}`}
@@ -766,6 +1050,8 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
                 const attachmentUrl = msg.attachmentPath ? getDocumentUrl(msg.attachmentPath) : null;
                 const isImg = isImageFile(msg.attachmentName || msg.attachmentPath || '');
                 const avatarColor = getAvatarColor(msg.userId || msg.authorName);
+                const mentionsCurrentUser =
+                  !isOwn && doesMessageMentionUser(msg, currentUserId, authorName);
 
                 return (
                   <React.Fragment key={msg.id}>
@@ -791,7 +1077,11 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
                         </div>
                       )}
 
-                      <div className={`company-chat__bubble ${isOwn ? 'is-own' : ''}`}>
+                      <div
+                        className={`company-chat__bubble ${isOwn ? 'is-own' : ''} ${
+                          mentionsCurrentUser ? 'is-mentioning-me' : ''
+                        }`}
+                      >
                         {/* Cabeçalho da Mensagem */}
                         <div className="company-chat__bubble-head">
                           <div className="company-chat__author-meta">
@@ -807,6 +1097,12 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
                               <span className={`company-chat__tag ${categoryInfo.className}`}>
                                 {CategoryIcon && <CategoryIcon size={11} />}
                                 {categoryInfo.label}
+                              </span>
+                            )}
+                            {mentionsCurrentUser && (
+                              <span className="company-chat__tag company-chat__tag--mention">
+                                <AtSign size={10} />
+                                Mencionou você
                               </span>
                             )}
                           </div>
@@ -867,7 +1163,9 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
                         ) : (
                           <>
                             {msg.message && (
-                              <div className="company-chat__text">{msg.message}</div>
+                              <div className="company-chat__text">
+                                {renderMessageWithMentions(msg)}
+                              </div>
                             )}
 
                             {attachmentUrl && (
@@ -1044,6 +1342,86 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
           </div>
         )}
 
+        {selectedMentions.length > 0 && (
+          <div className="company-chat__pending-mentions">
+            <span className="company-chat__pending-mentions-label">
+              <AtSign size={12} /> Notificará:
+            </span>
+            {selectedMentions.map((person) => (
+              <span key={person.id} className="company-chat__mention-chip">
+                <span>@{person.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeMentionFromDraft(person)}
+                  aria-label={`Remover marcação de ${person.name}`}
+                  title={`Remover marcação de ${person.name}`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {isMentionMenuOpen && (
+          <div className="company-chat__mention-menu" role="listbox" aria-label="Marcar pessoa na mensagem">
+            <div className="company-chat__mention-menu-head">
+              <span>
+                <AtSign size={13} /> Marcar pessoa para notificar
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMentionTrigger(null);
+                  setManualMentionOpen(false);
+                }}
+                aria-label="Fechar lista de pessoas"
+              >
+                <X size={13} />
+              </button>
+            </div>
+            <div className="company-chat__mention-list">
+              {mentionSuggestions.length === 0 ? (
+                <div className="company-chat__mention-empty">
+                  Nenhuma pessoa encontrada para "{mentionTrigger?.query || ''}"
+                </div>
+              ) : (
+                mentionSuggestions.map((person, idx) => {
+                  const isHighlighted = idx === mentionHighlightIdx;
+                  const subtitle = [person.sector, person.role].filter(Boolean).join(' • ');
+                  return (
+                    <button
+                      key={person.id}
+                      type="button"
+                      className={`company-chat__mention-item ${
+                        isHighlighted ? 'is-highlighted' : ''
+                      }`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertMentionIntoDraft(person);
+                      }}
+                    >
+                      <span
+                        className="company-chat__mention-avatar"
+                        style={{ backgroundColor: getAvatarColor(person.id || person.name) }}
+                      >
+                        {getInitials(person.name)}
+                      </span>
+                      <span className="company-chat__mention-copy">
+                        <strong>{person.name}</strong>
+                        {subtitle && <small>{subtitle}</small>}
+                      </span>
+                      {person.companyTag && (
+                        <span className="company-chat__mention-tag">{person.companyTag}</span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="company-chat__composer-top">
           <div className="company-chat__composer-types">
             <span className="company-chat__composer-label">Tipo:</span>
@@ -1061,16 +1439,30 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-secondary company-chat__doc-btn"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={sending || compressingFile}
-            title="Anexar PDF, Word, Excel, PowerPoint, imagem ou ZIP (com compressão automática)"
-          >
-            <Paperclip size={14} />
-            <span>Anexar Documento</span>
-          </button>
+          <div className="company-chat__composer-actions">
+            <button
+              type="button"
+              className={`btn btn-secondary company-chat__mention-btn ${
+                isMentionMenuOpen ? 'is-active' : ''
+              }`}
+              onClick={handleToggleMentionPicker}
+              disabled={sending}
+              title="Marcar uma pessoa (@Nome) para enviar notificação"
+            >
+              <AtSign size={14} />
+              <span>Marcar pessoa</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary company-chat__doc-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || compressingFile}
+              title="Anexar PDF, Word, Excel, PowerPoint, imagem ou ZIP (com compressão automática)"
+            >
+              <Paperclip size={14} />
+              <span>Anexar Documento</span>
+            </button>
+          </div>
         </div>
 
         <div className="company-chat__input-row">
@@ -1098,7 +1490,7 @@ const CompanyChat = ({ company, group, onMessagesSync }) => {
             value={draft}
             onChange={handleTextareaChange}
             onKeyDown={handleTextareaKeyDown}
-            placeholder="Escreva uma mensagem ou anexe um documento para os técnicos desta empresa... (Enter envia, Shift+Enter quebra linha)"
+            placeholder="Escreva uma mensagem, use @ para marcar alguém ou anexe um documento... (Enter envia)"
             disabled={sending}
             className="company-chat__textarea"
           />

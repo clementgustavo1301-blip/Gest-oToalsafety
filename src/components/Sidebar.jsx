@@ -33,6 +33,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAI } from '../context/AIContext';
 import { useTheme } from '../hooks/useTheme';
 import { supabase } from '../lib/supabase';
+import NotificationBell from './NotificationBell';
 
 const routeIsActive = (pathname, path) => {
   if (path === '/' || path === '/ipa') return pathname === path;
@@ -168,6 +169,10 @@ const Sidebar = ({ isOpen, onClose }) => {
         <button className="sidebar__close hide-on-desktop" onClick={onClose} aria-label="Fechar menu">
           <X size={16} />
         </button>
+      </div>
+
+      <div className="sidebar__notifications">
+        <NotificationBell variant="sidebar" enableToast />
       </div>
 
       <div className="sidebar__section-label">Navegação</div>
