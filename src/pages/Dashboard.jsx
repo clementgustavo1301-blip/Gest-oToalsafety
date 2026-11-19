@@ -18,7 +18,9 @@ import {
   getEffectiveValidityDate,
   parseSafeDate,
   isLaudo,
-  isProgram
+  isProgram,
+  isPcaPprAet,
+  isPendingDeliverable
 } from '../utils/deliverableTiming';
 
 // Helpers de normalização e comparação de nomes
@@ -151,7 +153,7 @@ const Dashboard = () => {
 
   // Análise Global de Entregáveis
   const deliverablesAnalysis = useMemo(() => {
-    const activeDeliverables = deliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+    const activeDeliverables = deliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
     const expired = activeDeliverables.filter(d => isItemExpired(d, today));
     const expiring30 = activeDeliverables.filter(d => isItemExpiring30(d, today, in30Days));
     const expiring60 = activeDeliverables.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
@@ -256,7 +258,7 @@ const Dashboard = () => {
       );
       const companyIds = new Set(relatedCompanies.map(c => c.id));
       const respDeliverables = deliverables.filter(d => companyIds.has(d.companyId));
-      const activeRespDeliv = respDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+      const activeRespDeliv = respDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
       const expired = activeRespDeliv.filter(d => isItemExpired(d, today));
       const exp30 = activeRespDeliv.filter(d => isItemExpiring30(d, today, in30Days));
       const exp60 = activeRespDeliv.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
@@ -299,7 +301,7 @@ const Dashboard = () => {
 
     const companyIds = new Set(personCompanies.map(c => c.id));
     const personDeliverables = deliverables.filter(d => companyIds.has(d.companyId));
-    const activePersonDeliv = personDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+    const activePersonDeliv = personDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
     const expired = activePersonDeliv.filter(d => isItemExpired(d, today));
     const exp30 = activePersonDeliv.filter(d => isItemExpiring30(d, today, in30Days));
     const exp60 = activePersonDeliv.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
@@ -427,7 +429,7 @@ const Dashboard = () => {
   }
 
   const activeContracts = contracts.filter(c => c.status === 'ativo').length;
-  const pendingDeliverables = deliverables.filter(d => !isDelivered(d) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica').length;
+  const pendingDeliverables = deliverables.filter(d => isPendingDeliverable(d)).length;
   const completedTrainings = trainings.filter(t => t.status === 'concluido').length;
   const attentionItems = trainings.filter(t => t.status === 'nao_feito' || t.status === 'adiado').length;
 
@@ -443,7 +445,7 @@ const Dashboard = () => {
   const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
 
   const globalUpcomingDeliverables = deliverables
-    .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && (
+    .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d) && (
       isItemExpired(d, today) ||
       isItemExpiring30(d, today, in30Days) ||
       isItemExpiring60(d, today, in30Days, in60Days) ||
@@ -977,7 +979,7 @@ const Dashboard = () => {
                         const isSup = isCompanySupervisor(c, activePerson, isSamePerson(activePerson, loggedUserName) ? loggedUserId : undefined);
                         const isTec = isCompanyTecnico(c, activePerson, isSamePerson(activePerson, loggedUserName) ? loggedUserId : undefined);
 
-                        const compDeliverables = deliverables.filter(d => d.companyId === c.id && d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+                        const compDeliverables = deliverables.filter(d => d.companyId === c.id && d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
                         const compExpired = compDeliverables.filter(d => isItemExpired(d, today));
                         const compExp30 = compDeliverables.filter(d => isItemExpiring30(d, today, in30Days));
                         const compExp60 = compDeliverables.filter(d => isItemExpiring60(d, today, in30Days, in60Days));

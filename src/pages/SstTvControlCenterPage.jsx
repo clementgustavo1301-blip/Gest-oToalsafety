@@ -19,7 +19,8 @@ import {
   isItemExpiring60,
   getExpirationTargetDate,
   getDaysUntilExpiration,
-  getEffectiveValidityDate
+  getEffectiveValidityDate,
+  isPcaPprAet
 } from '../utils/deliverableTiming';
 import { supabase } from '../lib/supabase';
 import '../tv2.css';
@@ -272,7 +273,7 @@ const SstTvControlCenterPage = () => {
   // Entregáveis ativos filtrados
   const activeDeliverables = useMemo(() => {
     return deliverables
-      .filter(d => filteredCompanyIds.has(d.companyId) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica')
+      .filter(d => filteredCompanyIds.has(d.companyId) && d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d))
       .map(d => {
         const comp = companiesMap[d.companyId];
         const daysLeft = getDaysUntilExpiration(d, today);
@@ -410,7 +411,7 @@ const SstTvControlCenterPage = () => {
   // Dados completos da Carteira por Técnico / Supervisor
   const teamChartData = useMemo(() => {
     const allDeliverablesWithFlags = deliverables
-      .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica')
+      .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d))
       .map(d => ({
         ...d,
         isExpired: isItemExpired(d, today),

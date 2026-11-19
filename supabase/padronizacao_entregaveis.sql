@@ -47,7 +47,8 @@ SET
 
 -- ==============================================================================
 -- 4. (SCRIPT OPCIONAL) Carga automática dos 12 entregáveis para todas as empresas ativas
--- Descomente o bloco abaixo caso queira gerar os 12 entregáveis pendentes para as empresas que ainda não possuem:
+-- PCA, PPR e AET são gerados com status 'nao_se_aplica' para não gerar pendências.
+-- Descomente o bloco abaixo caso queira gerar os 12 entregáveis para as empresas que ainda não possuem:
 -- ==============================================================================
 /*
 INSERT INTO public.deliverables (company_id, title, type, status, due_date)
@@ -55,7 +56,10 @@ SELECT
     c.id AS company_id,
     sd.title,
     sd.type,
-    'pendente' AS status,
+    CASE
+      WHEN UPPER(TRIM(sd.title)) IN ('PCA', 'PPR', 'AET') THEN 'nao_se_aplica'
+      ELSE 'pendente'
+    END AS status,
     CURRENT_DATE + INTERVAL '30 days' AS due_date
 FROM public.companies c
 CROSS JOIN public.standard_deliverables sd
@@ -64,3 +68,21 @@ WHERE NOT EXISTS (
     WHERE d.company_id = c.id AND LOWER(TRIM(d.title)) = LOWER(TRIM(sd.title))
 );
 */
+
+-- 5. Garantir que registros existentes de PCA, PPR e AET sem arquivo fiquem como 'nao_se_aplica' e sem validade
+UPDATE public.deliverables
+SET
+    status = 'nao_se_aplica',
+    validity_date = NULL
+WHERE file_name IS NULL
+  AND status <> 'cancelado'
+  AND (
+    LOWER(TRIM(title)) IN ('pca', 'ppr', 'aet')
+    OR LOWER(title) ~ '\m(pca|ppr|aet)\M'
+    OR LOWER(title) LIKE '%conservação auditiva%'
+    OR LOWER(title) LIKE '%conservacao auditiva%'
+    OR LOWER(title) LIKE '%proteção respiratória%'
+    OR LOWER(title) LIKE '%protecao respiratoria%'
+    OR LOWER(title) LIKE '%análise ergonômica%'
+    OR LOWER(title) LIKE '%analise ergonomica%'
+  );

@@ -91,12 +91,27 @@ function formatDocTitle(rawTitle, docKey) {
   return trimmed;
 }
 
-/** Resolve o nome do responsável: técnico do entregável → técnico responsável da empresa. */
+/** Resolve o nome do responsável: técnico responsável da empresa (ou grupo) → supervisor → técnico do entregável. */
 export function resolveResponsible(deliverable, company, profilesById) {
-  const prof = deliverable.responsibleId ? profilesById.get(deliverable.responsibleId) : null;
+  const fromCompanyTec = (
+    (company?.effTecnico && company.effTecnico !== 'Não definido' ? company.effTecnico : '') ||
+    company?.tecnicoResponsavel ||
+    company?.responsible ||
+    (deliverable?.tecnicoResponsavel && deliverable.tecnicoResponsavel !== 'Não definido' ? deliverable.tecnicoResponsavel : '')
+  ).trim();
+  if (fromCompanyTec) return fromCompanyTec;
+
+  const fromCompanySup = (
+    (company?.effSupervisor && company.effSupervisor !== 'Não definido' ? company.effSupervisor : '') ||
+    company?.supervisor ||
+    company?.supportResponsible ||
+    (deliverable?.supervisor && deliverable.supervisor !== 'Não definido' ? deliverable.supervisor : '')
+  ).trim();
+  if (fromCompanySup) return fromCompanySup;
+
+  const prof = deliverable?.responsibleId ? profilesById?.get(deliverable.responsibleId) : null;
   if (prof?.name) return prof.name.trim();
-  const fromCompany = (company?.tecnicoResponsavel || company?.responsible || '').trim();
-  return fromCompany || NO_RESPONSIBLE;
+  return NO_RESPONSIBLE;
 }
 
 /**

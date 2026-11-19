@@ -1,24 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText } from 'lucide-react';
-import { getContractsByCompany, getProfiles } from '../services/storageService';
+import { X, FileText, ShieldCheck, UserCheck } from 'lucide-react';
+import { getContractsByCompany, getCompanyById, getGroups, resolveCompaniesWithHeritage } from '../services/storageService';
 import { STANDARD_DELIVERABLES } from '../data/deliverables';
-import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram } from '../utils/deliverableTiming';
+import { getDefaultValidityMonths, parseSafeDate, isProgram, isPcaPprAet } from '../utils/deliverableTiming';
 
 const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'programa' }) => {
   const [selectedDeliverable, setSelectedDeliverable] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState(initialType);
+  const [status, setStatus] = useState('pendente');
   const [contractId, setContractId] = useState('');
   const [dataEnvio, setDataEnvio] = useState('');
   const [validityDate, setValidityDate] = useState('');
   const [validityManuallyEdited, setValidityManuallyEdited] = useState(false);
   const [ultimaRevisao, setUltimaRevisao] = useState('');
-  const [deliveredDate, setDeliveredDate] = useState('');
-  const [responsibleId, setResponsibleId] = useState('');
+  const [deliveredDate] = useState('');
   const [file, setFile] = useState(null);
 
-  const updateSuggestedValidity = (curTitle, curType, curDateEnvio) => {
+  const isNotApplicableItem = isPcaPprAet({ title, type }) || status === 'nao_se_aplica';
+  const showValidityField = !isNotApplicableItem && type === 'programa' && isProgram({ title, type });
+
+  const updateSuggestedValidity = (curTitle, curType, curDateEnvio, curStatus = status) => {
+    if (isPcaPprAet({ title: curTitle, type: curType }) || curStatus === 'nao_se_aplica') {
+      setValidityDate('');
+      return;
+    }
     if (curType !== 'programa' && !isProgram({ title: curTitle, type: curType })) {
       setValidityDate('');
       return;
@@ -42,19 +49,25 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
   const [repeatCount, setRepeatCount] = useState(4);
 
   const [contracts, setContracts] = useState([]);
-  const [profiles, setProfiles] = useState([]);
+  const [companyInfo, setCompanyInfo] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
       setLoadingData(true);
-      const [ctrs, profs] = await Promise.all([
-        getContractsByCompany(companyId),
-        getProfiles()
+      const [ctrs, comp, groups] = await Promise.all([
+        companyId ? getContractsByCompany(companyId) : Promise.resolve([]),
+        companyId ? getCompanyById(companyId) : Promise.resolve(null),
+        getGroups()
       ]);
-      setContracts(ctrs);
-      setProfiles(profs);
+      setContracts(ctrs || []);
+      if (comp) {
+        const resolved = resolveCompaniesWithHeritage([comp], groups || [])[0];
+        setCompanyInfo(resolved || comp);
+      } else {
+        setCompanyInfo(null);
+      }
       setLoadingData(false);
     }
     load();
@@ -62,25 +75,28 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !dataEnvio) return;
-    
+    if (!title.trim()) return;
+    if (!isNotApplicableItem && !dataEnvio) return;
+
     setSaving(true);
-    
+    const effectiveDate = dataEnvio || new Date().toISOString().split('T')[0];
+    const effectiveStatus = file ? 'entregue' : (isPcaPprAet({ title, type }) ? (status === 'cancelado' ? 'cancelado' : 'nao_se_aplica') : status);
+
     const baseItem = {
       title: title.trim(),
       description: description.trim() || null,
       type,
       contractId: contractId || null,
-      dueDate: dataEnvio,
-      dataEnvio,
-      dataEmissao: dataEnvio,
-      data_emissao: dataEnvio,
-      data_envio: dataEnvio,
-      validityDate: (type === 'programa' && isProgram({ title, type })) ? (validityDate || null) : null,
+      dueDate: effectiveDate,
+      dataEnvio: effectiveDate,
+      dataEmissao: effectiveDate,
+      data_emissao: effectiveDate,
+      data_envio: effectiveDate,
+      validityDate: (!isNotApplicableItem && type === 'programa' && isProgram({ title, type })) ? (validityDate || null) : null,
       ultimaRevisao: ultimaRevisao || null,
-      status: file ? 'entregue' : 'pendente',
-      deliveredDate: deliveredDate || dataEnvio || (file ? new Date().toISOString() : null),
-      responsibleId: responsibleId || null,
+      status: effectiveStatus,
+      deliveredDate: deliveredDate || (file ? new Date().toISOString().split('T')[0] : null),
+      responsibleId: companyInfo?.responsibleId || null,
       fileName: null,
       file: file
     };
@@ -168,14 +184,17 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                     if (val === 'outro') {
                       setTitle('');
                       setDescription('');
+                      setStatus('pendente');
                     } else if (val) {
                       const found = STANDARD_DELIVERABLES.find(d => d.value === val);
                       if (found) {
+                        const nextStatus = found.defaultStatus || (isPcaPprAet({ title: found.label, type: found.defaultType }) ? 'nao_se_aplica' : 'pendente');
                         setTitle(found.label);
                         setType(found.defaultType);
+                        setStatus(nextStatus);
                         if (found.description) setDescription(found.description);
-                        if (found.defaultType === 'programa') {
-                          updateSuggestedValidity(found.label, found.defaultType, dataEnvio);
+                        if (found.defaultType === 'programa' && nextStatus !== 'nao_se_aplica' && !isPcaPprAet({ title: found.label, type: found.defaultType })) {
+                          updateSuggestedValidity(found.label, found.defaultType, dataEnvio, nextStatus);
                         } else {
                           setValidityDate('');
                           setValidityManuallyEdited(false);
@@ -188,7 +207,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                 >
                   <option value="">Selecione um entregável...</option>
                   {STANDARD_DELIVERABLES.map(d => (
-                    <option key={d.value} value={d.value}>{d.label} ({d.defaultType})</option>
+                    <option key={d.value} value={d.value}>{d.label} ({d.defaultType}){d.defaultStatus === 'nao_se_aplica' ? ' — Não Se Aplica' : ''}</option>
                   ))}
                   <option value="outro">Outro (personalizado)</option>
                 </select>
@@ -204,7 +223,12 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                   onChange={(e) => {
                     const val = e.target.value;
                     setTitle(val);
-                    updateSuggestedValidity(val, type, dataEnvio);
+                    if (isPcaPprAet({ title: val, type })) {
+                      setStatus('nao_se_aplica');
+                      setValidityDate('');
+                    } else {
+                      updateSuggestedValidity(val, type, dataEnvio, status);
+                    }
                   }}
                   placeholder="Ex: PGR - Programa de Gerenciamento de Riscos"
                   className="modal-input"
@@ -228,7 +252,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                 />
               </div>
 
-              {/* Type & Contract */}
+              {/* Type & Status */}
               <div className="grid-responsive-2">
                 <div>
                   <label className="modal-label" htmlFor="dlv-type">Tipo</label>
@@ -238,8 +262,8 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                     onChange={(e) => {
                       const val = e.target.value;
                       setType(val);
-                      if (val === 'programa') {
-                        updateSuggestedValidity(title, val, dataEnvio);
+                      if (val === 'programa' && !isPcaPprAet({ title, type: val }) && status !== 'nao_se_aplica') {
+                        updateSuggestedValidity(title, val, dataEnvio, status);
                       } else {
                         setValidityDate('');
                         setValidityManuallyEdited(false);
@@ -257,23 +281,52 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                   </select>
                 </div>
                 <div>
-                  <label className="modal-label" htmlFor="dlv-contract">Contrato Vinculado</label>
+                  <label className="modal-label" htmlFor="dlv-status">Status</label>
                   <select
-                    id="dlv-contract"
-                    value={contractId}
-                    onChange={(e) => setContractId(e.target.value)}
+                    id="dlv-status"
+                    value={status}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setStatus(val);
+                      if (val === 'nao_se_aplica') {
+                        setValidityDate('');
+                      } else {
+                        updateSuggestedValidity(title, type, dataEnvio, val);
+                      }
+                    }}
                     className="modal-input"
                     disabled={saving}
                   >
-                    <option value="">Sem vínculo</option>
-                    {contracts.map(c => (
-                      <option key={c.id} value={c.id}>{c.contractNumber}</option>
-                    ))}
+                    <option value="pendente" disabled={isPcaPprAet({ title, type })}>Pendente</option>
+                    <option value="em_elaboracao">Em Elaboração</option>
+                    <option value="agendado">Agendado</option>
+                    <option value="entregue">Entregue</option>
+                    <option value="feito">Feito</option>
+                    <option value="adiado">Adiado</option>
+                    <option value="cancelado">Cancelado</option>
+                    <option value="nao_se_aplica">Não Se Aplica</option>
                   </select>
                 </div>
               </div>
 
-              {/* Datas: Data de Emissão (OBRIGATÓRIO), Validade (NÃO OBRIGATÓRIO), Última Revisão (NÃO OBRIGATÓRIO) */}
+              {/* Contract */}
+              <div>
+                <label className="modal-label" htmlFor="dlv-contract">Contrato Vinculado</label>
+                <select
+                  id="dlv-contract"
+                  value={contractId}
+                  onChange={(e) => setContractId(e.target.value)}
+                  className="modal-input"
+                  disabled={saving}
+                >
+                  <option value="">Sem vínculo</option>
+                  {contracts.map(c => (
+                    <option key={c.id} value={c.id}>{c.contractNumber}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Datas: Data de Emissão, Validade (NÃO OBRIGATÓRIO), Última Revisão (NÃO OBRIGATÓRIO) */}
               <div style={{
                 padding: '1rem',
                 backgroundColor: 'var(--surface-hover, #f8fafc)',
@@ -285,7 +338,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
               }}>
                 <div>
                   <label className="modal-label" htmlFor="dlv-envio" style={{ fontWeight: '600' }}>
-                    Data de Emissão <span style={{ color: '#ef4444', fontWeight: 'bold' }}>* (Obrigatório)</span>
+                    Data de Emissão {isNotApplicableItem ? '(Opcional)' : <span style={{ color: '#ef4444', fontWeight: 'bold' }}>* (Obrigatório)</span>}
                   </label>
                   <input
                     id="dlv-envio"
@@ -294,18 +347,20 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                     onChange={(e) => {
                       const val = e.target.value;
                       setDataEnvio(val);
-                      updateSuggestedValidity(title, type, val);
+                      updateSuggestedValidity(title, type, val, status);
                     }}
                     className="modal-input"
-                    required
+                    required={!isNotApplicableItem}
                     disabled={saving}
                   />
                   <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                    Data de emissão prevista ou realizada do documento ao cliente.
+                    {isNotApplicableItem
+                      ? 'Para PCA, PPR, AET ou itens "Não Se Aplica", a data é opcional e não gera pendência.'
+                      : 'Data de emissão prevista ou realizada do documento ao cliente.'}
                   </span>
                 </div>
 
-                {type !== 'programa' || !isProgram({ title, type }) ? (
+                {!showValidityField ? (
                   <div>
                     <label className="modal-label" htmlFor="dlv-revisao">
                       Última Revisão (Opcional)
@@ -319,7 +374,9 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                       disabled={saving}
                     />
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'block' }}>
-                      Não obrigatório (apenas programas possuem prazo de validade normativa)
+                      {isNotApplicableItem
+                        ? 'Não obrigatório (não se aplica / sem prazo de validade).'
+                        : 'Não obrigatório (apenas programas possuem prazo de validade normativa)'}
                     </span>
                   </div>
                 ) : (
@@ -334,7 +391,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                             type="button"
                             onClick={() => {
                               setValidityManuallyEdited(false);
-                              updateSuggestedValidity(title, type, dataEnvio);
+                              updateSuggestedValidity(title, type, dataEnvio, status);
                             }}
                             style={{
                               background: 'none', border: 'none', color: 'var(--primary)',
@@ -381,21 +438,33 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
                 )}
               </div>
 
-              {/* Responsável */}
-              <div>
-                <label className="modal-label" htmlFor="dlv-responsible">Responsável (Técnico)</label>
-                <select
-                  id="dlv-responsible"
-                  value={responsibleId}
-                  onChange={(e) => setResponsibleId(e.target.value)}
-                  className="modal-input"
-                  disabled={saving}
-                >
-                  <option value="">Nenhum</option>
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
-                  ))}
-                </select>
+              {/* Responsáveis vinculados à Empresa */}
+              <div style={{
+                padding: '0.875rem 1rem',
+                backgroundColor: 'var(--surface-hover, #f8fafc)',
+                borderRadius: 'var(--radius-md, 8px)',
+                border: '1px solid var(--border, #e2e8f0)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}>
+                <span className="modal-label" style={{ marginBottom: 0 }}>Responsáveis pela Empresa</span>
+                <div className="grid-responsive-2" style={{ gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                    <ShieldCheck size={15} color="var(--primary)" />
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.7rem' }}>Supervisor</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{companyInfo?.effSupervisor || 'Não definido'}</strong>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                    <UserCheck size={15} color="var(--secondary)" />
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.7rem' }}>Responsável Técnico</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{companyInfo?.effTecnico || 'Não definido'}</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Repetição para Treinamento / Visita Técnica */}
@@ -466,7 +535,7 @@ const AddDeliverableModal = ({ companyId, onClose, onSave, initialType = 'progra
 
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={!title.trim() || !dataEnvio || saving}>
+              <button type="submit" className="btn btn-primary" disabled={!title.trim() || (!isNotApplicableItem && !dataEnvio) || saving}>
                 {saving ? 'Salvando...' : 'Adicionar Entregável'}
               </button>
             </div>

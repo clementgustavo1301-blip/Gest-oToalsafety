@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText, Download, Filter, Search,
   CheckCircle, Clock, AlertTriangle, FileSpreadsheet, File,
-  LayoutGrid, List as ListIcon, Edit3, Trash2
+  LayoutGrid, List as ListIcon, Edit3, Trash2,
+  ShieldCheck, UserCheck, Building2, RotateCcw
 } from 'lucide-react';
 import {
   getDeliverablesByCompany, getContractsByCompany, addDeliverable, updateDeliverable,
-  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies, deleteDeliverable,
-  deleteDeliverables
+  uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies,
+  getGroups, resolveCompaniesWithHeritage, deleteDeliverable, deleteDeliverables
 } from '../services/storageService';
-import { isItemExpired, isDelivered, getEffectiveValidityDate, isLaudo, isProgram } from '../utils/deliverableTiming';
+import {
+  isItemExpired, isDelivered, getEffectiveValidityDate, isProgram,
+  isPcaPprAet, isPendingDeliverable
+} from '../utils/deliverableTiming';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
 import DeliverablesReportModal from './DeliverablesReportModal';
@@ -35,11 +39,19 @@ const STATUS_CONFIG = {
   nao_se_aplica: { label: 'Não Se Aplica', icon: <AlertTriangle size={14} />, color: '#4b5563', bg: '#f3f4f6' },
 };
 
+const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 const DeliverablesViewer = ({ companyId, onUpdate }) => {
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterContract, setFilterContract] = useState('all');
+  const [filterGroup, setFilterGroup] = useState('all');
   const [filterCompany, setFilterCompany] = useState('all');
+  const [filterResponsible, setFilterResponsible] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
@@ -47,6 +59,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
   const [deliverables, setDeliverables] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState(null);
   const [editingDeliverable, setEditingDeliverable] = useState(null);
@@ -64,14 +77,17 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
       setDeliverables(delivs);
       setContracts(ctrs);
     } else {
-      const [delivs, ctrs, comps] = await Promise.all([
+      const [delivs, ctrs, comps, grps] = await Promise.all([
         getAllDeliverablesSummary(),
         getContracts(),
-        getCompanies()
+        getCompanies(),
+        getGroups()
       ]);
+      const resolvedCompanies = resolveCompaniesWithHeritage(comps, grps);
       setDeliverables(delivs);
       setContracts(ctrs);
-      setCompanies(comps);
+      setCompanies(resolvedCompanies);
+      setGroups(grps);
     }
     if (showLoading) setLoading(false);
   };
@@ -79,6 +95,102 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
   useEffect(() => {
     loadData(true);
   }, [companyId]);
+
+  const responsiblesOptions = useMemo(() => {
+    const map = new Map();
+    const register = (rawName, role) => {
+      const name = String(rawName || '').trim();
+      if (!name || name === 'Não definido') return;
+      const key = normalizeText(name);
+      if (!map.has(key)) {
+        map.set(key, { name, isSup: false, isTec: false });
+      }
+      const entry = map.get(key);
+      if (role === 'sup') entry.isSup = true;
+      if (role === 'tec') entry.isTec = true;
+    };
+
+    companies.forEach(c => {
+      register(c.effSupervisor, 'sup');
+      register(c.effTecnico, 'tec');
+    });
+
+    return Array.from(map.values())
+      .map(entry => {
+        const roleTag = entry.isSup && entry.isTec
+          ? 'Supervisor / Resp. Técnico'
+          : entry.isSup
+            ? 'Supervisor'
+            : 'Resp. Técnico';
+        return {
+          name: entry.name,
+          label: `${entry.name} (${roleTag})`,
+        };
+      })
+      .sort((a, b) => collator.compare(a.name, b.name));
+  }, [companies]);
+
+  const sortedGroups = useMemo(() => {
+    return [...groups].sort((a, b) => collator.compare(a.name, b.name));
+  }, [groups]);
+
+  const filteredCompaniesOptions = useMemo(() => {
+    const normResp = normalizeText(filterResponsible);
+    return [...companies]
+      .filter(c => {
+        const matchGrp = filterGroup === 'all' || c.groupId === filterGroup;
+        const matchResp = filterResponsible === 'all' ||
+          normalizeText(c.effSupervisor) === normResp ||
+          normalizeText(c.effTecnico) === normResp;
+        return matchGrp && matchResp;
+      })
+      .sort((a, b) => collator.compare(a.name, b.name));
+  }, [companies, filterGroup, filterResponsible]);
+
+  const handleGroupFilterChange = (nextGroupId) => {
+    setFilterGroup(nextGroupId);
+    if (nextGroupId !== 'all' && filterCompany !== 'all') {
+      const selectedComp = companies.find(c => c.id === filterCompany);
+      if (selectedComp && selectedComp.groupId !== nextGroupId) {
+        setFilterCompany('all');
+      }
+    }
+  };
+
+  const handleResponsibleFilterChange = (nextResp) => {
+    setFilterResponsible(nextResp);
+    if (nextResp !== 'all' && filterCompany !== 'all') {
+      const selectedComp = companies.find(c => c.id === filterCompany);
+      const normResp = normalizeText(nextResp);
+      if (
+        selectedComp &&
+        normalizeText(selectedComp.effSupervisor) !== normResp &&
+        normalizeText(selectedComp.effTecnico) !== normResp
+      ) {
+        setFilterCompany('all');
+      }
+    }
+  };
+
+  const hasActiveFilters = Boolean(
+    filterGroup !== 'all' ||
+    filterCompany !== 'all' ||
+    filterResponsible !== 'all' ||
+    filterStatus !== 'all' ||
+    filterType !== 'all' ||
+    filterContract !== 'all' ||
+    searchTerm.trim() !== ''
+  );
+
+  const handleClearFilters = () => {
+    setFilterGroup('all');
+    setFilterCompany('all');
+    setFilterResponsible('all');
+    setFilterStatus('all');
+    setFilterType('all');
+    setFilterContract('all');
+    setSearchTerm('');
+  };
 
   const handleAddDeliverable = async (dataOrArray) => {
     const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
@@ -183,30 +295,48 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const filtered = deliverables.filter(d => {
+  const normRespFilter = normalizeText(filterResponsible);
+
+  const matchesScope = (d) => {
+    const matchGroup = companyId || filterGroup === 'all' || d.groupId === filterGroup;
+    const matchCompany = companyId || filterCompany === 'all' || d.companyId === filterCompany;
+    const matchResponsible = companyId || filterResponsible === 'all' ||
+      normalizeText(d.supervisor) === normRespFilter ||
+      normalizeText(d.tecnicoResponsavel) === normRespFilter;
+    const q = normalizeText(searchTerm);
+    const matchSearch = !q ||
+      normalizeText(d.title).includes(q) ||
+      normalizeText(d.companyName).includes(q) ||
+      normalizeText(d.groupName).includes(q) ||
+      normalizeText(d.supervisor).includes(q) ||
+      normalizeText(d.tecnicoResponsavel).includes(q);
+    return matchGroup && matchCompany && matchResponsible && matchSearch;
+  };
+
+  const statsBase = deliverables.filter(matchesScope);
+
+  const filtered = statsBase.filter(d => {
     const matchType = filterType === 'all' || d.type === filterType;
     const isExpired = isItemExpired(d, today);
-    
+    const pcaPprAet = isPcaPprAet(d);
+
     let matchStatus = false;
     if (filterStatus === 'all') matchStatus = true;
     else if (filterStatus === 'vencido') matchStatus = isExpired;
     else if (filterStatus === 'entregue') matchStatus = isDelivered(d) && !isExpired;
+    else if (filterStatus === 'pendente') matchStatus = d.status === 'pendente' && !pcaPprAet;
     else matchStatus = d.status === filterStatus;
 
     const matchContract = filterContract === 'all' || d.contractId === filterContract;
-    const matchCompany = filterCompany === 'all' || d.companyId === filterCompany;
-    const matchSearch = !searchTerm || 
-      d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (d.companyName && d.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchType && matchStatus && matchContract && matchSearch && matchCompany;
+    return matchType && matchStatus && matchContract;
   });
 
   const stats = {
-    total: deliverables.length,
-    entregue: deliverables.filter(d => isDelivered(d) && !isItemExpired(d, today)).length,
-    pendente: deliverables.filter(d => !isDelivered(d) && !isItemExpired(d, today) && d.status !== 'cancelado').length,
-    em_elaboracao: deliverables.filter(d => d.status === 'em_elaboracao').length,
-    vencidos: deliverables.filter(d => isItemExpired(d, today)).length,
+    total: statsBase.length,
+    entregue: statsBase.filter(d => isDelivered(d) && !isItemExpired(d, today)).length,
+    pendente: statsBase.filter(d => isPendingDeliverable(d) && !isItemExpired(d, today)).length,
+    em_elaboracao: statsBase.filter(d => d.status === 'em_elaboracao' && !isPcaPprAet(d)).length,
+    vencidos: statsBase.filter(d => isItemExpired(d, today)).length,
   };
 
   return (
@@ -233,13 +363,13 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
       </div>
 
       {/* Filters */}
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '200px' }}>
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', display: 'flex', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '220px' }}>
           <Search size={18} color="var(--text-secondary)" />
           <input
             id="search-deliverables"
             type="text"
-            placeholder="Buscar entregável..."
+            placeholder="Buscar entregável, empresa, grupo ou responsável..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
@@ -248,8 +378,8 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
             }}
           />
         </div>
-        <div className="filters-actions">
-          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginRight: '0.5rem' }}>
+        <div className="filters-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginRight: '0.25rem' }}>
             <button
               type="button"
               onClick={() => setViewMode('grid')}
@@ -259,6 +389,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                 color: viewMode === 'grid' ? 'var(--primary)' : 'var(--text-secondary)',
                 border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}
+              title="Visualização em Cards"
             >
               <LayoutGrid size={16} />
             </button>
@@ -271,25 +402,51 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                 color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-secondary)',
                 border: 'none', cursor: 'pointer', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}
+              title="Visualização em Lista"
             >
               <ListIcon size={16} />
             </button>
           </div>
           <Filter size={16} color="var(--text-secondary)" />
           {!companyId && (
-            <select
-              id="filter-company"
-              value={filterCompany}
-              onChange={(e) => setFilterCompany(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">Todas as empresas</option>
-              {[...companies]
-                .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-                .map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <>
+              <select
+                id="filter-group"
+                value={filterGroup}
+                onChange={(e) => handleGroupFilterChange(e.target.value)}
+                className="filter-select"
+                aria-label="Filtrar por Grupo"
+              >
+                <option value="all">Todos os grupos</option>
+                {sortedGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              <select
+                id="filter-company"
+                value={filterCompany}
+                onChange={(e) => setFilterCompany(e.target.value)}
+                className="filter-select"
+                aria-label="Filtrar por Empresa"
+              >
+                <option value="all">Todas as empresas ({filteredCompaniesOptions.length})</option>
+                {filteredCompaniesOptions.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <select
+                id="filter-responsible"
+                value={filterResponsible}
+                onChange={(e) => handleResponsibleFilterChange(e.target.value)}
+                className="filter-select"
+                aria-label="Filtrar por Responsável"
+              >
+                <option value="all">Todos os responsáveis</option>
+                {responsiblesOptions.map(r => (
+                  <option key={r.name} value={r.name}>{r.label}</option>
+                ))}
+              </select>
+            </>
           )}
           <select
             id="filter-status"
@@ -332,6 +489,17 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
               <option key={c.id} value={c.id}>{c.contractNumber}</option>
             ))}
           </select>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleClearFilters}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.375rem 0.75rem', fontSize: '0.8rem' }}
+              title="Limpar todos os filtros"
+            >
+              <RotateCcw size={14} /> Limpar filtros
+            </button>
+          )}
           {companyId && (
             <button 
               type="button"
@@ -457,10 +625,13 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
           : { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
       }>
         {filtered.map(d => {
-          const itemIsProgram = d.type === 'programa' && isProgram(d);
+          const itemIsPcaPprAet = isPcaPprAet(d);
+          const itemIsProgram = !itemIsPcaPprAet && d.type === 'programa' && isProgram(d);
           const typeConf = TYPE_CONFIG[d.type] || TYPE_CONFIG.contrato;
           const isExpired = isItemExpired(d, today);
-          const effectiveStatus = (!itemIsProgram && d.status === 'vencido') ? 'pendente' : d.status;
+          const effectiveStatus = itemIsPcaPprAet && !isDelivered(d) && d.status !== 'cancelado'
+            ? 'nao_se_aplica'
+            : ((!itemIsProgram && d.status === 'vencido') ? 'pendente' : d.status);
           const statusConf = isExpired ? STATUS_CONFIG.vencido : (STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pendente);
 
           return (
@@ -518,14 +689,19 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                 <h4 style={{ fontWeight: '600', color: isExpired ? '#991b1b' : 'var(--text-primary)', fontSize: '0.9375rem', lineHeight: 1.4 }}>
                   {d.title}
                 </h4>
-                {!companyId && d.companyName && (
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                    <FileText size={12} /> {d.companyName}
+                {((!companyId && d.companyName) || (d.groupName && d.groupName !== 'Sem Grupo')) && (
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+                    <Building2 size={12} style={{ flexShrink: 0 }} />
+                    <span>
+                      {!companyId && d.companyName ? d.companyName : ''}
+                      {!companyId && d.companyName && d.groupName && d.groupName !== 'Sem Grupo' ? ' • ' : ''}
+                      {d.groupName && d.groupName !== 'Sem Grupo' ? d.groupName : ''}
+                    </span>
                   </p>
                 )}
                 {/* Meta details if in list mode to save space */}
                 {viewMode === 'list' && (
-                  <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                     {(d.dataEmissao || d.dataEnvio) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
                     {itemIsProgram && (() => {
                       const effVal = getEffectiveValidityDate(d);
@@ -542,7 +718,12 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                       <span>Revisão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.ultimaRevisao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>
                     )}
                     {d.deliveredDate && <span>Entregue em: {new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
-                    <span>Contrato: {contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A'}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <ShieldCheck size={13} color="var(--primary)" /> Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{d.supervisor || 'Não definido'}</strong>
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <UserCheck size={13} color="var(--secondary)" /> Resp. Técnico: <strong style={{ color: 'var(--text-primary)' }}>{d.tecnicoResponsavel || 'Não definido'}</strong>
+                    </span>
                   </div>
                 )}
               </div>
@@ -594,11 +775,30 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                       <span style={{ fontWeight: '500', color: 'var(--secondary)' }}>{new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Contrato:</span>
-                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-                      {contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A'}
-                    </span>
+                  <div style={{
+                    marginTop: '0.25rem',
+                    paddingTop: '0.375rem',
+                    borderTop: '1px dashed var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <ShieldCheck size={13} color="var(--primary)" /> Supervisor:
+                      </span>
+                      <span style={{ fontWeight: '600', color: 'var(--text-primary)', textAlign: 'right' }}>
+                        {d.supervisor || 'Não definido'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <UserCheck size={13} color="var(--secondary)" /> Resp. Técnico:
+                      </span>
+                      <span style={{ fontWeight: '600', color: 'var(--text-primary)', textAlign: 'right' }}>
+                        {d.tecnicoResponsavel || 'Não definido'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -679,7 +879,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                       </button>
                     </>
                   )}
-                  {['entregue', 'feito', 'adiado', 'cancelado', 'nao_se_aplica'].includes(d.status) && (
+                  {['entregue', 'feito', 'adiado', 'cancelado', 'nao_se_aplica'].includes(d.status) && !itemIsPcaPprAet && (
                     <button
                       type="button"
                       className="btn"

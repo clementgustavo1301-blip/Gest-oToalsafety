@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram } from '../utils/deliverableTiming';
+import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram, isPcaPprAet } from '../utils/deliverableTiming';
 import { compressFileForUpload } from '../utils/fileCompressor';
 
 // --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
@@ -143,17 +143,24 @@ function mapContract(row) {
 
 function mapDeliverable(row) {
   if (!row) return null;
+  const pcaPprAet = isPcaPprAet(row);
+  const rawStatus = row.status || 'pendente';
+  const isDeliveredWithFile = ['entregue', 'feito', 'concluido'].includes(rawStatus) && Boolean(row.file_name);
+  const status = pcaPprAet && rawStatus !== 'cancelado' && !isDeliveredWithFile
+    ? 'nao_se_aplica'
+    : rawStatus;
+
   return {
     id: row.id,
     companyId: row.company_id,
     contractId: row.contract_id,
     title: row.title,
     type: row.type,
-    status: row.status || 'pendente',
+    status,
     dueDate: row.due_date || row.data_envio || row.data_emissao,
     dataEnvio: row.data_envio || row.data_emissao || row.due_date || row.delivered_date,
     dataEmissao: row.data_emissao || row.data_envio || row.due_date || row.delivered_date,
-    validityDate: row.validity_date,
+    validityDate: pcaPprAet ? null : row.validity_date,
     deliveredDate: row.delivered_date,
     ultimaRevisao: row.ultima_revisao,
     fileName: row.file_name,
@@ -161,6 +168,39 @@ function mapDeliverable(row) {
     description: row.description,
     responsibleId: row.responsible_id,
   };
+}
+
+export function resolveCompaniesWithHeritage(companies = [], groups = []) {
+  const groupsMap = {};
+  groups.forEach(g => { groupsMap[g.id] = g; });
+
+  const groupResolvedTeam = {};
+  groups.forEach(g => {
+    const compsInG = companies.filter(c => c.groupId === g.id);
+    const sup = g.supervisor || compsInG.find(c => c.supervisor)?.supervisor || compsInG.find(c => c.supportResponsible)?.supportResponsible || '';
+    const tec = g.tecnicoResponsavel || compsInG.find(c => c.tecnicoResponsavel)?.tecnicoResponsavel || compsInG.find(c => c.responsible)?.responsible || '';
+    const vis = (g.visitasTecnicas && g.visitasTecnicas !== 'N/A')
+      ? g.visitasTecnicas
+      : (compsInG.find(c => c.visitasTecnicas && c.visitasTecnicas !== 'N/A')?.visitasTecnicas || 'N/A');
+    groupResolvedTeam[g.id] = { sup, tec, vis };
+  });
+
+  return companies.map(c => {
+    const g = groupsMap[c.groupId];
+    const gResolved = c.groupId ? groupResolvedTeam[c.groupId] : null;
+    const effSupervisor = gResolved?.sup || g?.supervisor || c.supervisor || c.supportResponsible || '';
+    const effTecnico = gResolved?.tec || g?.tecnicoResponsavel || c.tecnicoResponsavel || c.responsible || '';
+    const effVisitas = (gResolved?.vis && gResolved.vis !== 'N/A')
+      ? gResolved.vis
+      : ((g?.visitasTecnicas && g.visitasTecnicas !== 'N/A') ? g.visitasTecnicas : (c.visitasTecnicas || 'N/A'));
+    return {
+      ...c,
+      groupName: g?.name || 'Sem Grupo',
+      effSupervisor: effSupervisor || 'Não definido',
+      effTecnico: effTecnico || 'Não definido',
+      effVisitas: effVisitas || 'N/A',
+    };
+  });
 }
 
 function mapTraining(row) {
@@ -822,9 +862,27 @@ export async function getDeliverables() {
 }
 
 export async function getDeliverablesByCompany(companyId) {
-  const { data, error } = await supabase.from('deliverables').select('*').eq('company_id', companyId);
+  const [{ data, error }, company, groups] = await Promise.all([
+    supabase.from('deliverables').select('*').eq('company_id', companyId),
+    getCompanyById(companyId),
+    getGroups(),
+  ]);
   if (error) { console.error('Error fetching deliverables by company:', error); return []; }
-  return data.filter(row => !isS2240Row(row)).map(mapDeliverable);
+  const siblings = company?.groupId ? await getCompaniesByGroup(company.groupId) : (company ? [company] : []);
+  const resolvedList = resolveCompaniesWithHeritage(siblings.length > 0 ? siblings : (company ? [company] : []), groups);
+  const resolved = resolvedList.find(c => c.id === companyId) || (company ? resolveCompaniesWithHeritage([company], groups)[0] : null);
+
+  return data
+    .filter(row => !isS2240Row(row))
+    .map(mapDeliverable)
+    .map(d => ({
+      ...d,
+      companyName: resolved?.name || 'N/A',
+      groupId: resolved?.groupId || null,
+      groupName: resolved?.groupName || 'Sem Grupo',
+      supervisor: resolved?.effSupervisor || 'Não definido',
+      tecnicoResponsavel: resolved?.effTecnico || 'Não definido',
+    }));
 }
 
 export async function getDeliverablesByContract(contractId) {
@@ -834,7 +892,8 @@ export async function getDeliverablesByContract(contractId) {
 }
 
 export async function addDeliverable(deliverable) {
-  const isProg = deliverable.type === 'programa' && isProgram(deliverable);
+  const pcaPprAet = isPcaPprAet(deliverable);
+  const isProg = !pcaPprAet && deliverable.type === 'programa' && isProgram(deliverable);
   const emissaoVal = deliverable.dataEmissao || deliverable.dataEnvio || deliverable.dueDate || null;
   let validityVal = isProg ? (deliverable.validityDate || null) : null;
   if (isProg && !validityVal && emissaoVal) {
@@ -851,6 +910,9 @@ export async function addDeliverable(deliverable) {
     }
   }
   const revisaoVal = deliverable.ultimaRevisao || null;
+  const resolvedStatus = pcaPprAet
+    ? (deliverable.fileName ? 'entregue' : (deliverable.status && deliverable.status !== 'pendente' ? deliverable.status : 'nao_se_aplica'))
+    : (deliverable.status || 'pendente');
 
   // Cada empresa (CNPJ) tem seus próprios programas e entregáveis de forma independente.
   // Se já existir o mesmo programa/documento na MESMA empresa (exceto treinamentos e visitas técnicas), atualiza apenas o registro desta empresa.
@@ -870,7 +932,7 @@ export async function addDeliverable(deliverable) {
         data_emissao: emissaoVal,
         validity_date: validityVal,
         ultima_revisao: revisaoVal,
-        status: deliverable.status || 'pendente',
+        status: resolvedStatus,
       };
       if (deliverable.contractId !== undefined) updatePayload.contract_id = deliverable.contractId;
       if (deliverable.description !== undefined) updatePayload.description = deliverable.description;
@@ -897,7 +959,7 @@ export async function addDeliverable(deliverable) {
     contract_id: deliverable.contractId,
     title: deliverable.title,
     type: deliverable.type,
-    status: deliverable.status || 'pendente',
+    status: resolvedStatus,
     due_date: emissaoVal,
     data_envio: emissaoVal,
     data_emissao: emissaoVal,
@@ -925,6 +987,10 @@ export async function updateDeliverable(deliverableId, updates) {
     .eq('id', deliverableId)
     .single();
 
+  const effectiveTitle = updates.title !== undefined ? updates.title : currentDeliv?.title;
+  const effectiveType = updates.type !== undefined ? updates.type : currentDeliv?.type;
+  const targetIsPcaPprAet = isPcaPprAet({ title: effectiveTitle, type: effectiveType });
+
   const snakeUpdates = {};
   if (updates.title !== undefined) snakeUpdates.title = updates.title;
   if (updates.description !== undefined) snakeUpdates.description = updates.description;
@@ -937,13 +1003,15 @@ export async function updateDeliverable(deliverableId, updates) {
     snakeUpdates.due_date = emissaoVal;
   }
   if (updates.dueDate !== undefined && emissaoVal === undefined) snakeUpdates.due_date = updates.dueDate;
-  if ((updates.type && updates.type !== 'programa') || isLaudo(updates)) {
+  if ((effectiveType && effectiveType !== 'programa') || isLaudo({ title: effectiveTitle, type: effectiveType }) || targetIsPcaPprAet) {
     snakeUpdates.validity_date = null;
   } else if (updates.validityDate !== undefined) {
     snakeUpdates.validity_date = updates.validityDate;
   }
   if (updates.ultimaRevisao !== undefined) snakeUpdates.ultima_revisao = updates.ultimaRevisao;
-  if (updates.status !== undefined) snakeUpdates.status = updates.status;
+  if (updates.status !== undefined) {
+    snakeUpdates.status = (targetIsPcaPprAet && updates.status === 'pendente') ? 'nao_se_aplica' : updates.status;
+  }
   if (updates.reason !== undefined) snakeUpdates.reason = updates.reason;
   if (updates.fileName !== undefined) snakeUpdates.file_name = updates.fileName;
   if (updates.deliveredDate !== undefined) snakeUpdates.delivered_date = updates.deliveredDate;
@@ -1006,16 +1074,29 @@ export async function deleteDeliverables(deliverableIds) {
 }
 
 export async function getAllDeliverablesSummary() {
-  // To avoid multiple queries, we can fetch all and map
-  const deliverables = await getDeliverables();
-  const companies = await getCompanies();
-  const contracts = await getContracts();
+  const [deliverables, companies, groups, contracts] = await Promise.all([
+    getDeliverables(),
+    getCompanies(),
+    getGroups(),
+    getContracts(),
+  ]);
 
-  return deliverables.map(d => ({
-    ...d,
-    companyName: companies.find(c => c.id === d.companyId)?.name || 'N/A',
-    contractNumber: contracts.find(c => c.id === d.contractId)?.contractNumber || 'N/A',
-  }));
+  const resolvedCompanies = resolveCompaniesWithHeritage(companies, groups);
+  const companiesById = new Map(resolvedCompanies.map(c => [c.id, c]));
+  const contractsById = new Map(contracts.map(c => [c.id, c]));
+
+  return deliverables.map(d => {
+    const comp = companiesById.get(d.companyId);
+    return {
+      ...d,
+      companyName: comp?.name || 'N/A',
+      groupId: comp?.groupId || null,
+      groupName: comp?.groupName || 'Sem Grupo',
+      supervisor: comp?.effSupervisor || 'Não definido',
+      tecnicoResponsavel: comp?.effTecnico || 'Não definido',
+      contractNumber: contractsById.get(d.contractId)?.contractNumber || 'N/A',
+    };
+  });
 }
 
 // --- Storage (Arquivos) ---

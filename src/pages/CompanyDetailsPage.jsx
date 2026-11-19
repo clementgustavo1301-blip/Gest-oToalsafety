@@ -29,7 +29,9 @@ import {
   isItemExpiring60,
   getDeliverableTimingInfo,
   getEffectiveValidityDate,
-  isProgram
+  isProgram,
+  isPcaPprAet,
+  isPendingDeliverable
 } from '../utils/deliverableTiming';
 
 const TABS = [
@@ -186,7 +188,7 @@ const CompanyDetailsPage = () => {
   const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   const in60Days = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
 
-  const activeDeliverables = deliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica');
+  const activeDeliverables = deliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
 
   // Vencidos (validade expirada ou prazo de envio passado)
   const expiredDeliverablesList = activeDeliverables.filter(d => isItemExpired(d, today));
@@ -213,7 +215,7 @@ const CompanyDetailsPage = () => {
     !isItemExpiring60(d, today, in30Days, in60Days)
   );
 
-  const pendingDeliverablesList = activeDeliverables.filter(d => !isDelivered(d));
+  const pendingDeliverablesList = activeDeliverables.filter(d => isPendingDeliverable(d));
 
   const totalDeliverablesCount = activeDeliverables.length;
   const totalForBar = totalDeliverablesCount || 1;
@@ -323,7 +325,7 @@ const CompanyDetailsPage = () => {
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Programas</p>
           </div>
           <div style={{ textAlign: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-md)' }}>
-            <p style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--warning)' }}>{deliverables.filter(d => d.status === 'pendente').length}</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--warning)' }}>{pendingDeliverablesList.length}</p>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Pendentes</p>
           </div>
         </div>
@@ -747,7 +749,7 @@ const CompanyDetailsPage = () => {
                                 : 'Não informada'}
                             </strong>
                           </span>
-                          {(prog.type === 'programa' && isProgram(prog)) && (
+                          {(prog.type === 'programa' && isProgram(prog) && !isPcaPprAet(prog)) && (
                             <span>
                               Validade: <strong style={{ color: isExpired ? '#dc2626' : 'var(--text-primary)', fontWeight: isExpired ? '700' : '600' }}>
                                 {(() => {

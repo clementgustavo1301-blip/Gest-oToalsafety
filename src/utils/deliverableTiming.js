@@ -36,6 +36,41 @@ export function isDelivered(d) {
 }
 
 /**
+ * Identifica se o entregável é PCA, PPR ou AET.
+ * Por regra operacional, esses três itens são tratados como "Não Se Aplica"
+ * por padrão e não devem gerar pendências, validade ou alertas de vencimento.
+ */
+export function isPcaPprAet(item) {
+  if (!item) return false;
+  const title = (item.title || item.name || '').trim().toLowerCase();
+  if (!title) return false;
+  return (
+    title === 'pca' ||
+    title === 'ppr' ||
+    title === 'aet' ||
+    /\b(pca|ppr|aet)\b/i.test(title) ||
+    title.includes('conservação auditiva') ||
+    title.includes('conservacao auditiva') ||
+    title.includes('proteção respiratória') ||
+    title.includes('protecao respiratoria') ||
+    title.includes('análise ergonômica') ||
+    title.includes('analise ergonomica')
+  );
+}
+
+/**
+ * Determina se um entregável conta como pendente no sistema.
+ * Itens entregues, cancelados, marcados como "Não Se Aplica" ou PCA/PPR/AET não geram pendência.
+ */
+export function isPendingDeliverable(d) {
+  if (!d) return false;
+  if (isDelivered(d)) return false;
+  if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
+  if (isPcaPprAet(d)) return false;
+  return true;
+}
+
+/**
  * Identifica se um item é um Laudo Técnico (LTCAT, LI, LP, AET, etc.).
  * Laudos retratam condições ambientais e periciais e NÃO possuem prazo de validade normativa.
  */
@@ -111,7 +146,7 @@ export function isUnconfiguredSeedItem(d) {
  * APENAS PROGRAMAS POSSUEM PRAZO DE VALIDADE.
  */
 export function getDefaultValidityMonths(item) {
-  if (!item) return null;
+  if (!item || isPcaPprAet(item)) return null;
 
   // Apenas programas possuem data de validade normativa
   if (!isProgram(item)) {
@@ -127,12 +162,10 @@ export function getDefaultValidityMonths(item) {
   }
 
   // 2. Programas com periodicidade anual (12 meses / 1 ano)
-  // PCMSO (NR-07), PCA, PPR
+  // PCMSO (NR-07)
   if (
     title.includes('pcmso') ||
-    title.includes('controle m') ||
-    title.includes('pca') ||
-    title.includes('ppr')
+    title.includes('controle m')
   ) {
     return 12;
   }
@@ -143,11 +176,11 @@ export function getDefaultValidityMonths(item) {
 
 /**
  * Retorna a data real de validade do documento.
- * Retorna null para Documentos, Laudos e itens que não sejam programas de SST.
+ * Retorna null para Documentos, Laudos, PCA/PPR/AET e itens que não sejam programas de SST.
  * Apenas PROGRAMAS possuem data de validade.
  */
 export function getEffectiveValidityDate(d) {
-  if (!d) return null;
+  if (!d || isPcaPprAet(d)) return null;
 
   // Apenas PROGRAMAS possuem data de validade
   if (!isProgram(d)) {
@@ -178,7 +211,7 @@ export function getEffectiveValidityDate(d) {
 }
 
 export function formatEffectiveValidityDateBR(d) {
-  if (!isProgram(d)) return 'Sem validade';
+  if (!isProgram(d) || isPcaPprAet(d)) return 'Sem validade';
   const vDate = getEffectiveValidityDate(d);
   if (!vDate) return 'Sem validade';
   const day = String(vDate.getUTCDate()).padStart(2, '0');
@@ -188,12 +221,12 @@ export function formatEffectiveValidityDateBR(d) {
 }
 
 export function getExpirationTargetDate(d) {
-  if (!d || !isProgram(d)) return null;
+  if (!d || isPcaPprAet(d) || !isProgram(d)) return null;
   return getEffectiveValidityDate(d);
 }
 
 export function getDaysUntilExpiration(d, refDate = new Date()) {
-  if (!d || !isProgram(d)) return null;
+  if (!d || isPcaPprAet(d) || !isProgram(d)) return null;
   const targetDate = getExpirationTargetDate(d);
   if (!targetDate) return null;
   const today = new Date(refDate);
@@ -204,7 +237,7 @@ export function getDaysUntilExpiration(d, refDate = new Date()) {
 }
 
 export function isItemExpired(d, refDate = new Date()) {
-  if (!d || !isProgram(d)) return false;
+  if (!d || isPcaPprAet(d) || !isProgram(d)) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
 
@@ -223,7 +256,7 @@ export function isItemExpired(d, refDate = new Date()) {
 }
 
 export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
-  if (!d || !isProgram(d)) return false;
+  if (!d || isPcaPprAet(d) || !isProgram(d)) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
 
@@ -242,7 +275,7 @@ export function isItemExpiring30(d, refDate = new Date(), in30 = null) {
 }
 
 export function isItemExpiring60(d, refDate = new Date(), in30 = null, in60 = null) {
-  if (!d || !isProgram(d)) return false;
+  if (!d || isPcaPprAet(d) || !isProgram(d)) return false;
   if (d.status === 'cancelado' || d.status === 'nao_se_aplica') return false;
   if (isUnconfiguredSeedItem(d)) return false;
 
@@ -275,8 +308,8 @@ export function getDeliverableTimingInfo(d, refDate = new Date()) {
   if (d.status === 'cancelado') {
     return { statusKey: 'cancelado', label: 'Cancelado', bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1' };
   }
-  if (d.status === 'nao_se_aplica') {
-    return { statusKey: 'nao_se_aplica', label: 'Não Se Aplica', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' };
+  if (d.status === 'nao_se_aplica' || (isPcaPprAet(d) && !isDelivered(d))) {
+    return { statusKey: 'nao_se_aplica', label: 'Não Se Aplica', bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0' };
   }
 
   // Apenas PROGRAMAS possuem prazo de validade normativa e vencimento.
