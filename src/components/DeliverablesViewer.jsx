@@ -54,6 +54,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [modalInitialMode, setModalInitialMode] = useState('single');
   const [viewMode, setViewMode] = useState('grid');
   
   const [deliverables, setDeliverables] = useState([]);
@@ -194,9 +195,10 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
 
   const handleAddDeliverable = async (dataOrArray) => {
     const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
-    
+    if (items.length === 0) return;
+
     let fileName = null;
-    if (items[0].file) {
+    if (items[0]?.file) {
       fileName = await uploadDocument(items[0].file, `deliverables/${companyId}`);
     }
 
@@ -501,14 +503,28 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
             </button>
           )}
           {companyId && (
-            <button 
-              type="button"
-              className="btn btn-primary" 
-              onClick={() => setShowModal(true)}
-              style={{ marginLeft: 'auto' }}
-            >
-              Registrar Entregável
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setModalInitialMode('batch');
+                  setShowModal(true);
+                }}
+              >
+                Cadastrar em Lote
+              </button>
+              <button 
+                type="button"
+                className="btn btn-primary" 
+                onClick={() => {
+                  setModalInitialMode('single');
+                  setShowModal(true);
+                }}
+              >
+                Registrar Entregável
+              </button>
+            </div>
           )}
           {!companyId && (
             <button
@@ -975,6 +991,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
       {showModal && (
         <AddDeliverableModal 
           companyId={companyId} 
+          initialMode={modalInitialMode}
           onClose={() => setShowModal(false)}
           onSave={handleAddDeliverable}
         />

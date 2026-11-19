@@ -55,6 +55,7 @@ const CompanyDetailsPage = () => {
   const [deliverables, setDeliverables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDeliverableModal, setShowDeliverableModal] = useState(false);
+  const [deliverableModalMode, setDeliverableModalMode] = useState('single');
   const [editingDeliverable, setEditingDeliverable] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [chatSummary, setChatSummary] = useState({ totalCount: 0, unreadCount: 0, tableMissing: false });
@@ -702,17 +703,34 @@ const CompanyDetailsPage = () => {
 
           {/* Programas */}
           <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
               <h2 className="text-h2" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <FileText size={20} /> Programas
               </h2>
-              <button 
-                className="btn btn-secondary" 
-                style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
-                onClick={() => setShowDeliverableModal(true)}
-              >
-                + Novo Programa
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
+                  onClick={() => {
+                    setDeliverableModalMode('batch');
+                    setShowDeliverableModal(true);
+                  }}
+                >
+                  Cadastrar em Lote
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
+                  onClick={() => {
+                    setDeliverableModalMode('single');
+                    setShowDeliverableModal(true);
+                  }}
+                >
+                  + Novo Programa
+                </button>
+              </div>
             </div>
             
             {programs.length === 0 ? (
@@ -831,6 +849,7 @@ const CompanyDetailsPage = () => {
         <AddDeliverableModal 
           companyId={companyId}
           initialType="programa"
+          initialMode={deliverableModalMode}
           onClose={() => setShowDeliverableModal(false)} 
           onSave={handleAddDeliverable} 
         />
