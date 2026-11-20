@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 import { 
   Award, FileText, Plus, Trash2, Download, Loader, 
   CheckCircle2, AlertCircle, Users, Sparkles,
@@ -19,7 +20,7 @@ import { getCustomTrainings, saveCustomTraining } from '../services/customTraini
 import { 
   getTrainingClasses, saveTrainingClass, deleteTrainingClass,
   getTrainingEnrollments, updateStudent, deleteStudent, subscribeToEnrollments,
-  importTrainingEnrollments
+  importTrainingEnrollments, subscribeToTrainingClassUpdates
 } from '../services/trainingClassesService';
 import { parseTrainingParticipantRows } from '../utils/trainingSpreadsheetImport';
 import SignaturePadModal from '../components/SignaturePadModal';
@@ -285,7 +286,7 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
 
   if (visualWeight > 380) {
     return {
-      headerMaxHeight: '46px',
+      headerWidth: '80%',
       bodySize: '0.54rem',
       bodyLineHeight: '1.42',
       subTitleSize: '0.60rem',
@@ -310,7 +311,7 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
   }
   if (visualWeight > 230) {
     return {
-      headerMaxHeight: '52px',
+      headerWidth: '84%',
       bodySize: '0.59rem',
       bodyLineHeight: '1.48',
       subTitleSize: '0.65rem',
@@ -334,7 +335,7 @@ export const getModelo1FrenteStyles = ({ curso = '', descricao = '', studentName
     };
   }
   return {
-    headerMaxHeight: '56px',
+    headerWidth: '88%',
     bodySize: '0.63rem',
     bodyLineHeight: '1.55',
     subTitleSize: '0.70rem',
@@ -539,6 +540,20 @@ const TrainingCertificatesPage = () => {
   const certificatePreviewRef = useRef(null);
 
   const [generating, setGenerating] = useState(false);
+  // Formato de download: 'zip' (um PDF por aluno dentro de um .zip) ou 'single' (PDF único)
+  const [exportFormat, setExportFormat] = useState(() => {
+    try {
+      return localStorage.getItem('tc_export_format') === 'single' ? 'single' : 'zip';
+    } catch {
+      return 'zip';
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('tc_export_format', exportFormat); } catch { /* ignore */ }
+  }, [exportFormat]);
+  // QR Code do link público de inscrição da turma
+  const [enrollQrTurma, setEnrollQrTurma] = useState(null);
+  const [enrollQrDownloading, setEnrollQrDownloading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchText, setBatchText] = useState('');
@@ -625,8 +640,18 @@ const TrainingCertificatesPage = () => {
       }
     });
 
+    const unsubscribeRemoteClasses = subscribeToTrainingClassUpdates((updatedClass) => {
+      setTurmas(prev => prev.map(t => String(t.id) === String(updatedClass.id) ? updatedClass : t));
+      const currentId = selectedTurmaIdInGenerator || 'draft_turma';
+      if (String(updatedClass.id) === String(currentId)) {
+        setCurrentTurmaSignatures(getTurmaSignatures(currentId));
+        setTokensRefreshKey(k => k + 1);
+      }
+    });
+
     return () => {
       if (unsubscribeSignatures) unsubscribeSignatures();
+      if (unsubscribeRemoteClasses) unsubscribeRemoteClasses();
     };
   }, [selectedTurmaIdInGenerator]);
 
@@ -1126,6 +1151,8 @@ const TrainingCertificatesPage = () => {
       initializeDefaultSignaturesForTurma(savedTurma);
       setShowTurmaModal(false);
       await loadData();
+      // Ao criar uma nova turma, já exibe o QR Code do link de inscrição.
+      if (!editingTurma && savedTurma?.id) setEnrollQrTurma(savedTurma);
       setFeedback({ 
         type: 'success', 
         text: editingTurma
@@ -1623,25 +1650,31 @@ const TrainingCertificatesPage = () => {
 
     const originalColaboradores = colaboradores.map(item => ({ ...item }));
     const originalPreviewTab = previewTab;
+    const useZip = exportFormat === 'zip' && targetColaboradores.length > 1;
     setGenerating(true);
     try {
       if (document.fonts?.ready) await document.fonts.ready;
 
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
-        putOnlyUsedFonts: true,
-        precision: 12
-      });
-      pdf.setProperties({
-        title: `Certificados - ${formData.curso}`,
-        subject: 'Certificados de treinamento',
-        creator: 'EcoSafety'
-      });
-      let pageIndex = 0;
-      for (const participant of targetColaboradores) {
+      const createCertificatePdf = (title) => {
+        const doc = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4',
+          compress: true,
+          putOnlyUsedFonts: true,
+          precision: 12
+        });
+        doc.setProperties({
+          title,
+          subject: 'Certificados de treinamento',
+          creator: 'EcoSafety'
+        });
+        return doc;
+      };
+
+      // Renderiza frente + verso de um participante no PDF informado.
+      const renderParticipant = async (doc, participant, startsOnNewPage) => {
+        let first = !startsOnNewPage;
         for (const side of ['frente', 'verso']) {
           flushSync(() => {
             setColaboradores([{ ...participant }]);
@@ -1661,19 +1694,67 @@ const TrainingCertificatesPage = () => {
             });
           }));
 
-          if (pageIndex > 0) pdf.addPage('a4', 'landscape');
-          await renderCertificateDomPage(pdf, previewNode);
-          pageIndex += 1;
+          if (!first) doc.addPage('a4', 'landscape');
+          first = false;
+          await renderCertificateDomPage(doc, previewNode);
         }
-      }
+      };
 
       const safeCourse = formData.curso.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
-      pdf.save(`Certificados_${safeCourse}_${targetColaboradores.length}alunos.pdf`);
+      // Nome de arquivo no padrão "NOME DO ALUNO CURSO.pdf" (seguro para Windows/WhatsApp).
+      const toSafeFileName = (text) => String(text || '')
+        .replace(/[\\/:*?"<>|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 150);
 
-      setFeedback({ 
-        type: 'success', 
-        text: `PDF vetorial com ${targetColaboradores.length} certificado(s) gerado em alta qualidade.`
-      });
+      if (useZip) {
+        const zip = new JSZip();
+        const usedNames = new Map();
+        for (const participant of targetColaboradores) {
+          const doc = createCertificatePdf(`Certificado - ${participant.nome} - ${formData.curso}`);
+          await renderParticipant(doc, participant, false);
+          const baseName = toSafeFileName(`${participant.nome.trim().toUpperCase()} ${formData.curso.trim()}`) || 'Certificado';
+          const count = (usedNames.get(baseName) || 0) + 1;
+          usedNames.set(baseName, count);
+          const fileName = count > 1 ? `${baseName} (${count}).pdf` : `${baseName}.pdf`;
+          zip.file(fileName, doc.output('arraybuffer'));
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        const zipUrl = URL.createObjectURL(zipBlob);
+        const anchor = document.createElement('a');
+        anchor.href = zipUrl;
+        anchor.download = `Certificados_${safeCourse}_${targetColaboradores.length}alunos.zip`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(zipUrl), 4000);
+
+        setFeedback({
+          type: 'success',
+          text: `Arquivo ZIP com ${targetColaboradores.length} certificado(s) em PDFs individuais gerado com sucesso.`
+        });
+      } else {
+        const pdf = createCertificatePdf(`Certificados - ${formData.curso}`);
+        let isFirst = true;
+        for (const participant of targetColaboradores) {
+          await renderParticipant(pdf, participant, !isFirst);
+          isFirst = false;
+        }
+
+        if (targetColaboradores.length === 1) {
+          const single = targetColaboradores[0];
+          pdf.save(`${toSafeFileName(`${single.nome.trim().toUpperCase()} ${formData.curso.trim()}`) || 'Certificado'}.pdf`);
+        } else {
+          pdf.save(`Certificados_${safeCourse}_${targetColaboradores.length}alunos.pdf`);
+        }
+
+        setFeedback({ 
+          type: 'success', 
+          text: `PDF vetorial com ${targetColaboradores.length} certificado(s) gerado em alta qualidade.`
+        });
+      }
       setTimeout(() => setFeedback(null), 5000);
     } catch (err) {
       console.error('Erro ao gerar certificados:', err);
@@ -2898,16 +2979,18 @@ const TrainingCertificatesPage = () => {
                     return certModel === 'modelo1' ? (
                       previewTab === 'frente' ? (
                         /* MODELO 1 - FRENTE (Nomenclatura e Estrutura Padrão Oficial .DOCX) */
-                        <div className="tc-certificate-front" style={{ fontFamily: "'Roboto', sans-serif" }}>
-                          {/* Topo: Header Banner Oficial com Logomarca EcoSafety e Título */}
-                          <div style={{ textAlign: 'center' }}>
+                        <div className="tc-certificate-front" style={{ fontFamily: "'Roboto', sans-serif", paddingBottom: '8.5%', boxSizing: 'border-box' }}>
+                          {/* Topo: Header Banner Oficial com Logomarca EcoSafety e Título.
+                              Dimensionado pela largura (proporcional à página, como no .DOCX original),
+                              para que título e logo não fiquem pequenos no PDF exportado. */}
+                          <div style={{ textAlign: 'center', flexShrink: 0 }}>
                             <img 
                               src="/certificate-templates/m1_header_transparent.png" 
                               alt="EcoSafety Certificado de Capacitação" 
                               style={{ 
-                                height: m1FrenteStyles.headerMaxHeight, 
+                                width: m1FrenteStyles.headerWidth, 
+                                height: 'auto', 
                                 maxWidth: '100%', 
-                                width: 'auto', 
                                 objectFit: 'contain', 
                                 display: 'inline-block' 
                               }} 
@@ -3243,6 +3326,30 @@ const TrainingCertificatesPage = () => {
                   </div>
                 </div>
 
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', margin: '0.6rem 0 0.5rem' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Formato do download</span>
+                  <div className="tc-seg" role="group" aria-label="Formato do download dos certificados">
+                    <button
+                      type="button"
+                      className={exportFormat === 'zip' ? 'is-active' : ''}
+                      aria-pressed={exportFormat === 'zip'}
+                      onClick={() => setExportFormat('zip')}
+                      title="Um arquivo PDF separado para cada aluno, todos dentro de um .zip"
+                    >
+                      ZIP (um PDF por aluno)
+                    </button>
+                    <button
+                      type="button"
+                      className={exportFormat === 'single' ? 'is-active' : ''}
+                      aria-pressed={exportFormat === 'single'}
+                      onClick={() => setExportFormat('single')}
+                      title="Todos os certificados em um único arquivo PDF"
+                    >
+                      PDF único
+                    </button>
+                  </div>
+                </div>
+
                 <button
                   id="btn-generate-pdf"
                   type="button"
@@ -3253,12 +3360,14 @@ const TrainingCertificatesPage = () => {
                   {generating ? (
                     <>
                       <Loader size={19} className="animate-spin" />
-                      Gerando {selectedCount} PDF(s)...
+                      Gerando {selectedCount} certificado{selectedCount !== 1 ? 's' : ''}...
                     </>
                   ) : (
                     <>
                       <Download size={19} />
-                      Baixar {selectedCount} certificado{selectedCount !== 1 ? 's' : ''} em PDF
+                      {exportFormat === 'zip' && selectedCount > 1
+                        ? `Baixar ${selectedCount} certificados (ZIP com PDFs individuais)`
+                        : `Baixar ${selectedCount} certificado${selectedCount !== 1 ? 's' : ''} em PDF`}
                     </>
                   )}
                 </button>
@@ -3473,6 +3582,15 @@ const TrainingCertificatesPage = () => {
                           <ExternalLink size={14} />
                           Abrir formulário
                         </a>
+                        <button
+                          type="button"
+                          className="tc-btn"
+                          onClick={() => setEnrollQrTurma(turma)}
+                          title="Mostrar QR Code do formulário de inscrição desta turma"
+                        >
+                          <QrCode size={14} />
+                          QR Code
+                        </button>
                       </div>
 
                       <div className="tc-turma-foot">
@@ -4502,6 +4620,122 @@ const TrainingCertificatesPage = () => {
       {/* ========================================================================= */}
       {/* MODAL: ASSINAR PELO CELULAR (QR CODE & LINK DE COMPARTILHAMENTO)          */}
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* MODAL: QR CODE DO LINK PÚBLICO DE INSCRIÇÃO DA TURMA                       */}
+      {/* ========================================================================= */}
+      {enrollQrTurma && (() => {
+        const enrollUrl = getPublicEnrollmentUrl(enrollQrTurma.id);
+        const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=12&data=${encodeURIComponent(enrollUrl)}`;
+        const qrFileName = `QR Code inscricao - ${String(enrollQrTurma.name || 'turma').replace(/[\\/:*?"<>|]/g, ' ').trim()}.png`;
+        const copyKey = `enroll-qr-${enrollQrTurma.id}`;
+
+        const handleDownloadQr = async () => {
+          setEnrollQrDownloading(true);
+          try {
+            const response = await fetch(qrImageUrl);
+            if (!response.ok) throw new Error('Falha ao baixar QR Code');
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = blobUrl;
+            anchor.download = qrFileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+          } catch (error) {
+            console.warn('Não foi possível baixar o QR Code diretamente:', error);
+            window.open(qrImageUrl, '_blank', 'noopener');
+          } finally {
+            setEnrollQrDownloading(false);
+          }
+        };
+
+        return (
+          <div className="modal-backdrop" onClick={() => setEnrollQrTurma(null)}>
+            <div
+              className="modal-content"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tc-enroll-qr-title"
+              onClick={e => e.stopPropagation()}
+              style={{ maxWidth: '460px', borderRadius: '1.25rem', padding: '1.5rem', textAlign: 'center' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.9rem', textAlign: 'left' }}>
+                <div>
+                  <h3 id="tc-enroll-qr-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    QR Code de inscrição
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Turma: <strong>{enrollQrTurma.name}</strong>
+                    {enrollQrTurma.course_name && enrollQrTurma.course_name !== enrollQrTurma.name ? ` • ${enrollQrTurma.course_name}` : ''}
+                  </span>
+                </div>
+                <button type="button" className="modal-close" onClick={() => setEnrollQrTurma(null)} aria-label="Fechar">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 0.9rem' }}>
+                Os participantes apontam a câmera do celular para abrir o formulário de inscrição desta turma.
+              </p>
+
+              <div style={{
+                display: 'inline-block',
+                padding: '0.75rem',
+                backgroundColor: '#ffffff',
+                borderRadius: '1rem',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+                marginBottom: '0.9rem'
+              }}>
+                <img
+                  src={qrImageUrl}
+                  alt={`QR Code do formulário de inscrição da turma ${enrollQrTurma.name}`}
+                  width={260}
+                  height={260}
+                  style={{ width: '260px', height: '260px', maxWidth: '100%', display: 'block' }}
+                />
+              </div>
+
+              <div className="tc-url-field" style={{ marginBottom: '0.75rem', textAlign: 'left' }}>
+                <code title={enrollUrl}>{enrollUrl}</code>
+                <button
+                  type="button"
+                  className={copiedKey === copyKey ? 'is-copied' : ''}
+                  onClick={() => copyPublicLink(enrollQrTurma.id, copyKey)}
+                  aria-live="polite"
+                >
+                  {copiedKey === copyKey ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedKey === copyKey ? 'Copiado' : 'Copiar link'}
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="tc-btn tc-btn--primary"
+                  onClick={handleDownloadQr}
+                  disabled={enrollQrDownloading}
+                >
+                  {enrollQrDownloading ? <Loader size={14} className="animate-spin" /> : <Download size={14} />}
+                  Baixar QR Code (PNG)
+                </button>
+                <a
+                  href={enrollUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tc-btn"
+                >
+                  <ExternalLink size={14} />
+                  Abrir formulário
+                </a>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ========================================================================= */}
       {/* MODAL: LINKS EXCLUSIVOS DE ASSINATURA DA TURMA (EXPIRAÇÃO AUTOMÁTICA)      */}
       {/* ========================================================================= */}

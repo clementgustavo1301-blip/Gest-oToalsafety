@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { isWithinInterval, subDays, addDays, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const geminiApiKey = process.env.VITE_GEMINI_API_KEY;
 export const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
 export const telegramChatId = process.env.TELEGRAM_CHAT_ID;

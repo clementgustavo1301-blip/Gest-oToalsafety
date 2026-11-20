@@ -242,12 +242,29 @@ export default function PublicTrainingEnrollmentPage() {
       return;
     }
 
+    const nowTs = Date.now();
+    try {
+      const lastTs = parseInt(sessionStorage.getItem('pte_last_submit_ts') || '0', 10);
+      if (nowTs - lastTs < 5000) {
+        setErrorMsg('Aguarde alguns segundos antes de enviar uma nova inscrição.');
+        return;
+      }
+    } catch {
+      // sessionStorage indisponível
+    }
+
     const digits = cleanCpf(cpf);
     setSubmitting(true);
     setErrorMsg('');
 
     try {
-      const protocolNumber = `PART-${Date.now().toString().slice(-6)}`;
+      let randomSuffix = String(Date.now()).slice(-6);
+      if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+        const bytes = new Uint8Array(3);
+        window.crypto.getRandomValues(bytes);
+        randomSuffix = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      }
+      const protocolNumber = `PART-${randomSuffix}`;
       const result = await registerStudent({
         turma_id: activeTurma.id,
         nome: nome.trim(),
@@ -257,6 +274,12 @@ export default function PublicTrainingEnrollmentPage() {
         empresa: activeTurma?.company || null,
         status: 'Inscrito'
       });
+
+      try {
+        sessionStorage.setItem('pte_last_submit_ts', String(Date.now()));
+      } catch {
+        // sessionStorage indisponível
+      }
 
       setSuccessData({
         ...result,
@@ -385,7 +408,12 @@ export default function PublicTrainingEnrollmentPage() {
                   </div>
                   <div className="pte-comprovante-row">
                     <span className="pte-comprovante-label">CPF:</span>
-                    <strong className="pte-comprovante-value">{successData.cpf}</strong>
+                    <strong className="pte-comprovante-value">
+                      {(() => {
+                        const formatted = formatCpf(cleanCpf(successData.cpf || ''));
+                        return formatted.length === 14 ? `***.${formatted.slice(4, 11)}-**` : '***.***.***-**';
+                      })()}
+                    </strong>
                   </div>
                   {successData.matricula && (
                     <div className="pte-comprovante-row">

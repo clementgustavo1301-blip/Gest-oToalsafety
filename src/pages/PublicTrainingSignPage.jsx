@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { 
-  Award, CheckCircle2, RotateCcw, Check, Sparkles, 
-  AlertCircle, ShieldCheck, UserCheck, Smartphone, Layers, ArrowLeft, Maximize2,
-  Lock, Calendar, Building, MapPin, Clock, User
+  Award, CheckCircle2, RotateCcw, Check,
+  AlertCircle, ShieldCheck, Smartphone, Maximize2,
+  Lock
 } from 'lucide-react';
-import { getTrainingClasses } from '../services/trainingClassesService';
+import { getTrainingClasses, getTrainingClassById } from '../services/trainingClassesService';
 import { 
-  getTurmaSignatures, saveRoleSignature, clearTurmaSignature,
-  getSigningToken, completeSigningToken, subscribeToTurmaSignatures
+  getTurmaSignatures, saveRoleSignature, hydrateTurmaSigningStateFromClass,
+  getSigningToken, fetchRemoteSigningToken, completeSigningToken, subscribeToTurmaSignatures
 } from '../services/turmaSignatureService';
 import SignaturePadModal from '../components/SignaturePadModal';
 
@@ -21,7 +21,6 @@ export default function PublicTrainingSignPage() {
 
   const [tokenData, setTokenData] = useState(null);
   const [tokenInvalid, setTokenInvalid] = useState(false);
-  const [turmas, setTurmas] = useState([]);
   const [selectedTurma, setSelectedTurma] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,42 +30,51 @@ export default function PublicTrainingSignPage() {
   // Assinaturas já coletadas para esta turma
   const [signatures, setSignatures] = useState({});
 
-  // 1. Carregamento inicial de turmas e validação do token
+  // 1. Carregamento inicial de turmas e validação obrigatória do token
   useEffect(() => {
     async function load() {
       try {
-        const list = await getTrainingClasses();
-        setTurmas(list || []);
+        if (!tokenParam || String(tokenParam).trim().length < 12) {
+          setTokenInvalid(true);
+          return;
+        }
 
-        // Se houver token na URL, valida prioritariamente o token
-        if (tokenParam) {
-          const foundToken = getSigningToken(tokenParam);
-          if (foundToken) {
-            setTokenData(foundToken);
-            setSelectedRole(foundToken.roleKey);
-            const foundTurma = (list || []).find(t => String(t.id) === String(foundToken.turmaId));
-            if (foundTurma) {
-              setSelectedTurma(foundTurma);
-              const sigs = getTurmaSignatures(foundTurma.id);
-              setSignatures(sigs || {});
-            }
-          } else {
-            setTokenInvalid(true);
-          }
-        } else if (activeTurmaId) {
-          const found = (list || []).find(t => String(t.id) === String(activeTurmaId));
-          if (found) {
-            setSelectedTurma(found);
-            const sigs = getTurmaSignatures(found.id);
-            setSignatures(sigs || {});
-          }
-        } else if (list && list.length > 0) {
-          setSelectedTurma(list[0]);
-          const sigs = getTurmaSignatures(list[0].id);
+        let list = [];
+        if (activeTurmaId) {
+          const single = await getTrainingClassById(activeTurmaId).catch(() => null);
+          if (single) list = [single];
+        }
+        if (list.length === 0) {
+          list = (await getTrainingClasses()) || [];
+        }
+
+        list.forEach((turma) => hydrateTurmaSigningStateFromClass(turma));
+
+        const foundToken = await fetchRemoteSigningToken(tokenParam);
+        if (!foundToken || foundToken.status === 'revoked') {
+          setTokenInvalid(true);
+          return;
+        }
+
+        if (activeTurmaId && String(foundToken.turmaId) !== String(activeTurmaId)) {
+          setTokenInvalid(true);
+          return;
+        }
+
+        setTokenData(foundToken);
+        setSelectedRole(foundToken.roleKey);
+
+        const foundTurma = list.find(t => String(t.id) === String(foundToken.turmaId));
+        if (foundTurma) {
+          setSelectedTurma(foundTurma);
+          const sigs = getTurmaSignatures(foundTurma.id);
           setSignatures(sigs || {});
+        } else {
+          setTokenInvalid(true);
         }
       } catch (e) {
         console.error('Erro ao carregar dados para assinatura:', e);
+        setTokenInvalid(true);
       } finally {
         setLoading(false);
       }
@@ -451,8 +459,8 @@ export default function PublicTrainingSignPage() {
     );
   }
 
-  // Se o token fornecido for inválido
-  if (tokenInvalid) {
+  // Se o token fornecido for inválido ou ausente
+  if (tokenInvalid || !tokenData) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -489,26 +497,9 @@ export default function PublicTrainingSignPage() {
           <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.5rem' }}>
             Link de Assinatura Inválido ou Expirado
           </h2>
-          <p style={{ fontSize: '0.875rem', color: '#64748b', lineHeight: '1.5', marginBottom: '1.5rem' }}>
-            Este link não foi encontrado ou foi cancelado. Por favor, solicite um novo link de assinatura ao responsável do treinamento.
+          <p style={{ fontSize: '0.875rem', color: '#64748b', lineHeight: '1.5', marginBottom: 0 }}>
+            Este link é inválido, não possui token de autorização ou foi cancelado. Solicite um novo link exclusivo de assinatura ao responsável do treinamento.
           </p>
-          <Link
-            to="/training-certificates"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.25rem',
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              borderRadius: '0.75rem',
-              textDecoration: 'none',
-              fontWeight: '700',
-              fontSize: '0.875rem'
-            }}
-          >
-            <ArrowLeft size={16} /> Acessar Painel TotalSafety
-          </Link>
         </div>
       </div>
     );
@@ -704,27 +695,10 @@ export default function PublicTrainingSignPage() {
               TotalSafety • Assinatura de Turma
             </h1>
             <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: 0 }}>
-              {tokenData ? 'Link exclusivo para assinatura' : 'Portal de Assinatura Digital Touch'}
+              Link exclusivo para assinatura
             </p>
           </div>
         </div>
-
-        <Link
-          to="/training-certificates"
-          style={{
-            color: '#94a3b8',
-            fontSize: '0.78rem',
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.3rem',
-            padding: '0.4rem 0.8rem',
-            borderRadius: '0.5rem',
-            backgroundColor: 'rgba(255, 255, 255, 0.08)'
-          }}
-        >
-          <ArrowLeft size={14} /> Painel
-        </Link>
       </header>
 
       {/* Conteúdo Central */}

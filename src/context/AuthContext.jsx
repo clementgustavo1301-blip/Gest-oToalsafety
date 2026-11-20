@@ -17,12 +17,20 @@ export function AuthProvider({ children }) {
   });
 
   const setActiveLink = (link) => {
-    setActiveLinkState(link);
-    if (link) {
-      localStorage.setItem('activeLink', JSON.stringify(link));
-    } else {
+    if (!link) {
+      setActiveLinkState(null);
       localStorage.removeItem('activeLink');
+      return;
     }
+    const verified = userLinks.find(
+      (l) => l.id === link.id && l.status === 'approved'
+    );
+    if (!verified) {
+      console.warn('Tentativa de ativar vínculo não aprovado bloqueada.');
+      return;
+    }
+    setActiveLinkState(verified);
+    localStorage.setItem('activeLink', JSON.stringify(verified));
   };
   const [loading, setLoading] = useState(true);
 
@@ -50,13 +58,27 @@ export function AuthProvider({ children }) {
     
     setUserProfile(profile);
 
-    // 2. Fetch all user links
+    // 2. Fetch all user links and validate activeLink against DB records
     const { data: links } = await supabase
       .from('user_links')
       .select('*')
       .eq('user_id', userId);
       
-    setUserLinks(links || []);
+    const safeLinks = links || [];
+    setUserLinks(safeLinks);
+
+    setActiveLinkState((prev) => {
+      if (!prev) return null;
+      const verified = safeLinks.find(
+        (l) => l.id === prev.id && l.user_id === userId && l.status === 'approved'
+      );
+      if (verified) {
+        localStorage.setItem('activeLink', JSON.stringify(verified));
+        return verified;
+      }
+      localStorage.removeItem('activeLink');
+      return null;
+    });
   };
 
   const refreshProfile = async () => {
@@ -77,6 +99,13 @@ export function AuthProvider({ children }) {
         
         if (session?.user) {
           await fetchProfile(session.user.id, session.user.user_metadata);
+        } else {
+          localStorage.removeItem('activeLink');
+          if (isMounted) {
+            setUserProfile(null);
+            setUserLinks([]);
+            setActiveLinkState(null);
+          }
         }
       } catch (error) {
         console.error("Erro na autenticação inicial:", error);
@@ -92,7 +121,12 @@ export function AuthProvider({ children }) {
       if (session?.user) {
         await fetchProfile(session.user.id, session.user.user_metadata);
       } else {
-        if (isMounted) setUserProfile(null);
+        localStorage.removeItem('activeLink');
+        if (isMounted) {
+          setUserProfile(null);
+          setUserLinks([]);
+          setActiveLinkState(null);
+        }
       }
     });
 
@@ -103,13 +137,17 @@ export function AuthProvider({ children }) {
   }, []);
 
   const hasAccess = (allowedSectors, allowedRoles) => {
-    if (!activeLink) return false;
-    
-    // Admin tem acesso total (verifica se o link ativo é de Admin ou setor IPA)
-    if (activeLink.role === 'Admin' || activeLink.sector === 'IPA') return true;
+    if (!activeLink || activeLink.status !== 'approved') return false;
+    const verified = userLinks.find(
+      (l) => l.id === activeLink.id && l.status === 'approved'
+    );
+    if (!verified) return false;
 
-    const sectorMatch = !allowedSectors || allowedSectors.includes(activeLink.sector);
-    const roleMatch = !allowedRoles || allowedRoles.includes(activeLink.role);
+    // Admin tem acesso total (verifica se o link ativo verificado é de Admin ou setor IPA)
+    if (verified.role === 'Admin' || verified.sector === 'IPA') return true;
+
+    const sectorMatch = !allowedSectors || allowedSectors.includes(verified.sector);
+    const roleMatch = !allowedRoles || allowedRoles.includes(verified.role);
 
     return sectorMatch && roleMatch;
   };

@@ -1099,20 +1099,60 @@ export async function getAllDeliverablesSummary() {
   });
 }
 
+const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([
+  'pdf', 'png', 'jpg', 'jpeg', 'webp',
+  'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx', 'txt', 'zip'
+]);
+
 // --- Storage (Arquivos) ---
 export async function uploadDocument(file, folderPath, options = {}) {
+  if (!file) {
+    throw new Error('Nenhum arquivo selecionado para envio.');
+  }
+
+  if (typeof file.size === 'number' && file.size > MAX_UPLOAD_SIZE_BYTES) {
+    throw new Error('O arquivo excede o tamanho máximo permitido de 25 MB.');
+  }
+
+  const originalParts = String(file.name || '').split('.');
+  const rawOriginalExt = originalParts.length > 1 ? originalParts.pop() : '';
+  const safeOriginalExt = rawOriginalExt.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!safeOriginalExt || !ALLOWED_UPLOAD_EXTENSIONS.has(safeOriginalExt)) {
+    throw new Error(`Tipo de arquivo não permitido (.${safeOriginalExt || 'desconhecido'}).`);
+  }
+
   let fileToUpload = file;
   if (options.skipCompression !== true) {
     const compressed = await compressFileForUpload(file);
     fileToUpload = compressed.file || file;
   }
 
-  const nameParts = (fileToUpload.name || '').split('.');
+  if (typeof fileToUpload.size === 'number' && fileToUpload.size > MAX_UPLOAD_SIZE_BYTES) {
+    throw new Error('O arquivo comprimido ainda excede o tamanho máximo permitido de 25 MB.');
+  }
+
+  const nameParts = String(fileToUpload.name || '').split('.');
   const rawExt = nameParts.length > 1 ? nameParts.pop() : '';
   const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const extSuffix = safeExt ? `.${safeExt}` : '';
-  const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}${extSuffix}`;
-  const filePath = `${folderPath}/${fileName}`;
+  if (!safeExt || !ALLOWED_UPLOAD_EXTENSIONS.has(safeExt)) {
+    throw new Error(`Tipo de arquivo não permitido (.${safeExt || 'desconhecido'}).`);
+  }
+
+  const safeFolder = String(folderPath || 'misc')
+    .replace(/\.\./g, '')
+    .replace(/[^a-zA-Z0-9/_-]/g, '')
+    .replace(/^\/+|\/+$/g, '') || 'misc';
+
+  let randomPart = Math.random().toString(36).substring(2, 15);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    window.crypto.getRandomValues(bytes);
+    randomPart = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  const fileName = `${randomPart}_${Date.now()}.${safeExt}`;
+  const filePath = `${safeFolder}/${fileName}`;
 
   const { error } = await supabase.storage
     .from('documents')

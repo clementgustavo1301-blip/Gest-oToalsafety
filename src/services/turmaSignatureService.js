@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase';
 import { getInstructorSignatureUrl } from '../data/officialTrainingModels.js';
 
 /**
@@ -8,6 +9,157 @@ import { getInstructorSignatureUrl } from '../data/officialTrainingModels.js';
 const STORAGE_PREFIX = 'totalsafety_turma_signatures_';
 const TOKENS_STORAGE_KEY = 'totalsafety_signing_tokens';
 const CHANNEL_NAME = 'totalsafety_turma_signatures';
+const VALID_ROLE_KEY_REGEX = /^(instructor(?:_\d+)?|tech_lead|coordinator)$/;
+const MAX_SIGNATURE_DATA_URL_LENGTH = 600000;
+
+function generateSecureTokenString() {
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `sig_${hex}`;
+  }
+  return `sig_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isValidSignatureImage(value) {
+  if (typeof value !== 'string') return false;
+  if (value.length === 0 || value.length > MAX_SIGNATURE_DATA_URL_LENGTH) return false;
+  return value.startsWith('data:image/png;base64,') || value.startsWith('/signatures/') || value.startsWith('/certificate-templates/');
+}
+
+function isUuidString(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+}
+
+function mergeTokenLists(remoteTokens = [], localTokens = []) {
+  const map = new Map();
+  const statusRank = { pending: 1, revoked: 2, signed: 3 };
+
+  const upsert = (t) => {
+    if (!t || !t.token) return;
+    const prev = map.get(t.token);
+    if (!prev) {
+      map.set(t.token, { ...t });
+      return;
+    }
+    const prevRank = statusRank[prev.status] || 0;
+    const nextRank = statusRank[t.status] || 0;
+    if (nextRank >= prevRank) {
+      map.set(t.token, {
+        ...prev,
+        ...t,
+        signatureDataUrl: t.signatureDataUrl || prev.signatureDataUrl || null,
+        signedAt: t.signedAt || prev.signedAt || null
+      });
+    }
+  };
+
+  (Array.isArray(remoteTokens) ? remoteTokens : []).forEach(upsert);
+  (Array.isArray(localTokens) ? localTokens : []).forEach(upsert);
+
+  return Array.from(map.values())
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+/**
+ * Hidrata assinaturas locais a partir de um registro de turma vindo do Supabase.
+ */
+export function hydrateTurmaSigningStateFromClass(turma) {
+  if (!turma?.id || typeof window === 'undefined' || !window.localStorage) return;
+
+  try {
+    const turmaId = String(turma.id);
+    const remoteSigs = turma.signatures && typeof turma.signatures === 'object' ? turma.signatures : {};
+
+    if (Object.keys(remoteSigs).length > 0) {
+      const localSigs = getTurmaSignatures(turmaId);
+      const mergedSigs = { ...localSigs };
+      let sigChanged = false;
+      Object.entries(remoteSigs).forEach(([roleKey, entry]) => {
+        if (roleKey === 'updatedAt') return;
+        if (entry?.dataUrl && (!mergedSigs[roleKey]?.dataUrl || (!mergedSigs[roleKey].signedAt && entry.signedAt))) {
+          mergedSigs[roleKey] = entry;
+          sigChanged = true;
+        }
+      });
+      if (sigChanged) {
+        localStorage.setItem(`${STORAGE_PREFIX}${turmaId}`, JSON.stringify(mergedSigs));
+      }
+    }
+  } catch (e) {
+    console.warn('[TurmaSignatureService] Erro ao hidratar assinaturas remotas:', e);
+  }
+}
+
+export async function fetchRemoteSigningToken(tokenString) {
+  if (!tokenString || typeof tokenString !== 'string' || tokenString.length < 12) return null;
+  try {
+    const { data, error } = await supabase.rpc('get_turma_signing_token', {
+      p_token: tokenString
+    });
+    if (!error && data && data.token) {
+      const all = getAllSigningTokens();
+      const merged = mergeTokenLists([data], all);
+      saveAllSigningTokens(merged);
+      return getSigningToken(tokenString);
+    }
+  } catch {
+    // RPC pode não estar instalada ainda; usa fallback local
+  }
+  return getSigningToken(tokenString);
+}
+
+export async function syncTurmaSigningStateToSupabase(turmaId) {
+  if (!isUuidString(turmaId)) return;
+  try {
+    const localSigs = getTurmaSignatures(turmaId);
+    const localTokens = getTurmaTokens(turmaId).slice(0, 20);
+
+    const { data: row, error: fetchErr } = await supabase
+      .from('training_classes')
+      .select('signatures')
+      .eq('id', turmaId)
+      .maybeSingle();
+
+    if (!fetchErr && row) {
+      const mergedSigs = {
+        ...(row.signatures && typeof row.signatures === 'object' ? row.signatures : {}),
+        ...localSigs
+      };
+
+      await supabase
+        .from('training_classes')
+        .update({
+          signatures: mergedSigs,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', turmaId);
+    }
+
+    if (localTokens.length > 0) {
+      const tokenRows = localTokens.map((t) => ({
+        token: t.token,
+        turma_id: turmaId,
+        role_key: t.roleKey,
+        instructor_id: t.instructorId || null,
+        signer_name: t.signerName || '',
+        role_title: t.roleTitle || '',
+        turma_name: t.turmaName || '',
+        course_name: t.courseName || '',
+        status: t.status || 'pending',
+        signed_at: t.signedAt || null,
+        signature_data_url: t.signatureDataUrl || null
+      }));
+
+      await supabase
+        .from('turma_signing_tokens')
+        .upsert(tokenRows, { onConflict: 'token' });
+    }
+  } catch {
+    // Usuário público sem sessão autenticada não altera diretamente (tratado via RPC)
+  }
+}
 
 let broadcastChannel = null;
 try {
@@ -138,7 +290,11 @@ export function initializeDefaultSignaturesForTurma(turma) {
  * @param {object} meta { signerName, signedAt, roleTitle, instructorId }
  */
 export function saveRoleSignature(turmaId, roleKey, signatureDataUrl, meta = {}) {
-  if (!turmaId || !roleKey) return null;
+  if (!turmaId || !roleKey || !VALID_ROLE_KEY_REGEX.test(roleKey)) return null;
+  if (!isValidSignatureImage(signatureDataUrl)) {
+    console.warn('[TurmaSignatureService] Imagem de assinatura inválida rejeitada.');
+    return null;
+  }
   try {
     const existing = getTurmaSignatures(turmaId);
     const signatureEntry = {
@@ -187,6 +343,10 @@ export function saveRoleSignature(turmaId, roleKey, signatureDataUrl, meta = {})
         roleKey,
         signatures: updated
       });
+    }
+
+    if (!meta.skipRemoteSync) {
+      syncTurmaSigningStateToSupabase(turmaId).catch(() => {});
     }
 
     return updated;
@@ -260,41 +420,44 @@ export function getTurmaTokens(turmaId) {
  * Cria ou recupera o token exclusivo de assinatura para um papel/instrutor da turma
  */
 export function createOrGetSigningToken(turmaId, roleKey, meta = {}) {
-  if (!turmaId || !roleKey) return null;
+  if (!turmaId || !roleKey || !VALID_ROLE_KEY_REGEX.test(roleKey)) return null;
   const all = getAllSigningTokens();
   const sigs = getTurmaSignatures(turmaId);
   const isAlreadySigned = !!(sigs[roleKey]?.dataUrl || (roleKey === 'instructor_0' && sigs.instructor?.dataUrl));
 
-  // Procura token existente ativo para este papel
+  // Procura token existente ativo (não revogado) para este papel
   const existingIdx = all.findIndex(t => 
     String(t.turmaId) === String(turmaId) && 
+    t.status !== 'revoked' &&
     (t.roleKey === roleKey || (roleKey === 'instructor_0' && t.roleKey === 'instructor')) &&
     (!meta.instructorId || t.instructorId === meta.instructorId)
   );
 
   if (existingIdx >= 0) {
     const existing = all[existingIdx];
+    let dirty = false;
     // Sincroniza estado caso já tenha sido assinado externamente
     if (isAlreadySigned && existing.status !== 'signed') {
       const activeSig = sigs[roleKey] || sigs.instructor;
       existing.status = 'signed';
       existing.signedAt = activeSig.signedAt || new Date().toISOString();
       existing.signatureDataUrl = activeSig.dataUrl;
-      saveAllSigningTokens(all);
+      dirty = true;
     }
     // Atualiza metadados se necessário
     if (meta.signerName && meta.signerName !== existing.signerName) {
       existing.signerName = meta.signerName;
       existing.roleTitle = meta.roleTitle || existing.roleTitle;
+      dirty = true;
+    }
+    if (dirty) {
       saveAllSigningTokens(all);
     }
     return existing;
   }
 
-  // Gera novo token único
-  const randomPart = Math.random().toString(36).substring(2, 9);
-  const timePart = Date.now().toString(36);
-  const token = `sig_${randomPart}_${timePart}`;
+  // Gera novo token criptograficamente seguro
+  const token = generateSecureTokenString();
 
   const activeSig = sigs[roleKey] || (roleKey === 'instructor_0' ? sigs.instructor : null);
 
@@ -315,6 +478,7 @@ export function createOrGetSigningToken(turmaId, roleKey, meta = {}) {
 
   all.unshift(newToken);
   saveAllSigningTokens(all);
+  syncTurmaSigningStateToSupabase(turmaId).catch(() => {});
   return newToken;
 }
 
@@ -322,7 +486,7 @@ export function createOrGetSigningToken(turmaId, roleKey, meta = {}) {
  * Força a geração de um novo link descartável (revogando token pendente anterior)
  */
 export function generateNewSigningToken(turmaId, roleKey, meta = {}) {
-  if (!turmaId || !roleKey) return null;
+  if (!turmaId || !roleKey || !VALID_ROLE_KEY_REGEX.test(roleKey)) return null;
   const all = getAllSigningTokens();
 
   // Marca anteriores deste papel como revogados se ainda estavam pendentes
@@ -332,9 +496,7 @@ export function generateNewSigningToken(turmaId, roleKey, meta = {}) {
     }
   });
 
-  const randomPart = Math.random().toString(36).substring(2, 9);
-  const timePart = Date.now().toString(36);
-  const token = `sig_${randomPart}_${timePart}`;
+  const token = generateSecureTokenString();
 
   const newToken = {
     token,
@@ -362,6 +524,7 @@ export function generateNewSigningToken(turmaId, roleKey, meta = {}) {
     });
   }
 
+  syncTurmaSigningStateToSupabase(turmaId).catch(() => {});
   return newToken;
 }
 
@@ -369,7 +532,7 @@ export function generateNewSigningToken(turmaId, roleKey, meta = {}) {
  * Busca os dados de um token de assinatura específico
  */
 export function getSigningToken(tokenString) {
-  if (!tokenString) return null;
+  if (!tokenString || typeof tokenString !== 'string' || tokenString.length < 12) return null;
   const all = getAllSigningTokens();
   const found = all.find(t => t.token === tokenString);
   if (!found) return null;
@@ -396,12 +559,19 @@ export function completeSigningToken(tokenString, signatureDataUrl) {
   if (!tokenString || !signatureDataUrl) {
     return { success: false, error: 'Dados insuficientes para concluir a assinatura.' };
   }
+  if (!isValidSignatureImage(signatureDataUrl) || !signatureDataUrl.startsWith('data:image/png;base64,')) {
+    return { success: false, error: 'Formato de assinatura inválido.' };
+  }
 
   const all = getAllSigningTokens();
   const tokenObj = all.find(t => t.token === tokenString);
 
   if (!tokenObj) {
     return { success: false, error: 'Link de assinatura inválido ou não encontrado.' };
+  }
+
+  if (!VALID_ROLE_KEY_REGEX.test(tokenObj.roleKey)) {
+    return { success: false, error: 'Papel de assinatura inválido no token.' };
   }
 
   if (tokenObj.status === 'signed') {
@@ -433,8 +603,27 @@ export function completeSigningToken(tokenString, signatureDataUrl) {
     signerName: tokenObj.signerName,
     roleTitle: tokenObj.roleTitle,
     signedAt,
-    instructorId: tokenObj.instructorId
+    instructorId: tokenObj.instructorId,
+    skipRemoteSync: true
   });
+
+  if (isUuidString(tokenObj.turmaId)) {
+    Promise.resolve(
+      supabase.rpc('complete_turma_signing_token', {
+        p_turma_id: tokenObj.turmaId,
+        p_token: tokenString,
+        p_signature_data_url: signatureDataUrl
+      })
+    )
+      .then(({ error }) => {
+        if (error) {
+          syncTurmaSigningStateToSupabase(tokenObj.turmaId).catch(() => {});
+        }
+      })
+      .catch(() => {
+        syncTurmaSigningStateToSupabase(tokenObj.turmaId).catch(() => {});
+      });
+  }
 
   if (broadcastChannel) {
     broadcastChannel.postMessage({

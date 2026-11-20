@@ -2,6 +2,23 @@ import { supabase } from '../lib/supabase';
 
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
+const ALLOWED_READ_TABLES = new Set([
+  'companies', 'groups', 'contracts', 'deliverables', 'trainings',
+  'inventory', 'convocations', 'group_contacts', 'ipa_campaigns',
+  'training_classes', 'training_enrollments', 'cat_records', 'profiles'
+]);
+
+const ALLOWED_WRITE_TABLES = new Set([
+  'companies', 'groups', 'contracts', 'deliverables', 'trainings',
+  'inventory', 'convocations', 'group_contacts', 'ipa_campaigns'
+]);
+
+const sanitizeFilterTerm = (value) =>
+  String(value || '')
+    .replace(/[,()'"\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const pad2 = (n) => String(n).padStart(2, '0');
 const formatDateYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
@@ -85,25 +102,26 @@ export const getAgendaData = async ({
 
     console.log(`[EcoIA Agenda] Buscando período: ${period} (${fromDate || 'início'} até ${toDate || 'fim'}) | Empresa: ${company_name || 'todas'} | Resp: ${responsible_name || 'todos'}`);
 
+    const safeCompanyTerm = sanitizeFilterTerm(company_name);
+    const safeResponsibleTerm = sanitizeFilterTerm(responsible_name);
+
     // 1. Resolução prévia de empresa por nome, se fornecido
     let matchedCompanyIds = null;
-    if (company_name && typeof company_name === 'string' && company_name.trim()) {
-      const term = company_name.trim();
+    if (safeCompanyTerm) {
       const { data: comps } = await supabase
         .from('companies')
         .select('id, name')
-        .ilike('name', `%${term}%`);
+        .ilike('name', `%${safeCompanyTerm}%`);
       matchedCompanyIds = comps?.map(c => c.id) || [];
     }
 
     // 2. Resolução prévia de perfil responsável por nome, se fornecido
     let matchedProfileIds = null;
-    if (responsible_name && typeof responsible_name === 'string' && responsible_name.trim()) {
-      const term = responsible_name.trim();
+    if (safeResponsibleTerm) {
       const { data: profs } = await supabase
         .from('profiles')
         .select('id, name')
-        .ilike('name', `%${term}%`);
+        .ilike('name', `%${safeResponsibleTerm}%`);
       matchedProfileIds = profs?.map(p => p.id) || [];
     }
 
@@ -124,17 +142,17 @@ export const getAgendaData = async ({
     }
 
     // Filtro por empresa
-    if (matchedCompanyIds && matchedCompanyIds.length > 0) {
-      tQuery = tQuery.or(`company_id.in.(${matchedCompanyIds.join(',')}),external_company_name.ilike.%${company_name.trim()}%`);
-    } else if (company_name) {
-      tQuery = tQuery.ilike('external_company_name', `%${company_name.trim()}%`);
+    if (matchedCompanyIds && matchedCompanyIds.length > 0 && safeCompanyTerm) {
+      tQuery = tQuery.or(`company_id.in.(${matchedCompanyIds.join(',')}),external_company_name.ilike.%${safeCompanyTerm}%`);
+    } else if (safeCompanyTerm) {
+      tQuery = tQuery.ilike('external_company_name', `%${safeCompanyTerm}%`);
     }
 
     // Filtro por responsável/instrutor
-    if (matchedProfileIds && matchedProfileIds.length > 0) {
-      tQuery = tQuery.or(`responsible_id.in.(${matchedProfileIds.join(',')}),instructor.ilike.%${responsible_name.trim()}%`);
-    } else if (responsible_name) {
-      tQuery = tQuery.ilike('instructor', `%${responsible_name.trim()}%`);
+    if (matchedProfileIds && matchedProfileIds.length > 0 && safeResponsibleTerm) {
+      tQuery = tQuery.or(`responsible_id.in.(${matchedProfileIds.join(',')}),instructor.ilike.%${safeResponsibleTerm}%`);
+    } else if (safeResponsibleTerm) {
+      tQuery = tQuery.ilike('instructor', `%${safeResponsibleTerm}%`);
     }
 
     tQuery = tQuery.order('date', { ascending: true }).limit(limit);
@@ -264,6 +282,15 @@ export const getAgendaData = async ({
  */
 export const executeDBAction = async (table, action, data = null, filters = null) => {
   try {
+    const isWriteAction = action === 'insert' || action === 'update' || action === 'delete';
+    if (isWriteAction) {
+      if (!ALLOWED_WRITE_TABLES.has(table)) {
+        throw new Error(`Operação de escrita bloqueada para a tabela '${table}'.`);
+      }
+    } else if (!ALLOWED_READ_TABLES.has(table)) {
+      throw new Error(`Acesso negado à tabela '${table}'.`);
+    }
+
     let query = supabase.from(table);
     let response;
 
@@ -298,32 +325,34 @@ export const executeDBAction = async (table, action, data = null, filters = null
               const toD = `${targetYear}-${pad2(mNum)}-${pad2(new Date(targetYear, mNum, 0).getDate())}`;
               query = query.gte('date', fromD).lte('date', toD);
             } else if (key === 'company_name' || key === 'company') {
+              const safeVal = sanitizeFilterTerm(value);
               // Resolução de empresa por nome
-              if (table === 'trainings' || table === 'deliverables' || table === 'contracts') {
-                const { data: comps } = await supabase.from('companies').select('id').ilike('name', `%${value}%`);
+              if (safeVal && (table === 'trainings' || table === 'deliverables' || table === 'contracts')) {
+                const { data: comps } = await supabase.from('companies').select('id').ilike('name', `%${safeVal}%`);
                 const compIds = comps?.map(c => c.id) || [];
                 if (compIds.length > 0) {
                   if (table === 'trainings') {
-                    query = query.or(`company_id.in.(${compIds.join(',')}),external_company_name.ilike.%${value}%`);
+                    query = query.or(`company_id.in.(${compIds.join(',')}),external_company_name.ilike.%${safeVal}%`);
                   } else {
                     query = query.in('company_id', compIds);
                   }
                 } else if (table === 'trainings') {
-                  query = query.ilike('external_company_name', `%${value}%`);
+                  query = query.ilike('external_company_name', `%${safeVal}%`);
                 }
-              } else if (table === 'ipa_campaigns') {
-                query = query.ilike('company', `%${value}%`);
-              } else {
-                query = query.ilike('name', `%${value}%`);
+              } else if (safeVal && table === 'ipa_campaigns') {
+                query = query.ilike('company', `%${safeVal}%`);
+              } else if (safeVal) {
+                query = query.ilike('name', `%${safeVal}%`);
               }
             } else if (key === 'responsible_name' || key === 'responsavel') {
-              if (table === 'trainings') {
-                const { data: profs } = await supabase.from('profiles').select('id').ilike('name', `%${value}%`);
+              const safeResp = sanitizeFilterTerm(value);
+              if (safeResp && table === 'trainings') {
+                const { data: profs } = await supabase.from('profiles').select('id').ilike('name', `%${safeResp}%`);
                 const profIds = profs?.map(p => p.id) || [];
                 if (profIds.length > 0) {
-                  query = query.or(`responsible_id.in.(${profIds.join(',')}),instructor.ilike.%${value}%`);
+                  query = query.or(`responsible_id.in.(${profIds.join(',')}),instructor.ilike.%${safeResp}%`);
                 } else {
-                  query = query.ilike('instructor', `%${value}%`);
+                  query = query.ilike('instructor', `%${safeResp}%`);
                 }
               }
             } else if (key === 'limit') {

@@ -1333,12 +1333,14 @@ a.tc-btn { text-decoration: none; }
 .tc-turma-public-link {
   display: flex;
   align-items: stretch;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
 
 .tc-turma-public-link .tc-url-field {
-  flex: 1;
+  flex: 1 1 220px;
+  min-width: 0;
   width: auto;
   background: var(--tc-muted-bg);
 }

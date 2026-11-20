@@ -11,6 +11,27 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.local.example
+
+# Agent/IDE directories
+.agents/
+.claude/
+awesome-claude-skills/
+supabase/.temp/
+output/
+
+# Local media, raw documents, and legacy archives (keep assets in public/)
+entregaveis fotos/
+modelos para viculo treinamento/
+gerador cronograma/
+ass/
+logo/
+*.pdf
+*.odp
+modelo final.pptx
+test_output.pptx
 
 # Editor directories and files
 .vscode/*

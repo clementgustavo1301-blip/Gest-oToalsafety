@@ -3,7 +3,6 @@
  * Base URL: https://api.cpfcnpj.com.br
  */
 
-const DEFAULT_TOKEN = '8ebc7b04958639ecbda124e77ff4667e';
 const BASE_URL = 'https://api.cpfcnpj.com.br';
 
 export const cleanCpf = (cpf = '') => {
@@ -65,10 +64,18 @@ export async function searchCpfA(cpf, customToken = null) {
     };
   }
 
-  const token = customToken || 
-    import.meta.env?.VITE_CPFCNPJ_API_TOKEN || 
-    (typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('cpfcnpj_api_token') : null) || 
-    DEFAULT_TOKEN;
+  const rawToken =
+    customToken ||
+    import.meta.env?.VITE_CPFCNPJ_API_TOKEN ||
+    (typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('cpfcnpj_api_token') : null) ||
+    '';
+  const token = String(rawToken).trim();
+  if (!token || token === 'COLE_AQUI') {
+    return {
+      success: false,
+      error: 'Consulta automática de CPF não configurada. Preencha seu nome completo manualmente abaixo.'
+    };
+  }
   const url = `${BASE_URL}/${token}/1/${digits}`;
 
   try {

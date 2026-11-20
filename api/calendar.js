@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // Helper to format date strings for iCal
@@ -32,9 +32,24 @@ function formatIcalEndDate(dateStr, timeStr) {
   return formatIcalDate(dateStr, endTimeStr);
 }
 
+// Helper to escape iCalendar text fields per RFC 5545
+function escapeIcalText(value) {
+  return String(value || '')
+    .replace(/\r/g, '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  const calendarToken = process.env.CALENDAR_API_TOKEN;
+  if (calendarToken && req.query.token !== calendarToken && req.headers['authorization'] !== `Bearer ${calendarToken}`) {
+    return res.status(401).json({ error: 'Unauthorized calendar access' });
   }
 
   try {
@@ -42,6 +57,7 @@ export default async function handler(req, res) {
 
     // Get the name query parameter (e.g., ?name=gustavo)
     const { name } = req.query;
+    const safeFileName = name ? String(name).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) : 'completa';
 
     const { data: trainings, error: errT } = await supabase.from('trainings').select('*');
     const { data: companiesData, error: errC } = await supabase.from('companies').select('id, name');
@@ -56,7 +72,7 @@ export default async function handler(req, res) {
     // Filter trainings by name if provided
     let filteredTrainings = trainings;
     if (name) {
-      const searchTerm = name.toLowerCase();
+      const searchTerm = String(name).toLowerCase();
       filteredTrainings = trainings.filter(t => {
         const inst = (t.instructor || '').toLowerCase();
         const part = (t.participants || '').toLowerCase();
@@ -70,20 +86,19 @@ export default async function handler(req, res) {
     ical.push('VERSION:2.0');
     ical.push('PRODID:-//TotalSafety//Gestão de Segurança//PT');
     ical.push('CALSCALE:GREGORIAN');
-    ical.push('X-WR-CALNAME:TotalSafety' + (name ? ` - ${name}` : ''));
+    ical.push('X-WR-CALNAME:TotalSafety' + (name ? ` - ${escapeIcalText(name)}` : ''));
 
     filteredTrainings.forEach(t => {
       if (!t.date) return; // Skip if no date
 
       const companyName = compMap[t.company_id] || 'Empresa Desconhecida';
       const title = t.title || 'Agendamento';
-      const eventTitle = `${title} | ${companyName}`;
-      const description = `Instrutor/Responsável: ${t.instructor || 'N/A'}\\nParticipantes: ${t.participants || 'N/A'}\\nStatus: ${t.status || 'N/A'}`;
+      const eventTitle = escapeIcalText(`${title} | ${companyName}`);
+      const description = escapeIcalText(`Instrutor/Responsável: ${t.instructor || 'N/A'}\nParticipantes: ${t.participants || 'N/A'}\nStatus: ${t.status || 'N/A'}`);
 
       ical.push('BEGIN:VEVENT');
       ical.push(`UID:treinamento-${t.id}@totalsafety.com`);
       
-      // DTSTAMP is required and must be UTC. We'll just use a generic fixed date for simplicity if actual creation date isn't strictly needed
       const nowUtc = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
       ical.push(`DTSTAMP:${nowUtc}`);
       
@@ -100,11 +115,11 @@ export default async function handler(req, res) {
 
     ical.push('END:VCALENDAR');
 
-    const icalString = ical.join('\\r\\n');
+    const icalString = ical.join('\r\n');
 
     // Send the response as an ICS file download
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="agenda_${name ? name : 'completa'}.ics"`);
+    res.setHeader('Content-Disposition', `attachment; filename="agenda_${safeFileName}.ics"`);
     res.status(200).send(icalString);
 
   } catch (error) {

@@ -1,6 +1,43 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { validateCpf, formatCpf, cleanCpf } from '../services/cpfService';
 import { AlertTriangle, Clock, CheckCircle, Copy, Download, Printer, ShieldCheck } from 'lucide-react';
+
+const sanitizeTextField = (value, maxLength = 200) => {
+  if (typeof value !== 'string') return '';
+  return Array.from(value)
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return (code >= 32 || code === 9 || code === 10 || code === 13) && code !== 127;
+    })
+    .join('')
+    .replace(/[<>]/g, '')
+    .trim()
+    .slice(0, maxLength);
+};
+
+const formatCnpj = (cnpj = '') => {
+  const digits = String(cnpj).replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12, 14)}`;
+};
+
+const generateCatProtocol = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  let rand = String(Date.now()).slice(-6);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(3);
+    window.crypto.getRandomValues(bytes);
+    rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+  return `CAT-${y}${m}${d}-${rand}`;
+};
 
 const PublicCATPage = () => {
   const [loading, setLoading] = useState(false);
@@ -62,26 +99,43 @@ const PublicCATPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    let nextValue = type === 'checkbox' ? checked : value;
+    if (name === 'employee_cpf') {
+      nextValue = formatCpf(value);
+    } else if (name === 'company_cnpj') {
+      nextValue = formatCnpj(value);
+    }
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: nextValue
     }));
   };
 
   const generateSummary = () => {
     let t = 'COMUNICAÇÃO DE ACIDENTE DE TRABALHO — COLETA DE DADOS\n';
-    t += '======================================================\n\n';
-    
-    t += '01. DADOS DO ACIDENTE\n';
+    t += '======================================================\n';
+    if (protocol) t += `Protocolo: ${protocol}\n`;
+    t += '\n00. EMPRESA E TRABALHADOR\n';
+    t += `Empresa: ${formData.company_name}\n`;
+    t += `CNPJ: ${formData.company_cnpj}\n`;
+    t += `Trabalhador: ${formData.employee_name}\n`;
+    t += `CPF: ${formData.employee_cpf}\n`;
+    t += `Tipo de CAT: ${formData.tp_cat}\n`;
+
+    t += '\n01. DADOS DO ACIDENTE\n';
     t += `Tipo do acidente: ${formData.tp_acid}\n`;
     t += `Data: ${formData.a_data}\n`;
     t += `Hora: ${formData.a_hora}\n`;
+    if (formData.a_hrstrab) t += `Horas trabalhadas antes do acidente: ${formData.a_hrstrab}\n`;
+    if (formData.a_ultimodia) t += `Último dia trabalhado: ${formData.a_ultimodia}\n`;
     t += `Houve afastamento: ${formData.afast}\n`;
     if(formData.a_diasafast) t += `Dias de afastamento: ${formData.a_diasafast}\n`;
     if(formData.a_retorno) t += `Previsão de retorno: ${formData.a_retorno}\n`;
     t += `Houve óbito: ${formData.obito}\n`;
     if(formData.a_dtobito) t += `Data do óbito: ${formData.a_dtobito}\n`;
     t += `Registro policial: ${formData.policia}\n`;
+    if(formData.a_agente) t += `Agente causador: ${formData.a_agente}\n`;
+    if(formData.a_natureza) t += `Natureza da lesão: ${formData.a_natureza}\n`;
     if(formData.a_descricao) t += `Situação geradora:\n${formData.a_descricao}\n`;
 
     t += '\n02. LOCAL DO ACIDENTE\n';
@@ -102,8 +156,11 @@ const PublicCATPage = () => {
     t += '\n04. ATENDIMENTO MÉDICO\n';
     t += `Data do atendimento: ${formData.m_data}\n`;
     t += `Hora do atendimento: ${formData.m_hora}\n`;
+    if (formData.m_unidade) t += `Unidade médica: ${formData.m_unidade}\n`;
+    if (formData.m_cnes) t += `CNES: ${formData.m_cnes}\n`;
     t += `Internação: ${formData.intern}\n`;
     t += `CID-10: ${formData.m_cid}\n`;
+    if (formData.m_diag) t += `Diagnóstico provável: ${formData.m_diag}\n`;
     t += `Duração provável do tratamento (dias): ${formData.m_durtrat}\n`;
     if(formData.m_desclesao) t += `Descrição da lesão: ${formData.m_desclesao}\n`;
     t += `Médico emitente: ${formData.m_medico}\n`;
@@ -126,7 +183,7 @@ const PublicCATPage = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `CAT_Formulario.txt`;
+    a.download = protocol ? `${protocol}.txt` : `CAT_Formulario.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -135,15 +192,59 @@ const PublicCATPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
     try {
-      const payload = { ...formData };
-      
+      const lastSubmit = parseInt(sessionStorage.getItem('cat_last_submit_ts') || '0', 10);
+      if (Date.now() - lastSubmit < 15000) {
+        setError('Aguarde alguns segundos antes de enviar outro registro de CAT.');
+        return;
+      }
+    } catch {
+      // sessionStorage indisponível
+    }
+
+    const companyDigits = String(formData.company_cnpj || '').replace(/\D/g, '');
+    const cpfDigits = cleanCpf(formData.employee_cpf || '');
+
+    if (sanitizeTextField(formData.company_name, 160).length < 2) {
+      setError('Informe a Razão Social / Nome da Empresa.');
+      return;
+    }
+    if (companyDigits.length !== 14) {
+      setError('Informe um CNPJ válido com 14 dígitos.');
+      return;
+    }
+    if (sanitizeTextField(formData.employee_name, 160).length < 3) {
+      setError('Informe o nome completo do trabalhador.');
+      return;
+    }
+    if (!validateCpf(cpfDigits)) {
+      setError('CPF do trabalhador inválido. Verifique os dígitos informados.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const protocolCode = generateCatProtocol();
+      const payload = { protocol: protocolCode };
+
+      Object.entries(formData).forEach(([key, val]) => {
+        if (typeof val === 'string') {
+          const maxLen = (key === 'a_descricao' || key === 'p_outras' || key === 'm_desclesao') ? 2000 : 200;
+          payload[key] = sanitizeTextField(val, maxLen);
+        } else {
+          payload[key] = val;
+        }
+      });
+
+      payload.company_cnpj = formatCnpj(companyDigits);
+      payload.employee_cpf = formatCpf(cpfDigits);
+
       // Parse integers
-      payload.a_diasafast = payload.a_diasafast ? parseInt(payload.a_diasafast) : null;
-      payload.m_durtrat = payload.m_durtrat ? parseInt(payload.m_durtrat) : null;
+      payload.a_diasafast = payload.a_diasafast ? parseInt(payload.a_diasafast, 10) : null;
+      payload.m_durtrat = payload.m_durtrat ? parseInt(payload.m_durtrat, 10) : null;
       
       // Parse dates (empty string must be null for Postgres)
       const dateFields = ['a_data', 'a_ultimodia', 'a_retorno', 'a_dtobito', 'm_data'];
@@ -159,11 +260,18 @@ const PublicCATPage = () => {
 
       if (dbError) {
         console.error('Erro ao inserir no Supabase:', dbError);
-        setError('Erro ao salvar no banco: ' + dbError.message);
+        setError('Não foi possível registrar a CAT no momento. Verifique os dados informados e tente novamente.');
         setLoading(false);
         return;
       }
-      
+
+      try {
+        sessionStorage.setItem('cat_last_submit_ts', String(Date.now()));
+      } catch {
+        // sessionStorage indisponível
+      }
+
+      setProtocol(protocolCode);
       setSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -184,6 +292,11 @@ const PublicCATPage = () => {
           <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
             Formulário Enviado com Sucesso!
           </h2>
+          {protocol && (
+            <div style={{ display: 'inline-block', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.5rem 1rem', marginBottom: '1rem', fontFamily: 'monospace', fontWeight: '700', color: 'var(--primary)' }}>
+              Protocolo: {protocol}
+            </div>
+          )}
           <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: '1.6' }}>
             A equipe de SST da Ecosafety Consultoria recebeu os dados da CAT. 
             Em breve daremos andamento à transmissão.
@@ -248,6 +361,41 @@ const PublicCATPage = () => {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
+          {/* BLOCO 00: Empresa e Trabalhador */}
+          <section className="card" style={{ padding: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+              <span style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700' }}>00</span>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>Empresa e Trabalhador</h2>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="modal-label">Razão Social / Nome da Empresa <span style={{color: 'var(--error)'}}>*</span></label>
+                <input type="text" className="modal-input" name="company_name" value={formData.company_name} onChange={handleChange} maxLength={160} required placeholder="Nome completo da empresa" />
+              </div>
+              <div>
+                <label className="modal-label">CNPJ da Empresa <span style={{color: 'var(--error)'}}>*</span></label>
+                <input type="text" className="modal-input" name="company_cnpj" value={formData.company_cnpj} onChange={handleChange} maxLength={18} required placeholder="00.000.000/0000-00" />
+              </div>
+              <div>
+                <label className="modal-label">Tipo de CAT <span style={{color: 'var(--error)'}}>*</span></label>
+                <select className="modal-input" name="tp_cat" value={formData.tp_cat} onChange={handleChange} required>
+                  <option value="Inicial">Inicial</option>
+                  <option value="Reabertura">Reabertura</option>
+                  <option value="Comunicação de Óbito">Comunicação de Óbito</option>
+                </select>
+              </div>
+              <div>
+                <label className="modal-label">Nome Completo do Trabalhador <span style={{color: 'var(--error)'}}>*</span></label>
+                <input type="text" className="modal-input" name="employee_name" value={formData.employee_name} onChange={handleChange} maxLength={160} required placeholder="Nome completo do trabalhador" />
+              </div>
+              <div>
+                <label className="modal-label">CPF do Trabalhador <span style={{color: 'var(--error)'}}>*</span></label>
+                <input type="text" className="modal-input" name="employee_cpf" value={formData.employee_cpf} onChange={handleChange} maxLength={14} required placeholder="000.000.000-00" />
+              </div>
+            </div>
+          </section>
+
           {/* BLOCO 01: Dados do acidente */}
           <section className="card" style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
@@ -273,6 +421,14 @@ const PublicCATPage = () => {
                 <input type="time" className="modal-input" name="a_hora" value={formData.a_hora} onChange={handleChange} required />
               </div>
               <div>
+                <label className="modal-label">Horas Trabalhadas Antes</label>
+                <input type="text" className="modal-input" name="a_hrstrab" value={formData.a_hrstrab} onChange={handleChange} placeholder="Ex: 04:30" />
+              </div>
+              <div>
+                <label className="modal-label">Último Dia Trabalhado</label>
+                <input type="date" className="modal-input" name="a_ultimodia" value={formData.a_ultimodia} onChange={handleChange} />
+              </div>
+              <div>
                 <label className="modal-label">Houve Afastamento? <span style={{color: 'var(--error)'}}>*</span></label>
                 <select className="modal-input" name="afast" value={formData.afast} onChange={handleChange} required>
                   <option>Não</option>
@@ -284,6 +440,10 @@ const PublicCATPage = () => {
                 <input type="number" min="0" className="modal-input" name="a_diasafast" value={formData.a_diasafast} onChange={handleChange} />
               </div>
               <div>
+                <label className="modal-label">Previsão de Retorno</label>
+                <input type="date" className="modal-input" name="a_retorno" value={formData.a_retorno} onChange={handleChange} />
+              </div>
+              <div>
                 <label className="modal-label">Houve Óbito? <span style={{color: 'var(--error)'}}>*</span></label>
                 <select className="modal-input" name="obito" value={formData.obito} onChange={handleChange} required>
                   <option>Não</option>
@@ -293,6 +453,21 @@ const PublicCATPage = () => {
               <div>
                 <label className="modal-label">Data Óbito</label>
                 <input type="date" className="modal-input" name="a_dtobito" value={formData.a_dtobito} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="modal-label">Registro Policial?</label>
+                <select className="modal-input" name="policia" value={formData.policia} onChange={handleChange}>
+                  <option>Não</option>
+                  <option>Sim</option>
+                </select>
+              </div>
+              <div>
+                <label className="modal-label">Agente Causador</label>
+                <input type="text" className="modal-input" name="a_agente" value={formData.a_agente} onChange={handleChange} placeholder="Ex: Queda, Máquina, Objeto..." />
+              </div>
+              <div>
+                <label className="modal-label">Natureza da Lesão</label>
+                <input type="text" className="modal-input" name="a_natureza" value={formData.a_natureza} onChange={handleChange} placeholder="Ex: Corte, Fratura, Contusão..." />
               </div>
             </div>
 
@@ -406,6 +581,14 @@ const PublicCATPage = () => {
                 <input type="time" className="modal-input" name="m_hora" value={formData.m_hora} onChange={handleChange} />
               </div>
               <div>
+                <label className="modal-label">Unidade Médica</label>
+                <input type="text" className="modal-input" name="m_unidade" value={formData.m_unidade} onChange={handleChange} placeholder="Hospital / UPA / Clínica" />
+              </div>
+              <div>
+                <label className="modal-label">CNES da Unidade</label>
+                <input type="text" className="modal-input" name="m_cnes" value={formData.m_cnes} onChange={handleChange} />
+              </div>
+              <div>
                 <label className="modal-label">Houve Internação? <span style={{color: 'var(--error)'}}>*</span></label>
                 <select className="modal-input" name="intern" value={formData.intern} onChange={handleChange} required>
                   <option>Não</option>
@@ -417,8 +600,16 @@ const PublicCATPage = () => {
                 <input type="text" className="modal-input" name="m_cid" value={formData.m_cid} onChange={handleChange} required placeholder="Ex: S62.6" />
               </div>
               <div>
+                <label className="modal-label">Diagnóstico Provável</label>
+                <input type="text" className="modal-input" name="m_diag" value={formData.m_diag} onChange={handleChange} />
+              </div>
+              <div>
                 <label className="modal-label">Duração Tratamento (dias)</label>
                 <input type="number" min="0" className="modal-input" name="m_durtrat" value={formData.m_durtrat} onChange={handleChange} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="modal-label">Descrição da Lesão</label>
+                <input type="text" className="modal-input" name="m_desclesao" value={formData.m_desclesao} onChange={handleChange} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label className="modal-label">Nome do Médico Emitente <span style={{color: 'var(--error)'}}>*</span></label>

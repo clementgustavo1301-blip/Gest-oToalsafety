@@ -1,11 +1,14 @@
 import { 
   supabase, 
   telegramBotToken, 
+  telegramChatId,
   sendDeliverablesReport, 
   sendDailyReport,
   sendDailyReportByResponsible,
   sendTelegramMessage 
 } from './_utils.js';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function handler(req, res) {
   // Only allow POST requests for the webhook
@@ -13,17 +16,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (webhookSecret && req.headers['x-telegram-bot-api-secret-token'] !== webhookSecret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   try {
-    const update = req.body;
+    const update = req.body || {};
     
     // Telegram will send updates. We handle callback_query (buttons) and messages.
     if (update.callback_query) {
       const callbackQuery = update.callback_query;
-      const callbackData = callbackQuery.data;
-      const replyChatId = callbackQuery.message.chat.id;
+      const callbackData = String(callbackQuery.data || '');
+      const replyChatId = callbackQuery.message?.chat?.id;
+
+      if (!telegramChatId || !replyChatId || String(replyChatId) !== String(telegramChatId)) {
+        return res.status(403).json({ error: 'Forbidden chat' });
+      }
       
       if (callbackData.startsWith('approve_')) {
-        const linkId = callbackData.replace('approve_', '');
+        const linkId = callbackData.replace('approve_', '').trim();
+        if (!UUID_REGEX.test(linkId)) {
+          await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${encodeURIComponent(callbackQuery.id)}&text=ID+inválido.&show_alert=true`);
+          return res.status(400).json({ error: 'Invalid link ID' });
+        }
+
         console.log(`\n📲 Comando de APROVAÇÃO via Telegram para o vínculo: ${linkId}`);
         
         if (supabase) {
@@ -34,17 +51,17 @@ export default async function handler(req, res) {
             
           if (error) {
             console.error('Erro ao aprovar vínculo:', error.message);
-            await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}&text=Erro ao aprovar.&show_alert=true`);
+            await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${encodeURIComponent(callbackQuery.id)}&text=Erro+ao+aprovar.&show_alert=true`);
           } else {
             console.log('✅ Vínculo aprovado com sucesso no Supabase!');
-            await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}&text=Acesso Aprovado!`);
+            await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${encodeURIComponent(callbackQuery.id)}&text=Acesso+Aprovado!`);
             
-            let originalText = callbackQuery.message.text || 'Acesso solicitado.';
+            const originalText = callbackQuery.message?.text || 'Acesso solicitado.';
             await fetch(`https://api.telegram.org/bot${telegramBotToken}/editMessageText`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                chat_id: callbackQuery.message.chat.id,
+                chat_id: replyChatId,
                 message_id: callbackQuery.message.message_id,
                 text: originalText + '\n\n✅ *Aprovado por você via Telegram*',
                 parse_mode: 'Markdown',
@@ -59,7 +76,7 @@ export default async function handler(req, res) {
         console.log(`\n📲 Comando de RELATÓRIO '${reportType}' selecionado no menu!`);
         
         // Remove the loading clock from the button
-        await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${callbackQuery.id}`);
+        await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery?callback_query_id=${encodeURIComponent(callbackQuery.id)}`);
         
         if (reportType === 'agendamentos') {
           // Sub-menu for Agendamentos
@@ -81,7 +98,12 @@ export default async function handler(req, res) {
       }
     } else if (update.message && update.message.text) {
       const text = update.message.text.toLowerCase().trim();
-      const replyChatId = update.message.chat.id;
+      const replyChatId = update.message.chat?.id;
+
+      if (!telegramChatId || !replyChatId || String(replyChatId) !== String(telegramChatId)) {
+        return res.status(403).json({ error: 'Forbidden chat' });
+      }
+
       if (text === 'relatorio' || text === '/relatorio' || text === 'relatório' || text === '/relatório') {
         console.log(`\n📲 Menu de RELATÓRIOS acionado via Telegram!`);
         

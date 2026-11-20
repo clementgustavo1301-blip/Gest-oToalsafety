@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { hydrateTurmaSigningStateFromClass } from './turmaSignatureService';
 
 const LOCAL_CLASSES_KEY = 'totalsafety_training_classes';
 const LOCAL_ENROLLMENTS_KEY = 'totalsafety_training_enrollments';
@@ -54,6 +55,7 @@ export async function getTrainingClasses() {
 
     if (!error && data) {
       const normalizedData = data.map(normalizeTrainingClass);
+      normalizedData.forEach(hydrateTurmaSigningStateFromClass);
       setLocal(LOCAL_CLASSES_KEY, normalizedData);
       return normalizedData;
     }
@@ -79,6 +81,7 @@ export async function getTrainingClassById(id) {
     if (!data) return null;
 
     const normalizedClass = normalizeTrainingClass(data);
+    hydrateTurmaSigningStateFromClass(normalizedClass);
     const localList = getLocal(LOCAL_CLASSES_KEY);
     const existingIdx = localList.findIndex(c => String(c.id) === String(normalizedClass.id));
     if (existingIdx >= 0) {
@@ -253,14 +256,32 @@ export async function getTrainingEnrollments(turmaId = null) {
   return local;
 }
 
+const stripControlChars = (str) =>
+  Array.from(String(str || ''))
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join('');
+
+const sanitizeParticipantText = (value, maxLength = 120) =>
+  stripControlChars(value)
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+
 export async function registerStudent(studentData) {
   if (!studentData.turma_id) {
     throw new Error('O link de inscrição não está vinculado a uma turma.');
   }
 
   const cpfDigits = String(studentData.cpf || '').replace(/\D/g, '').slice(0, 11);
-  if (cpfDigits.length !== 11 || !(studentData.nome || '').trim()) {
-    throw new Error('Os dados do participante estão incompletos.');
+  const cleanNome = sanitizeParticipantText(studentData.nome, 120);
+  const cleanMatricula = studentData.matricula ? sanitizeParticipantText(studentData.matricula, 40) : null;
+
+  if (cpfDigits.length !== 11 || cleanNome.length < 3) {
+    throw new Error('Os dados do participante estão inválidos ou incompletos.');
   }
 
   const normalizedCpf = cpfDigits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
@@ -276,11 +297,23 @@ export async function registerStudent(studentData) {
 
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(studentData.turma_id || '').trim());
 
+  if (isUUID) {
+    const { data: turmaRow, error: turmaErr } = await supabase
+      .from('training_classes')
+      .select('id, status')
+      .eq('id', studentData.turma_id)
+      .maybeSingle();
+
+    if (!turmaErr && (!turmaRow || String(turmaRow.status || 'Aberta').trim().toLowerCase() !== 'aberta')) {
+      throw new Error('Esta turma não está com inscrições abertas.');
+    }
+  }
+
   const payload = {
     turma_id: isUUID ? studentData.turma_id : null,
-    nome: studentData.nome.trim(),
+    nome: cleanNome,
     cpf: normalizedCpf,
-    matricula: studentData.matricula ? String(studentData.matricula).trim() : null,
+    matricula: cleanMatricula || null,
     data_nascimento: cleanBirthDate,
     telefone: studentData.telefone || null,
     empresa: studentData.empresa || null,
@@ -298,6 +331,9 @@ export async function registerStudent(studentData) {
         return { ...payload, turma_id: studentData.turma_id, already_registered: true };
       }
       if (error) {
+        if (error.code === '42501') {
+          throw new Error('Esta turma não está com inscrições abertas.');
+        }
         console.warn('[TrainingEnrollments] Supabase retornou erro no insert:', error);
         throw error;
       }
@@ -321,6 +357,9 @@ export async function registerStudent(studentData) {
 
     return fullPayload;
   } catch (err) {
+    if (err?.message === 'Esta turma não está com inscrições abertas.') {
+      throw err;
+    }
     console.error('[TrainingEnrollments] Falha ao registrar no Supabase:', err.message);
     // Em caso de falha de conexão, garante persistência no cache local
     const local = getLocal(LOCAL_ENROLLMENTS_KEY);
@@ -423,6 +462,28 @@ export function subscribeToEnrollments(onNewEnrollment) {
     };
   } catch (e) {
     console.warn('Erro ao configurar canal realtime:', e);
+    return () => {};
+  }
+}
+
+export function subscribeToTrainingClassUpdates(onClassUpdated) {
+  try {
+    const channel = supabase
+      .channel('public:training_classes_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'training_classes' }, (payload) => {
+        if (payload?.new) {
+          const normalized = normalizeTrainingClass(payload.new);
+          hydrateTurmaSigningStateFromClass(normalized);
+          onClassUpdated(normalized);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (e) {
+    console.warn('Erro ao configurar canal realtime de turmas:', e);
     return () => {};
   }
 }
