@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2, Plus, ChevronDown, ChevronRight, Search,
   Trash2, Users, FileText, MapPin, Edit2, UserCheck, LifeBuoy,
   ShieldCheck, Clock, CheckCircle2, Download
 } from 'lucide-react';
-import { getGroups, getCompanies, addGroup, updateGroup, addCompany, deleteGroup, deleteCompany } from '../services/storageService';
+import {
+  getGroups, getCompanies, addGroup, updateGroup, addCompany, deleteGroup, deleteCompany,
+  getCachedSnapshot, subscribeToStorageCache
+} from '../services/storageService';
 import AddGroupModal from '../components/AddGroupModal';
 import AddCompanyModal from '../components/AddCompanyModal';
 import ExportCompaniesModal from '../components/ExportCompaniesModal';
 
 const CompaniesPage = () => {
-  const [groups, setGroups] = useState([]);
-  const [allCompanies, setAllCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialSnap = useMemo(() => getCachedSnapshot(), []);
+  const [groups, setGroups] = useState(() => initialSnap.groups || []);
+  const [allCompanies, setAllCompanies] = useState(() => initialSnap.companies || []);
+  const [loading, setLoading] = useState(() => !initialSnap.hasCompaniesCache);
 
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -24,22 +29,26 @@ const CompaniesPage = () => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [editingGroup, setEditingGroup] = useState(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showLoading = true) => {
+    const snap = getCachedSnapshot();
+    if (showLoading && !snap.hasCompaniesCache) setLoading(true);
     const [fetchedGroups, fetchedCompanies] = await Promise.all([
       getGroups(),
       getCompanies()
     ]);
     setGroups(fetchedGroups);
     setAllCompanies(fetchedCompanies);
-    
-    // Começa com todos os grupos colapsados (fechados)
-    setExpandedGroups(new Set());
     setLoading(false);
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+    const unsub = subscribeToStorageCache(() => {
+      const snap = getCachedSnapshot();
+      if (snap.groups) setGroups(snap.groups);
+      if (snap.companies) setAllCompanies(snap.companies);
+    });
+    return () => unsub();
   }, []);
 
   const toggleGroup = (groupId) => {
@@ -78,19 +87,34 @@ const CompaniesPage = () => {
     }
   };
 
+  const companiesByGroupId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < allCompanies.length; i++) {
+      const c = allCompanies[i];
+      if (!map.has(c.groupId)) map.set(c.groupId, []);
+      map.get(c.groupId).push(c);
+    }
+    return map;
+  }, [allCompanies]);
+
+  const lowerSearch = useMemo(() => deferredSearchTerm.trim().toLowerCase(), [deferredSearchTerm]);
+
+  const filteredGroups = useMemo(() => {
+    return groups.filter(group => {
+      if (!lowerSearch) return true;
+      const companiesInGroup = companiesByGroupId.get(group.id) || [];
+      const matchGroup = (group.name || '').toLowerCase().includes(lowerSearch);
+      const matchCompany = companiesInGroup.some(c =>
+        (c.name || '').toLowerCase().includes(lowerSearch) ||
+        (c.cnpj || '').includes(deferredSearchTerm.trim())
+      );
+      return matchGroup || matchCompany;
+    }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  }, [groups, companiesByGroupId, lowerSearch, deferredSearchTerm]);
+
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Carregando empresas...</div>;
   }
-
-  const filteredGroups = groups.filter(group => {
-    const companiesInGroup = allCompanies.filter(c => c.groupId === group.id);
-    const matchGroup = group.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchCompany = companiesInGroup.some(c =>
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.cnpj.includes(searchTerm)
-    );
-    return matchGroup || matchCompany;
-  }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -144,12 +168,14 @@ const CompaniesPage = () => {
       {/* Groups List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {filteredGroups.map(group => {
-          const companiesInGroup = allCompanies.filter(c => c.groupId === group.id && (
-            !searchTerm ||
-            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.cnpj.includes(searchTerm) ||
-            group.name.toLowerCase().includes(searchTerm.toLowerCase())
-          ));
+          const allGroupCompanies = companiesByGroupId.get(group.id) || [];
+          const groupMatches = !lowerSearch || (group.name || '').toLowerCase().includes(lowerSearch);
+          const companiesInGroup = groupMatches
+            ? allGroupCompanies
+            : allGroupCompanies.filter(c =>
+                (c.name || '').toLowerCase().includes(lowerSearch) ||
+                (c.cnpj || '').includes(deferredSearchTerm.trim())
+              );
           const isExpanded = expandedGroups.has(group.id);
           const displaySupervisor = group.supervisor || companiesInGroup.find(c => c.supervisor)?.supervisor || companiesInGroup.find(c => c.supportResponsible)?.supportResponsible;
           const displayTecnico = group.tecnicoResponsavel || companiesInGroup.find(c => c.tecnicoResponsavel)?.tecnicoResponsavel || companiesInGroup.find(c => c.responsible)?.responsible;

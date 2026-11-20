@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue, useRef, useCallback } from 'react';
 import {
   FileText, Download, Filter, Search,
   CheckCircle, Clock, AlertTriangle, FileSpreadsheet, File,
@@ -8,15 +8,19 @@ import {
 import {
   getDeliverablesByCompany, getContractsByCompany, addDeliverable, updateDeliverable,
   uploadDocument, getDocumentUrl, getAllDeliverablesSummary, getContracts, getCompanies,
-  getGroups, resolveCompaniesWithHeritage, deleteDeliverable, deleteDeliverables
+  getGroups, resolveCompaniesWithHeritage, deleteDeliverable, deleteDeliverables,
+  getCachedSnapshot, subscribeToStorageCache
 } from '../services/storageService';
 import {
   isItemExpired, isDelivered, getEffectiveValidityDate, isProgram,
   isPcaPprAet, isPendingDeliverable
 } from '../utils/deliverableTiming';
+import { sanitizeErrorMessage } from '../utils/errorPolicy';
 import AddDeliverableModal from './AddDeliverableModal';
 import EditDeliverableModal from './EditDeliverableModal';
 import DeliverablesReportModal from './DeliverablesReportModal';
+
+const PAGE_SIZE = 60;
 
 const TYPE_CONFIG = {
   programa: { label: 'Programa', icon: <FileSpreadsheet size={16} />, color: 'var(--primary)', bg: 'var(--primary-light)' },
@@ -46,6 +50,7 @@ function normalizeText(value) {
 }
 
 const DeliverablesViewer = ({ companyId, onUpdate }) => {
+  const initialSnap = useMemo(() => getCachedSnapshot(companyId), [companyId]);
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterContract, setFilterContract] = useState('all');
@@ -53,23 +58,34 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
   const [filterCompany, setFilterCompany] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [showModal, setShowModal] = useState(false);
   const [modalInitialMode, setModalInitialMode] = useState('single');
   const [viewMode, setViewMode] = useState('grid');
   
-  const [deliverables, setDeliverables] = useState([]);
-  const [contracts, setContracts] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [deliverables, setDeliverables] = useState(() =>
+    companyId ? (initialSnap.companyDeliverables || []) : (initialSnap.allDeliverablesSummary || [])
+  );
+  const [contracts, setContracts] = useState(() =>
+    companyId ? (initialSnap.companyContracts || []) : (initialSnap.contracts || [])
+  );
+  const [companies, setCompanies] = useState(() => initialSnap.resolvedCompanies || []);
+  const [groups, setGroups] = useState(() => initialSnap.groups || []);
+  const [loading, setLoading] = useState(() =>
+    companyId ? !initialSnap.hasCompanyDetailsCache : !initialSnap.hasDeliverablesCache
+  );
   const [uploadingId, setUploadingId] = useState(null);
   const [editingDeliverable, setEditingDeliverable] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [deletingBulk, setDeletingBulk] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef(null);
 
-  const loadData = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
+  const loadData = useCallback(async (showLoading = true) => {
+    const snap = getCachedSnapshot(companyId);
+    const hasCache = companyId ? snap.hasCompanyDetailsCache : snap.hasDeliverablesCache;
+    if (showLoading && !hasCache) setLoading(true);
     if (companyId) {
       const [delivs, ctrs] = await Promise.all([
         getDeliverablesByCompany(companyId),
@@ -90,12 +106,36 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
       setCompanies(resolvedCompanies);
       setGroups(grps);
     }
-    if (showLoading) setLoading(false);
-  };
+    setLoading(false);
+  }, [companyId]);
 
   useEffect(() => {
+    const snap = getCachedSnapshot(companyId);
+    if (companyId) {
+      if (snap.companyDeliverables) setDeliverables(snap.companyDeliverables);
+      if (snap.companyContracts) setContracts(snap.companyContracts);
+    } else {
+      if (snap.allDeliverablesSummary) setDeliverables(snap.allDeliverablesSummary);
+      if (snap.contracts) setContracts(snap.contracts);
+      if (snap.resolvedCompanies) setCompanies(snap.resolvedCompanies);
+      if (snap.groups) setGroups(snap.groups);
+    }
     loadData(true);
-  }, [companyId]);
+
+    const unsub = subscribeToStorageCache(() => {
+      const nextSnap = getCachedSnapshot(companyId);
+      if (companyId) {
+        if (nextSnap.companyDeliverables) setDeliverables(nextSnap.companyDeliverables);
+        if (nextSnap.companyContracts) setContracts(nextSnap.companyContracts);
+      } else {
+        if (nextSnap.allDeliverablesSummary) setDeliverables(nextSnap.allDeliverablesSummary);
+        if (nextSnap.contracts) setContracts(nextSnap.contracts);
+        if (nextSnap.resolvedCompanies) setCompanies(nextSnap.resolvedCompanies);
+        if (nextSnap.groups) setGroups(nextSnap.groups);
+      }
+    });
+    return () => unsub();
+  }, [companyId, loadData]);
 
   const responsiblesOptions = useMemo(() => {
     const map = new Map();
@@ -202,9 +242,9 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
       fileName = await uploadDocument(items[0].file, `deliverables/${companyId}`);
     }
 
-    for (const data of items) {
-      await addDeliverable({ ...data, fileName, companyId });
-    }
+    await Promise.all(
+      items.map(data => addDeliverable({ ...data, fileName, companyId }))
+    );
 
     setShowModal(false);
     await loadData(false);
@@ -232,7 +272,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
       await loadData(false);
       if (onUpdate) onUpdate();
     } else {
-      alert('Erro ao fazer upload do arquivo.');
+      alert(sanitizeErrorMessage(null, 'Não foi possível enviar o arquivo no momento.'));
     }
     setUploadingId(null);
   };
@@ -252,11 +292,136 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
     );
   };
 
+  const selectedIdsSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const indexedDeliverables = useMemo(() => {
+    const fmtDate = (val) => {
+      if (!val) return '';
+      const dt = val instanceof Date ? val : new Date(val);
+      return Number.isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    };
+
+    return deliverables.map(d => {
+      const itemIsPcaPprAet = isPcaPprAet(d);
+      const itemIsProgram = !itemIsPcaPprAet && d.type === 'programa' && isProgram(d);
+      const itemIsDelivered = isDelivered(d);
+      const itemIsPending = isPendingDeliverable(d);
+      const itemIsExpired = isItemExpired(d, today);
+      const effectiveStatus = itemIsPcaPprAet && !itemIsDelivered && d.status !== 'cancelado'
+        ? 'nao_se_aplica'
+        : ((!itemIsProgram && d.status === 'vencido') ? 'pendente' : d.status);
+      const effVal = itemIsProgram ? getEffectiveValidityDate(d) : null;
+      const normSup = normalizeText(d.supervisor);
+      const normTec = normalizeText(d.tecnicoResponsavel);
+      const searchBlob = `${normalizeText(d.title)}|${normalizeText(d.companyName)}|${normalizeText(d.groupName)}|${normSup}|${normTec}`;
+
+      return {
+        ...d,
+        _isPcaPprAet: itemIsPcaPprAet,
+        _isProgram: itemIsProgram,
+        _isDelivered: itemIsDelivered,
+        _isPending: itemIsPending,
+        _isExpired: itemIsExpired,
+        _effectiveStatus: effectiveStatus,
+        _normSup: normSup,
+        _normTec: normTec,
+        _searchBlob: searchBlob,
+        _fmtEmissao: fmtDate(d.dataEmissao || d.dataEnvio),
+        _fmtValidade: effVal ? fmtDate(effVal) : '',
+        _fmtRevisao: fmtDate(d.ultimaRevisao),
+        _fmtDelivered: fmtDate(d.deliveredDate),
+      };
+    });
+  }, [deliverables, today]);
+
+  const normRespFilter = useMemo(() => normalizeText(filterResponsible), [filterResponsible]);
+  const normQuery = useMemo(() => normalizeText(deferredSearchTerm), [deferredSearchTerm]);
+
+  const statsBase = useMemo(() => {
+    return indexedDeliverables.filter(d => {
+      if (!companyId && filterGroup !== 'all' && d.groupId !== filterGroup) return false;
+      if (!companyId && filterCompany !== 'all' && d.companyId !== filterCompany) return false;
+      if (!companyId && filterResponsible !== 'all' && d._normSup !== normRespFilter && d._normTec !== normRespFilter) return false;
+      if (normQuery && !d._searchBlob.includes(normQuery)) return false;
+      return true;
+    });
+  }, [indexedDeliverables, companyId, filterGroup, filterCompany, filterResponsible, normRespFilter, normQuery]);
+
+  const filtered = useMemo(() => {
+    return statsBase.filter(d => {
+      if (filterType !== 'all' && d.type !== filterType) return false;
+      if (filterContract !== 'all' && d.contractId !== filterContract) return false;
+      if (filterStatus === 'all') return true;
+      if (filterStatus === 'vencido') return d._isExpired;
+      if (filterStatus === 'entregue') return d._isDelivered && !d._isExpired;
+      if (filterStatus === 'pendente') return d.status === 'pendente' && !d._isPcaPprAet;
+      return d.status === filterStatus;
+    });
+  }, [statsBase, filterType, filterStatus, filterContract]);
+
+  const stats = useMemo(() => {
+    let entregue = 0;
+    let pendente = 0;
+    let em_elaboracao = 0;
+    let vencidos = 0;
+    for (let i = 0; i < statsBase.length; i++) {
+      const d = statsBase[i];
+      if (d._isExpired) vencidos++;
+      else if (d._isDelivered) entregue++;
+      if (d._isPending && !d._isExpired) pendente++;
+      if (d.status === 'em_elaboracao' && !d._isPcaPprAet) em_elaboracao++;
+    }
+    return {
+      total: statsBase.length,
+      entregue,
+      pendente,
+      em_elaboracao,
+      vencidos,
+    };
+  }, [statsBase]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [companyId, filterGroup, filterCompany, filterResponsible, filterType, filterStatus, filterContract, normQuery]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || visibleCount >= filtered.length) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filtered.length));
+        }
+      },
+      { rootMargin: '400px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visibleCount, filtered.length]);
+
+  const visibleDeliverables = useMemo(() => {
+    return filtered.slice(0, visibleCount);
+  }, [filtered, visibleCount]);
+
+  const allFilteredSelected = useMemo(() => {
+    if (filtered.length === 0 || selectedIdsSet.size < filtered.length) return false;
+    for (let i = 0; i < filtered.length; i++) {
+      if (!selectedIdsSet.has(filtered[i].id)) return false;
+    }
+    return true;
+  }, [filtered, selectedIdsSet]);
+
   const handleToggleSelectAll = () => {
     const visibleIds = filtered.map(d => d.id);
-    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
-    if (allSelected) {
-      setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    if (allFilteredSelected) {
+      const removeSet = new Set(visibleIds);
+      setSelectedIds(prev => prev.filter(id => !removeSet.has(id)));
     } else {
       setSelectedIds(prev => Array.from(new Set([...prev, ...visibleIds])));
     }
@@ -276,8 +441,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
       await loadData(false);
       if (onUpdate) onUpdate();
     } catch (err) {
-      console.error('Erro ao excluir entregáveis:', err);
-      alert('Erro ao excluir os entregáveis selecionados.');
+      alert(sanitizeErrorMessage(err, 'Não foi possível excluir os entregáveis selecionados.'));
     } finally {
       setDeletingBulk(false);
     }
@@ -293,53 +457,6 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando entregáveis...</div>;
   }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const normRespFilter = normalizeText(filterResponsible);
-
-  const matchesScope = (d) => {
-    const matchGroup = companyId || filterGroup === 'all' || d.groupId === filterGroup;
-    const matchCompany = companyId || filterCompany === 'all' || d.companyId === filterCompany;
-    const matchResponsible = companyId || filterResponsible === 'all' ||
-      normalizeText(d.supervisor) === normRespFilter ||
-      normalizeText(d.tecnicoResponsavel) === normRespFilter;
-    const q = normalizeText(searchTerm);
-    const matchSearch = !q ||
-      normalizeText(d.title).includes(q) ||
-      normalizeText(d.companyName).includes(q) ||
-      normalizeText(d.groupName).includes(q) ||
-      normalizeText(d.supervisor).includes(q) ||
-      normalizeText(d.tecnicoResponsavel).includes(q);
-    return matchGroup && matchCompany && matchResponsible && matchSearch;
-  };
-
-  const statsBase = deliverables.filter(matchesScope);
-
-  const filtered = statsBase.filter(d => {
-    const matchType = filterType === 'all' || d.type === filterType;
-    const isExpired = isItemExpired(d, today);
-    const pcaPprAet = isPcaPprAet(d);
-
-    let matchStatus = false;
-    if (filterStatus === 'all') matchStatus = true;
-    else if (filterStatus === 'vencido') matchStatus = isExpired;
-    else if (filterStatus === 'entregue') matchStatus = isDelivered(d) && !isExpired;
-    else if (filterStatus === 'pendente') matchStatus = d.status === 'pendente' && !pcaPprAet;
-    else matchStatus = d.status === filterStatus;
-
-    const matchContract = filterContract === 'all' || d.contractId === filterContract;
-    return matchType && matchStatus && matchContract;
-  });
-
-  const stats = {
-    total: statsBase.length,
-    entregue: statsBase.filter(d => isDelivered(d) && !isItemExpired(d, today)).length,
-    pendente: statsBase.filter(d => isPendingDeliverable(d) && !isItemExpired(d, today)).length,
-    em_elaboracao: statsBase.filter(d => d.status === 'em_elaboracao' && !isPcaPprAet(d)).length,
-    vencidos: statsBase.filter(d => isItemExpired(d, today)).length,
-  };
 
   return (
     <div>
@@ -568,7 +685,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
             }}>
               <input
                 type="checkbox"
-                checked={filtered.length > 0 && filtered.every(d => selectedIds.includes(d.id))}
+                checked={allFilteredSelected}
                 onChange={handleToggleSelectAll}
                 style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }}
               />
@@ -640,15 +757,14 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
           ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '1rem' }
           : { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
       }>
-        {filtered.map(d => {
-          const itemIsPcaPprAet = isPcaPprAet(d);
-          const itemIsProgram = !itemIsPcaPprAet && d.type === 'programa' && isProgram(d);
+        {visibleDeliverables.map(d => {
+          const itemIsPcaPprAet = d._isPcaPprAet;
+          const itemIsProgram = d._isProgram;
           const typeConf = TYPE_CONFIG[d.type] || TYPE_CONFIG.contrato;
-          const isExpired = isItemExpired(d, today);
-          const effectiveStatus = itemIsPcaPprAet && !isDelivered(d) && d.status !== 'cancelado'
-            ? 'nao_se_aplica'
-            : ((!itemIsProgram && d.status === 'vencido') ? 'pendente' : d.status);
+          const isExpired = d._isExpired;
+          const effectiveStatus = d._effectiveStatus;
           const statusConf = isExpired ? STATUS_CONFIG.vencido : (STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pendente);
+          const isSelected = selectedIdsSet.has(d.id);
 
           return (
             <div key={d.id} className="card" style={{ 
@@ -656,10 +772,12 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
               flexDirection: viewMode === 'grid' ? 'column' : 'row', 
               gap: viewMode === 'grid' ? '0.75rem' : '1.5rem',
               alignItems: viewMode === 'grid' ? 'stretch' : 'center',
-              border: selectedIds.includes(d.id) ? '1.5px solid var(--primary)' : isExpired ? '1px solid #fca5a5' : '1px solid var(--border)',
+              border: isSelected ? '1.5px solid var(--primary)' : isExpired ? '1px solid #fca5a5' : '1px solid var(--border)',
               borderLeft: isExpired ? '4px solid #dc2626' : undefined,
-              backgroundColor: selectedIds.includes(d.id) ? 'rgba(14, 165, 233, 0.04)' : isExpired ? '#fffbfa' : 'var(--surface)',
-              transition: 'all 0.2s ease'
+              backgroundColor: isSelected ? 'rgba(14, 165, 233, 0.04)' : isExpired ? '#fffbfa' : 'var(--surface)',
+              transition: 'all 0.2s ease',
+              contentVisibility: 'auto',
+              containIntrinsicSize: viewMode === 'grid' ? '260px' : '90px'
             }}>
               {/* Header (Type & Status for Grid, Just Type for List) */}
               <div style={{ 
@@ -672,7 +790,7 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                   <input
                     type="checkbox"
-                    checked={selectedIds.includes(d.id)}
+                    checked={isSelected}
                     onChange={() => handleToggleSelect(d.id)}
                     onClick={(e) => e.stopPropagation()}
                     style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }}
@@ -718,22 +836,20 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                 {/* Meta details if in list mode to save space */}
                 {viewMode === 'list' && (
                   <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                    {(d.dataEmissao || d.dataEnvio) && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>}
-                    {itemIsProgram && (() => {
-                      const effVal = getEffectiveValidityDate(d);
-                      if (effVal) {
-                        return (
-                          <span style={{ color: isExpired ? '#dc2626' : 'inherit', fontWeight: isExpired ? '700' : 'normal' }}>
-                            Validade: {new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} {isExpired && '⚠️ Vencido'}
-                          </span>
-                        );
-                      }
-                      return <span>Validade: <strong style={{ color: 'var(--text-secondary)' }}>Sem validade</strong></span>;
-                    })()}
-                    {d.ultimaRevisao && (
-                      <span>Revisão: <strong style={{ color: 'var(--text-primary)' }}>{new Date(d.ultimaRevisao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></span>
+                    {d._fmtEmissao && <span>Data de Emissão: <strong style={{ color: 'var(--text-primary)' }}>{d._fmtEmissao}</strong></span>}
+                    {itemIsProgram && (
+                      d._fmtValidade ? (
+                        <span style={{ color: isExpired ? '#dc2626' : 'inherit', fontWeight: isExpired ? '700' : 'normal' }}>
+                          Validade: {d._fmtValidade} {isExpired && '⚠️ Vencido'}
+                        </span>
+                      ) : (
+                        <span>Validade: <strong style={{ color: 'var(--text-secondary)' }}>Sem validade</strong></span>
+                      )
                     )}
-                    {d.deliveredDate && <span>Entregue em: {new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>}
+                    {d._fmtRevisao && (
+                      <span>Revisão: <strong style={{ color: 'var(--text-primary)' }}>{d._fmtRevisao}</strong></span>
+                    )}
+                    {d._fmtDelivered && <span>Entregue em: {d._fmtDelivered}</span>}
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                       <ShieldCheck size={13} color="var(--primary)" /> Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{d.supervisor || 'Não definido'}</strong>
                     </span>
@@ -763,32 +879,26 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>Data de Emissão:</span>
-                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{(d.dataEmissao || d.dataEnvio) ? new Date(d.dataEmissao || d.dataEnvio).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Sem data'}</span>
+                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{d._fmtEmissao || 'Sem data'}</span>
                   </div>
                   {itemIsProgram && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: isExpired ? 'var(--danger)' : 'inherit', fontWeight: isExpired ? '600' : 'normal' }}>Validade:</span>
                       <span style={{ fontWeight: '600', color: isExpired ? 'var(--danger)' : 'var(--primary)' }}>
-                        {(() => {
-                          const effVal = getEffectiveValidityDate(d);
-                          if (effVal) {
-                            return `${new Date(effVal).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${isExpired ? '⚠️' : ''}`;
-                          }
-                          return 'Sem validade';
-                        })()}
+                        {d._fmtValidade ? `${d._fmtValidade} ${isExpired ? '⚠️' : ''}` : 'Sem validade'}
                       </span>
                     </div>
                   )}
-                  {d.ultimaRevisao && (
+                  {d._fmtRevisao && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Última Revisão:</span>
-                      <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{new Date(d.ultimaRevisao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                      <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{d._fmtRevisao}</span>
                     </div>
                   )}
-                  {d.deliveredDate && (
+                  {d._fmtDelivered && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Entregue em:</span>
-                      <span style={{ fontWeight: '500', color: 'var(--secondary)' }}>{new Date(d.deliveredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                      <span style={{ fontWeight: '500', color: 'var(--secondary)' }}>{d._fmtDelivered}</span>
                     </div>
                   )}
                   <div style={{
@@ -980,6 +1090,41 @@ const DeliverablesViewer = ({ companyId, onUpdate }) => {
           );
         })}
       </div>
+
+      {visibleCount < filtered.length && (
+        <div
+          ref={sentinelRef}
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '1.25rem 1rem',
+            marginTop: '1rem',
+            flexWrap: 'wrap'
+          }}
+        >
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+            Exibindo <strong>{visibleDeliverables.length}</strong> de <strong>{filtered.length}</strong> entregáveis
+          </span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filtered.length))}
+            style={{ fontSize: '0.8125rem', padding: '0.4rem 0.9rem' }}
+          >
+            Mostrar mais (+{Math.min(PAGE_SIZE, filtered.length - visibleCount)})
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setVisibleCount(filtered.length)}
+            style={{ fontSize: '0.8125rem', padding: '0.4rem 0.9rem' }}
+          >
+            Mostrar todos ({filtered.length})
+          </button>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>

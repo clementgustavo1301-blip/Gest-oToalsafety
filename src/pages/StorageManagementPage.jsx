@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Database, HardDrive, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { sanitizeErrorMessage } from '../utils/errorPolicy';
+import { invalidateStorageCache } from '../services/storageService';
 
 const TABLES = [
   'companies',
@@ -85,15 +87,16 @@ const StorageManagementPage = () => {
 
     setClearing(table);
     try {
-      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Deletes all rows where ID is not zero-uuid (which matches all standard UUIDs)
+      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (error) {
-        alert(`Erro ao limpar a tabela ${table}: ${error.message}`);
+        alert(sanitizeErrorMessage(error, 'Não foi possível limpar os registros selecionados.'));
       } else {
-        alert(`Tabela ${table} limpa com sucesso.`);
+        invalidateStorageCache();
+        alert('Registros limpos com sucesso.');
         await fetchStats();
       }
     } catch (err) {
-      alert(`Erro inesperado ao limpar a tabela ${table}.`);
+      alert(sanitizeErrorMessage(err, 'Não foi possível limpar os registros selecionados.'));
     }
     setClearing(null);
   };

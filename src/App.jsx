@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MobileTopBar from './components/MobileTopBar';
@@ -6,32 +6,33 @@ import Dashboard from './pages/Dashboard';
 import CalendarView from './pages/CalendarView';
 import CompaniesPage from './pages/CompaniesPage';
 import CompanyDetailsPage from './pages/CompanyDetailsPage';
-
 import DeliverablesPage from './pages/DeliverablesPage';
 import InventoryPage from './pages/InventoryPage';
-import AIAssistant from './pages/AIAssistant';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import ConvocationsPage from './pages/ConvocationsPage';
 import ContactsPage from './pages/ContactsPage';
-import ScheduleGeneratorPage from './pages/ScheduleGeneratorPage';
-import ReportsPage from './pages/ReportsPage';
 import TeamPage from './pages/TeamPage';
-import StorageManagementPage from './pages/StorageManagementPage';
-import ExamsBudgetPage from './pages/ExamsBudgetPage';
 import PublicCATPage from './pages/PublicCATPage';
 import CATPage from './pages/CATPage';
-import CertificatesPage from './pages/CertificatesPage';
-import TrainingCertificatesPage from './pages/TrainingCertificatesPage';
 import PublicTrainingEnrollmentPage from './pages/PublicTrainingEnrollmentPage';
 import PublicTrainingSignPage from './pages/PublicTrainingSignPage';
-import SstTvControlCenterPage from './pages/SstTvControlCenterPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileSetup from './components/ProfileSetup';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AIProvider } from './context/AIContext';
 import { ThemeProvider } from './context/ThemeContext';
-import IPASystem from './App.tsx';
+import { prefetchCoreData } from './services/storageService';
+
+const AIAssistant = lazy(() => import('./pages/AIAssistant'));
+const ScheduleGeneratorPage = lazy(() => import('./pages/ScheduleGeneratorPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const StorageManagementPage = lazy(() => import('./pages/StorageManagementPage'));
+const ExamsBudgetPage = lazy(() => import('./pages/ExamsBudgetPage'));
+const CertificatesPage = lazy(() => import('./pages/CertificatesPage'));
+const TrainingCertificatesPage = lazy(() => import('./pages/TrainingCertificatesPage'));
+const SstTvControlCenterPage = lazy(() => import('./pages/SstTvControlCenterPage'));
+const IPASystem = lazy(() => import('./App.tsx'));
 
 // Novo componente para proteger o layout dependendo do perfil
 const AppLayout = () => {
@@ -39,6 +40,12 @@ const AppLayout = () => {
   const { activeLink } = useAuth();
   const openSidebar = useCallback(() => setIsSidebarOpen(true), []);
   const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
+
+  useEffect(() => {
+    if (activeLink) {
+      prefetchCoreData();
+    }
+  }, [activeLink]);
 
   if (!activeLink) {
     return (
@@ -58,6 +65,7 @@ const AppLayout = () => {
           onClick={closeSidebar}
         />
         <main className="main-content">
+          <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Carregando...</div>}>
           <Routes>
             <Route path="/" element={
               activeLink?.sector === 'Treinamento' ? <Navigate to="/training-certificates" replace /> : <Dashboard />
@@ -165,6 +173,7 @@ const AppLayout = () => {
               </ProtectedRoute>
             } />
           </Routes>
+          </Suspense>
         </main>
       </div>
     </AIProvider>

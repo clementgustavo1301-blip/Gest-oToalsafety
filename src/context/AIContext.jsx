@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { sendMessageToAI } from '../services/aiService';
 import { extractTextFromPDF } from '../utils/pdfParser';
+import { sanitizeErrorMessage } from '../utils/errorPolicy';
 
 const AIContext = createContext({});
 
@@ -142,7 +143,7 @@ export const AIProvider = ({ children }) => {
       const errorResponse = {
         id: Date.now() + 1,
         role: 'assistant',
-        text: `⚠️ **Erro:** ${error.message}`
+        text: `⚠️ **Aviso:** ${sanitizeErrorMessage(error, 'Não foi possível processar sua solicitação no momento.')}`
       };
       setMessages(prev => {
         let updated = [...prev, errorResponse];

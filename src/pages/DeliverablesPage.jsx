@@ -5,7 +5,8 @@ import {
   ClipboardList, ShieldCheck, UserCheck, RotateCcw
 } from 'lucide-react';
 import {
-  getAllDeliverablesSummary, getContracts, getCompanies, getGroups, resolveCompaniesWithHeritage
+  getAllDeliverablesSummary, getContracts, getCompanies, getGroups, resolveCompaniesWithHeritage,
+  getCachedSnapshot, subscribeToStorageCache
 } from '../services/storageService';
 import { isPcaPprAet } from '../utils/deliverableTiming';
 import DeliverablesViewer from '../components/DeliverablesViewer';
@@ -35,6 +36,7 @@ const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base'
 const normalizeText = (v) => String(v || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const DeliverablesPage = () => {
+  const initialSnap = useMemo(() => getCachedSnapshot(), []);
   const [filterGroup, setFilterGroup] = useState('all');
   const [filterCompany, setFilterCompany] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
@@ -43,21 +45,24 @@ const DeliverablesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState('deliverables');
 
-  const [allDeliverables, setAllDeliverables] = useState([]);
-  const [allContracts, setAllContracts] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [allDeliverables, setAllDeliverables] = useState(() => initialSnap.allDeliverablesSummary || []);
+  const [allContracts, setAllContracts] = useState(() => initialSnap.contracts || []);
+  const [companies, setCompanies] = useState(() => initialSnap.resolvedCompanies || []);
+  const [groups, setGroups] = useState(() => initialSnap.groups || []);
+  const [loading, setLoading] = useState(() => !initialSnap.hasDeliverablesCache);
 
   useEffect(() => {
+    let mounted = true;
     async function load() {
-      setLoading(true);
+      const snap = getCachedSnapshot();
+      if (!snap.hasDeliverablesCache) setLoading(true);
       const [delivs, contracts, comps, grps] = await Promise.all([
         getAllDeliverablesSummary(),
         getContracts(),
         getCompanies(),
         getGroups()
       ]);
+      if (!mounted) return;
       setAllDeliverables(delivs);
       setAllContracts(contracts);
       setCompanies(resolveCompaniesWithHeritage(comps, grps));
@@ -65,6 +70,19 @@ const DeliverablesPage = () => {
       setLoading(false);
     }
     load();
+
+    const unsub = subscribeToStorageCache(() => {
+      if (!mounted) return;
+      const snap = getCachedSnapshot();
+      if (snap.allDeliverablesSummary) setAllDeliverables(snap.allDeliverablesSummary);
+      if (snap.contracts) setAllContracts(snap.contracts);
+      if (snap.resolvedCompanies) setCompanies(snap.resolvedCompanies);
+      if (snap.groups) setGroups(snap.groups);
+    });
+    return () => {
+      mounted = false;
+      unsub();
+    };
   }, []);
 
   const sortedGroups = useMemo(() => [...groups].sort((a, b) => collator.compare(a.name, b.name)), [groups]);
@@ -105,32 +123,42 @@ const DeliverablesPage = () => {
       .sort((a, b) => collator.compare(a.name, b.name));
   }, [companies, filterGroup, filterResponsible]);
 
-  if (loading) {
-    return <div style={{ textAlign: 'center', padding: '3rem' }}>Carregando entregáveis...</div>;
-  }
+  const normResp = useMemo(() => normalizeText(filterResponsible), [filterResponsible]);
+  const q = useMemo(() => normalizeText(searchTerm), [searchTerm]);
 
-  const normResp = normalizeText(filterResponsible);
-  const q = normalizeText(searchTerm);
+  const filtered = useMemo(() => {
+    if (activeView !== 'contracts') return [];
+    return allDeliverables.filter(d => {
+      const matchGroup = filterGroup === 'all' || d.groupId === filterGroup;
+      const matchCompany = filterCompany === 'all' || d.companyId === filterCompany;
+      const matchResponsible = filterResponsible === 'all' ||
+        normalizeText(d.supervisor) === normResp ||
+        normalizeText(d.tecnicoResponsavel) === normResp;
+      const matchType = filterType === 'all' || d.type === filterType;
+      const effectiveStatus = isPcaPprAet(d) && d.status === 'pendente' ? 'nao_se_aplica' : d.status;
+      const matchStatus = filterStatus === 'all' || effectiveStatus === filterStatus;
+      const matchSearch = !q ||
+        normalizeText(d.title).includes(q) ||
+        normalizeText(d.companyName).includes(q) ||
+        normalizeText(d.groupName).includes(q) ||
+        normalizeText(d.supervisor).includes(q) ||
+        normalizeText(d.tecnicoResponsavel).includes(q);
+      return matchGroup && matchCompany && matchResponsible && matchType && matchStatus && matchSearch;
+    });
+  }, [activeView, allDeliverables, filterGroup, filterCompany, filterResponsible, normResp, filterType, filterStatus, q]);
 
-  const filtered = allDeliverables.filter(d => {
-    const matchGroup = filterGroup === 'all' || d.groupId === filterGroup;
-    const matchCompany = filterCompany === 'all' || d.companyId === filterCompany;
-    const matchResponsible = filterResponsible === 'all' ||
-      normalizeText(d.supervisor) === normResp ||
-      normalizeText(d.tecnicoResponsavel) === normResp;
-    const matchType = filterType === 'all' || d.type === filterType;
-    const effectiveStatus = isPcaPprAet(d) && d.status === 'pendente' ? 'nao_se_aplica' : d.status;
-    const matchStatus = filterStatus === 'all' || effectiveStatus === filterStatus;
-    const matchSearch = !q ||
-      normalizeText(d.title).includes(q) ||
-      normalizeText(d.companyName).includes(q) ||
-      normalizeText(d.groupName).includes(q) ||
-      normalizeText(d.supervisor).includes(q) ||
-      normalizeText(d.tecnicoResponsavel).includes(q);
-    return matchGroup && matchCompany && matchResponsible && matchType && matchStatus && matchSearch;
-  });
+  const deliverablesByContractId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < filtered.length; i++) {
+      const d = filtered[i];
+      if (!d.contractId) continue;
+      if (!map.has(d.contractId)) map.set(d.contractId, []);
+      map.get(d.contractId).push(d);
+    }
+    return map;
+  }, [filtered]);
 
-  const companiesById = new Map(companies.map(c => [c.id, c]));
+  const companiesById = useMemo(() => new Map(companies.map(c => [c.id, c])), [companies]);
 
   const hasContractFilter = Boolean(
     filterGroup !== 'all' ||
@@ -298,7 +326,7 @@ const DeliverablesPage = () => {
                   normalizeText(contractCompany?.effSupervisor) === normResp ||
                   normalizeText(contractCompany?.effTecnico) === normResp)
               );
-              const contractDeliverables = filtered.filter(d => d.contractId === contract.id);
+              const contractDeliverables = deliverablesByContractId.get(contract.id) || [];
               if (!contractMatchesCompanyScope) return null;
               if (contractDeliverables.length === 0 && (filterStatus !== 'all' || filterType !== 'all' || searchTerm)) {
                 return null;

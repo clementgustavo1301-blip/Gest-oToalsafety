@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { sanitizeErrorMessage } from '../utils/errorPolicy';
 import { Users, Search, Plus, Edit2, Trash2, X, AlertCircle, Phone, Mail, Building2, User, Briefcase, MessageCircle } from 'lucide-react';
 
 const ContactsPage = () => {
@@ -126,8 +127,7 @@ const ContactsPage = () => {
       await fetchData();
       handleCloseModal();
     } catch (err) {
-      console.error('Erro ao salvar contato:', err);
-      setError('Erro ao salvar contato: ' + err.message);
+      setError(sanitizeErrorMessage(err, 'Não foi possível salvar o contato no momento.'));
     } finally {
       setSaving(false);
     }

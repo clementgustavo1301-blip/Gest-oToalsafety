@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import { createSafeError, sanitizeErrorMessage } from '../utils/errorPolicy';
+import { invalidateStorageCache } from './storageService';
 
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -159,8 +161,7 @@ export const getAgendaData = async ({
 
     const { data: rawTrainings, error: errT } = await tQuery;
     if (errT) {
-      console.error('[EcoIA Agenda] Erro ao buscar trainings:', errT);
-      throw new Error(`Erro ao buscar agendamentos: ${errT.message}`);
+      throw createSafeError('Não foi possível consultar os agendamentos no momento.');
     }
 
     // Formata eventos de trainings
@@ -268,10 +269,9 @@ export const getAgendaData = async ({
       events: unifiedEvents
     };
   } catch (error) {
-    console.error('[EcoIA Agenda] Erro geral:', error);
     return {
       success: false,
-      error: error.message,
+      error: sanitizeErrorMessage(error, 'Não foi possível consultar a agenda no momento.'),
       events: []
     };
   }
@@ -285,10 +285,10 @@ export const executeDBAction = async (table, action, data = null, filters = null
     const isWriteAction = action === 'insert' || action === 'update' || action === 'delete';
     if (isWriteAction) {
       if (!ALLOWED_WRITE_TABLES.has(table)) {
-        throw new Error(`Operação de escrita bloqueada para a tabela '${table}'.`);
+        throw createSafeError('Operação não permitida.');
       }
     } else if (!ALLOWED_READ_TABLES.has(table)) {
-      throw new Error(`Acesso negado à tabela '${table}'.`);
+      throw createSafeError('Acesso não autorizado.');
     }
 
     let query = supabase.from(table);
@@ -457,20 +457,23 @@ export const executeDBAction = async (table, action, data = null, filters = null
     }
 
     if (response.error) {
-      throw new Error(response.error.message);
+      throw createSafeError('Não foi possível concluir a operação solicitada.');
+    }
+
+    if (isWriteAction) {
+      invalidateStorageCache();
     }
 
     return {
       success: true,
-      message: `Operação ${action} executada com sucesso na tabela ${table}.`,
+      message: 'Operação executada com sucesso.',
       count: Array.isArray(response.data) ? response.data.length : undefined,
       data: response.data
     };
   } catch (error) {
-    console.error('[EcoIA DB Agent] Erro:', error);
     return {
       success: false,
-      error: error.message
+      error: sanitizeErrorMessage(error, 'Não foi possível concluir a operação solicitada.')
     };
   }
 };

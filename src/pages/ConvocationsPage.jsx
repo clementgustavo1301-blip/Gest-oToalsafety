@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { sanitizeErrorMessage } from '../utils/errorPolicy';
 import { Save, AlertCircle, Check, Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
 
 const MONTHS = [
@@ -66,12 +67,10 @@ const ConvocationsPage = () => {
       setConvocations(convMap);
 
     } catch (err) {
-      console.error('Error fetching data:', err);
-      // We don't want to break the UI if the table isn't created yet
       if (err.code === '42P01') {
-         setError('A tabela "convocations" não existe no banco de dados. Execute o script SQL no painel do Supabase para criá-la.');
+        setError('Módulo de convocações ainda não habilitado.');
       } else {
-         setError('Erro ao carregar dados: ' + err.message);
+        setError(sanitizeErrorMessage(err, 'Não foi possível carregar as convocações no momento.'));
       }
     } finally {
       setLoading(false);
@@ -108,8 +107,7 @@ const ConvocationsPage = () => {
       setConvocations(prev => ({ ...prev, [companyId]: data }));
       
     } catch (err) {
-      console.error('Error saving convocation:', err);
-      setError('Erro ao salvar alteração: ' + err.message);
+      setError(sanitizeErrorMessage(err, 'Não foi possível salvar a alteração no momento.'));
       // Revert UI on error
       fetchData();
     } finally {

@@ -3,6 +3,7 @@ import { ChevronRight, LogOut, Moon, Plus, RefreshCw, Sun, UserRound, X } from '
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 import { supabase } from '../lib/supabase';
+import { createSafeError, sanitizeErrorMessage } from '../utils/errorPolicy';
 import SectorIcon from './SectorIcon';
 
 const SECTORS_AND_ROLES = {
@@ -56,7 +57,7 @@ const ProfileSetup = () => {
 
       const existingLink = userLinks.find(link => link.sector === sector && link.role === role);
       if (existingLink) {
-        throw new Error(`Você já possui um vínculo de ${role} em ${sector} com status: ${existingLink.status}.`);
+        throw createSafeError(`Você já possui um vínculo de ${role} em ${sector} com status: ${statusLabels[existingLink.status] || existingLink.status}.`);
       }
 
       const { error: insertError } = await supabase.from('user_links').insert({
@@ -72,7 +73,7 @@ const ProfileSetup = () => {
       setSector('');
       setRole('');
     } catch (error) {
-      setModalError(error.message);
+      setModalError(sanitizeErrorMessage(error, 'Não foi possível solicitar o vínculo no momento.'));
     } finally {
       setModalLoading(false);
     }

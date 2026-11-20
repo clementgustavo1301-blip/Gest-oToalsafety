@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { sanitizeErrorMessage } from '../utils/errorPolicy';
 import { 
   AlertTriangle, FileText, Search, Filter, 
   CheckCircle, Clock, X, Eye, Copy, Download, RefreshCw, Send, CheckCircle2, Printer 
@@ -25,15 +26,13 @@ const CATPage = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.warn('Erro ao carregar CATs ou tabela inexistente:', error.message);
-        setErrorMsg('Erro de conexão ou tabela não encontrada. Verifique se o SQL foi executado.');
+        setErrorMsg(sanitizeErrorMessage(error, 'Não foi possível carregar os registros de CAT no momento.'));
         setCats([]);
       } else {
         setCats(data || []);
       }
     } catch (err) {
-      console.error(err);
-      setErrorMsg('Erro inesperado: ' + err.message);
+      setErrorMsg(sanitizeErrorMessage(err, 'Não foi possível carregar os registros de CAT no momento.'));
       setCats([]);
     } finally {
       setLoading(false);
@@ -65,7 +64,7 @@ const CATPage = () => {
         setSelectedCat({ ...selectedCat, status: newStatus });
       }
     } catch (err) {
-      alert('Erro ao atualizar status: ' + err.message);
+      alert(sanitizeErrorMessage(err, 'Não foi possível atualizar o status do registro.'));
     } finally {
       setIsUpdatingStatus(false);
     }

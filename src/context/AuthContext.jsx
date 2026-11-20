@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { invalidateStorageCache } from '../services/storageService';
 
 const AuthContext = createContext();
 
@@ -163,6 +164,7 @@ export function AuthProvider({ children }) {
     refreshProfile,
     signOut: () => {
       localStorage.removeItem('activeLink');
+      invalidateStorageCache();
       setActiveLinkState(null);
       return supabase.auth.signOut();
     },

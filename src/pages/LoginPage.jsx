@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { sanitizeErrorMessage } from '../utils/errorPolicy';
 import { Building2 } from 'lucide-react';
 
 const LoginPage = () => {
@@ -38,7 +39,7 @@ const LoginPage = () => {
         if (error) throw error;
       }
     } catch (err) {
-      setError(err.message);
+      setError(sanitizeErrorMessage(err, 'Não foi possível autenticar. Verifique suas credenciais.'));
     } finally {
       setLoading(false);
     }

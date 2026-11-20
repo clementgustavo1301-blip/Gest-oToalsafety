@@ -1,6 +1,115 @@
 import { supabase } from '../lib/supabase';
 import { getDefaultValidityMonths, parseSafeDate, isLaudo, isProgram, isPcaPprAet } from '../utils/deliverableTiming';
 import { compressFileForUpload } from '../utils/fileCompressor';
+import { sanitizeErrorMessage, createSafeError, logSafeError } from '../utils/errorPolicy';
+
+// --- Stale-While-Revalidate (SWR) Memory + SessionStorage Cache & Request Deduplicator ---
+const MEMORY_CACHE = new Map();
+const IN_FLIGHT = new Map();
+const CACHE_LISTENERS = new Set();
+const SESSION_CACHE_PREFIX = 'ts_swr_v1_';
+const PERSISTED_KEYS = new Set(['groups', 'companies', 'contracts', 'deliverables', 'trainings', 'profiles']);
+const FRESH_TTL_MS = 25 * 1000; // 25s: retorno instantâneo sem rede
+const STALE_TTL_MS = 10 * 60 * 1000; // 10min: retorno instantâneo + revalidação silenciosa em background
+
+function readCacheEntry(key) {
+  const mem = MEMORY_CACHE.get(key);
+  if (mem && Date.now() - mem.timestamp < STALE_TTL_MS) {
+    return mem;
+  }
+  if (PERSISTED_KEYS.has(key) && typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      const raw = window.sessionStorage.getItem(SESSION_CACHE_PREFIX + key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.data) && Date.now() - parsed.timestamp < STALE_TTL_MS) {
+          MEMORY_CACHE.set(key, parsed);
+          return parsed;
+        }
+      }
+    } catch {
+      // sessionStorage indisponível ou inválido
+    }
+  }
+  return null;
+}
+
+function writeCacheEntry(key, data) {
+  const entry = { data, timestamp: Date.now() };
+  MEMORY_CACHE.set(key, entry);
+  if (PERSISTED_KEYS.has(key) && typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      window.sessionStorage.setItem(SESSION_CACHE_PREFIX + key, JSON.stringify(entry));
+    } catch {
+      // Quota excedida ou sessionStorage indisponível
+    }
+  }
+  CACHE_LISTENERS.forEach((listener) => {
+    try {
+      listener(key, data);
+    } catch {
+      // Ignora erro em listener
+    }
+  });
+}
+
+export function subscribeToStorageCache(listener) {
+  if (typeof listener !== 'function') return () => {};
+  CACHE_LISTENERS.add(listener);
+  return () => {
+    CACHE_LISTENERS.delete(listener);
+  };
+}
+
+export function invalidateStorageCache(keys = null) {
+  const targetKeys = Array.isArray(keys) && keys.length > 0 ? keys : Array.from(PERSISTED_KEYS);
+  targetKeys.forEach((key) => {
+    MEMORY_CACHE.delete(key);
+    IN_FLIGHT.delete(key);
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        window.sessionStorage.removeItem(SESSION_CACHE_PREFIX + key);
+      } catch {
+        // Ignora
+      }
+    }
+  });
+}
+
+function executeDeduplicatedFetch(key, fetcher) {
+  if (IN_FLIGHT.has(key)) {
+    return IN_FLIGHT.get(key);
+  }
+  const promise = Promise.resolve()
+    .then(() => fetcher())
+    .then((result) => {
+      if (Array.isArray(result)) {
+        writeCacheEntry(key, result);
+      }
+      return result;
+    })
+    .finally(() => {
+      IN_FLIGHT.delete(key);
+    });
+
+  IN_FLIGHT.set(key, promise);
+  return promise;
+}
+
+async function fetchWithSWR(key, fetcher, { forceRefresh = false } = {}) {
+  if (!forceRefresh) {
+    const cached = readCacheEntry(key);
+    if (cached) {
+      const age = Date.now() - cached.timestamp;
+      if (age >= FRESH_TTL_MS) {
+        // Stale-while-revalidate: atualiza em background e retorna o cache em 0ms
+        executeDeduplicatedFetch(key, fetcher).catch(() => {});
+      }
+      return cached.data;
+    }
+  }
+  return executeDeduplicatedFetch(key, fetcher);
+}
 
 // --- Helpers to map between DB (snake_case) and Frontend (camelCase) ---
 
@@ -171,23 +280,34 @@ function mapDeliverable(row) {
 }
 
 export function resolveCompaniesWithHeritage(companies = [], groups = []) {
-  const groupsMap = {};
-  groups.forEach(g => { groupsMap[g.id] = g; });
+  const groupsMap = new Map();
+  groups.forEach(g => { groupsMap.set(g.id, g); });
 
-  const groupResolvedTeam = {};
+  const companiesByGroup = new Map();
+  companies.forEach(c => {
+    if (!c.groupId) return;
+    let list = companiesByGroup.get(c.groupId);
+    if (!list) {
+      list = [];
+      companiesByGroup.set(c.groupId, list);
+    }
+    list.push(c);
+  });
+
+  const groupResolvedTeam = new Map();
   groups.forEach(g => {
-    const compsInG = companies.filter(c => c.groupId === g.id);
+    const compsInG = companiesByGroup.get(g.id) || [];
     const sup = g.supervisor || compsInG.find(c => c.supervisor)?.supervisor || compsInG.find(c => c.supportResponsible)?.supportResponsible || '';
     const tec = g.tecnicoResponsavel || compsInG.find(c => c.tecnicoResponsavel)?.tecnicoResponsavel || compsInG.find(c => c.responsible)?.responsible || '';
     const vis = (g.visitasTecnicas && g.visitasTecnicas !== 'N/A')
       ? g.visitasTecnicas
       : (compsInG.find(c => c.visitasTecnicas && c.visitasTecnicas !== 'N/A')?.visitasTecnicas || 'N/A');
-    groupResolvedTeam[g.id] = { sup, tec, vis };
+    groupResolvedTeam.set(g.id, { sup, tec, vis });
   });
 
   return companies.map(c => {
-    const g = groupsMap[c.groupId];
-    const gResolved = c.groupId ? groupResolvedTeam[c.groupId] : null;
+    const g = c.groupId ? groupsMap.get(c.groupId) : null;
+    const gResolved = c.groupId ? groupResolvedTeam.get(c.groupId) : null;
     const effSupervisor = gResolved?.sup || g?.supervisor || c.supervisor || c.supportResponsible || '';
     const effTecnico = gResolved?.tec || g?.tecnicoResponsavel || c.tecnicoResponsavel || c.responsible || '';
     const effVisitas = (gResolved?.vis && gResolved.vis !== 'N/A')
@@ -201,6 +321,98 @@ export function resolveCompaniesWithHeritage(companies = [], groups = []) {
       effVisitas: effVisitas || 'N/A',
     };
   });
+}
+
+function buildDeliverablesSummary(deliverables = [], companies = [], groups = [], contracts = []) {
+  const resolvedCompanies = resolveCompaniesWithHeritage(companies, groups);
+  const companiesById = new Map(resolvedCompanies.map(c => [c.id, c]));
+  const contractsById = new Map(contracts.map(c => [c.id, c]));
+
+  return deliverables.map(d => {
+    const comp = companiesById.get(d.companyId);
+    return {
+      ...d,
+      companyName: comp?.name || 'N/A',
+      groupId: comp?.groupId || null,
+      groupName: comp?.groupName || 'Sem Grupo',
+      supervisor: comp?.effSupervisor || 'Não definido',
+      tecnicoResponsavel: comp?.effTecnico || 'Não definido',
+      contractNumber: contractsById.get(d.contractId)?.contractNumber || 'N/A',
+    };
+  });
+}
+
+/**
+ * Leitura síncrona (0ms) do snapshot em cache para inicialização imediata de telas
+ * (Dashboard, Entregáveis, Empresas e Detalhes da Empresa) sem spinner de carregamento.
+ */
+export function getCachedSnapshot(companyId = null) {
+  const groupsEntry = readCacheEntry('groups');
+  const companiesEntry = readCacheEntry('companies');
+  const contractsEntry = readCacheEntry('contracts');
+  const deliverablesEntry = readCacheEntry('deliverables');
+  const trainingsEntry = readCacheEntry('trainings');
+  const profilesEntry = readCacheEntry('profiles');
+
+  const groups = groupsEntry?.data || null;
+  const companies = companiesEntry?.data || null;
+  const contracts = contractsEntry?.data || null;
+  const deliverables = deliverablesEntry?.data || null;
+  const trainings = trainingsEntry?.data || null;
+  const profiles = profilesEntry?.data || null;
+
+  const resolvedCompanies = (companies && groups) ? resolveCompaniesWithHeritage(companies, groups) : [];
+  const allDeliverablesSummary = (deliverables && companies && groups)
+    ? buildDeliverablesSummary(deliverables, companies, groups, contracts || [])
+    : [];
+
+  let company = null;
+  let group = null;
+  let companyDeliverables = [];
+  let companyContracts = [];
+  let companyTrainings = [];
+
+  if (companyId) {
+    company = resolvedCompanies.find(c => c.id === companyId) || (companies ? companies.find(c => c.id === companyId) || null : null);
+    group = (groups && company?.groupId) ? groups.find(g => g.id === company.groupId) || null : null;
+    companyDeliverables = allDeliverablesSummary.filter(d => d.companyId === companyId);
+    companyContracts = contracts ? contracts.filter(c => c.companyId === companyId) : [];
+    companyTrainings = trainings ? trainings.filter(t => t.companyId === companyId) : [];
+  }
+
+  return {
+    groups: groups || [],
+    companies: companies || [],
+    resolvedCompanies,
+    contracts: contracts || [],
+    deliverables: deliverables || [],
+    allDeliverablesSummary,
+    trainings: trainings || [],
+    profiles: profiles || [],
+    company,
+    group,
+    companyDeliverables,
+    companyContracts,
+    companyTrainings,
+    hasCoreCache: Boolean(companies && groups && deliverables && contracts && trainings),
+    hasDeliverablesCache: Boolean(deliverables && companies && groups && contracts),
+    hasCompaniesCache: Boolean(companies && groups),
+    hasCompanyDetailsCache: Boolean(companyId && company && groups && deliverables && trainings),
+  };
+}
+
+/**
+ * Pré-aquece os dados principais em background logo após a autenticação.
+ */
+export function prefetchCoreData() {
+  return Promise.all([
+    getGroups(),
+    getCompanies(),
+    getContracts(),
+    getDeliverables(),
+    getTrainings(),
+    getProfiles(),
+  ]).catch(() => {});
 }
 
 function mapTraining(row) {
@@ -238,10 +450,15 @@ function mapTraining(row) {
 }
 
 // --- Groups ---
-export async function getGroups() {
-  const { data, error } = await supabase.from('groups').select('*').order('created_at', { ascending: true });
-  if (error) { console.error('Error fetching groups:', error); return []; }
-  return data.map(mapGroup);
+export async function getGroups(options = {}) {
+  return fetchWithSWR('groups', async () => {
+    const { data, error } = await supabase.from('groups').select('*').order('created_at', { ascending: true });
+    if (error) {
+      logSafeError('getGroups', error);
+      return [];
+    }
+    return (data || []).map(mapGroup);
+  }, options);
 }
 
 export async function addGroup(group) {
@@ -256,10 +473,12 @@ export async function addGroup(group) {
   const res1 = await supabase.from('groups').insert([extendedPayload]).select().single();
   if (res1.error && res1.error.message && (res1.error.message.includes('column') || res1.error.code === 'PGRST204')) {
     const res2 = await supabase.from('groups').insert([basePayload]).select().single();
-    if (res2.error) { console.error('Error adding group:', res2.error); return null; }
+    if (res2.error) { logSafeError('addGroup', res2.error); return null; }
+    invalidateStorageCache(['groups', 'companies']);
     return mapGroup(res2.data);
   }
-  if (res1.error) { console.error('Error adding group:', res1.error); return null; }
+  if (res1.error) { logSafeError('addGroup', res1.error); return null; }
+  invalidateStorageCache(['groups', 'companies']);
   return mapGroup(res1.data);
 }
 
@@ -329,33 +548,57 @@ export async function updateGroup(groupId, updates) {
       }
     }
   } catch (syncErr) {
-    console.error('Erro ao sincronizar empresas do grupo:', syncErr);
+    logSafeError('updateGroup.sync', syncErr);
   }
 
+  invalidateStorageCache(['groups', 'companies']);
   return groupResult;
 }
 
 export async function deleteGroup(groupId) {
   const { error } = await supabase.from('groups').delete().eq('id', groupId);
-  if (error) console.error('Error deleting group:', error);
+  if (error) logSafeError('deleteGroup', error);
+  invalidateStorageCache(['groups', 'companies', 'deliverables', 'contracts', 'trainings']);
 }
 
 // --- Companies ---
-export async function getCompanies() {
-  const { data, error } = await supabase.from('companies').select('*').order('name', { ascending: true });
-  if (error) { console.error('Error fetching companies:', error); return []; }
-  return data.map(mapCompany);
+export async function getCompanies(options = {}) {
+  return fetchWithSWR('companies', async () => {
+    const { data, error } = await supabase.from('companies').select('*').order('name', { ascending: true });
+    if (error) {
+      logSafeError('getCompanies', error);
+      return [];
+    }
+    return (data || []).map(mapCompany);
+  }, options);
 }
 
 export async function getCompaniesByGroup(groupId) {
+  const cached = readCacheEntry('companies');
+  if (cached && Array.isArray(cached.data)) {
+    if (Date.now() - cached.timestamp >= FRESH_TTL_MS) {
+      getCompanies({ forceRefresh: true }).catch(() => {});
+    }
+    return cached.data.filter(c => c.groupId === groupId);
+  }
   const { data, error } = await supabase.from('companies').select('*').eq('group_id', groupId);
-  if (error) { console.error('Error fetching companies by group:', error); return []; }
-  return data.map(mapCompany);
+  if (error) { logSafeError('getCompaniesByGroup', error); return []; }
+  return (data || []).map(mapCompany);
 }
 
 export async function getCompanyById(companyId) {
+  const cached = readCacheEntry('companies');
+  if (cached && Array.isArray(cached.data)) {
+    const found = cached.data.find(c => c.id === companyId);
+    if (found) {
+      if (Date.now() - cached.timestamp >= FRESH_TTL_MS) {
+        getCompanies({ forceRefresh: true }).catch(() => {});
+      }
+      return found;
+    }
+  }
   const { data, error } = await supabase.from('companies').select('*').eq('id', companyId).single();
-  if (error) { console.error('Error fetching company:', error); return null; }
+  if (error) { logSafeError('getCompanyById', error); return null; }
   return mapCompany(data);
 }
 
@@ -449,15 +692,16 @@ export async function addCompany(company) {
   }
 
   if (error) { 
-    console.error('Error adding company:', error); 
+    logSafeError('addCompany', error);
     if (error.code === '23505') {
       alert('Erro: Já existe uma empresa cadastrada com este CNPJ!');
     } else {
-      alert(`Erro ao adicionar empresa: ${error.message}`);
+      alert(sanitizeErrorMessage(error, 'Não foi possível adicionar a empresa.'));
     }
     return null; 
   }
 
+  invalidateStorageCache(['companies', 'groups']);
   return mapCompany(data);
 }
 
@@ -640,10 +884,11 @@ export async function updateCompany(companyId, updates) {
         }
       }
     } catch (groupSyncErr) {
-      console.warn('Erro ao sincronizar dados com o grupo e empresas irmãs:', groupSyncErr);
+      logSafeError('updateCompany.groupSync', groupSyncErr);
     }
   }
 
+  invalidateStorageCache(['companies', 'groups']);
   return mapCompany(data);
 }
 
@@ -655,24 +900,34 @@ export async function deleteCompany(companyId) {
 
   const { error } = await supabase.from('companies').delete().eq('id', companyId);
   if (error) {
-    console.error('Error deleting company:', error);
-    alert(`Erro ao excluir empresa: ${error.message}`);
+    logSafeError('deleteCompany', error);
+    alert(sanitizeErrorMessage(error, 'Não foi possível excluir a empresa.'));
     return false;
   }
+  invalidateStorageCache(['companies', 'groups', 'deliverables', 'contracts', 'trainings']);
   return true;
 }
 
 // --- Trainings ---
-export async function getTrainings() {
-  const { data, error } = await supabase.from('trainings').select('*').order('date', { ascending: true });
-  if (error) { console.error('Error fetching trainings:', error); return []; }
-  return data.map(mapTraining);
+export async function getTrainings(options = {}) {
+  return fetchWithSWR('trainings', async () => {
+    const { data, error } = await supabase.from('trainings').select('*').order('date', { ascending: true });
+    if (error) { logSafeError('getTrainings', error); return []; }
+    return (data || []).map(mapTraining);
+  }, options);
 }
 
 export async function getTrainingsByCompany(companyId) {
+  const cached = readCacheEntry('trainings');
+  if (cached && Array.isArray(cached.data)) {
+    if (Date.now() - cached.timestamp >= FRESH_TTL_MS) {
+      getTrainings({ forceRefresh: true }).catch(() => {});
+    }
+    return cached.data.filter(t => t.companyId === companyId);
+  }
   const { data, error } = await supabase.from('trainings').select('*').eq('company_id', companyId).order('date', { ascending: true });
-  if (error) { console.error('Error fetching trainings by company:', error); return []; }
-  return data.map(mapTraining);
+  if (error) { logSafeError('getTrainingsByCompany', error); return []; }
+  return (data || []).map(mapTraining);
 }
 
 export async function addTraining(training) {
@@ -717,12 +972,13 @@ export async function addTraining(training) {
     error = res1.error;
   }
 
-  if (error) { console.error('Error adding training:', error); return null; }
+  if (error) { logSafeError('addTraining', error); return null; }
 
   if (training.deliverableId) {
     await supabase.from('deliverables').update({ status: 'agendado' }).eq('id', training.deliverableId);
   }
 
+  invalidateStorageCache(['trainings', 'deliverables']);
   return mapTraining(data);
 }
 
@@ -767,7 +1023,7 @@ export async function updateTraining(trainingId, updates) {
     error = res1.error;
   }
 
-  if (error) { console.error('Error updating training:', error); return null; }
+  if (error) { logSafeError('updateTraining', error); return null; }
 
   // Sincronizar com deliverables
   if (data.deliverable_id && updates.status) {
@@ -779,6 +1035,7 @@ export async function updateTraining(trainingId, updates) {
     await supabase.from('deliverables').update({ status: delivStatus }).eq('id', data.deliverable_id);
   }
 
+  invalidateStorageCache(['trainings', 'deliverables']);
   return mapTraining(data);
 }
 
@@ -788,7 +1045,7 @@ export async function deleteTraining(trainingId) {
 
   const { error } = await supabase.from('trainings').delete().eq('id', trainingId);
   if (error) {
-    console.error('Error deleting training:', error);
+    logSafeError('deleteTraining', error);
     return;
   }
 
@@ -796,19 +1053,29 @@ export async function deleteTraining(trainingId) {
   if (training && training.deliverable_id) {
     await supabase.from('deliverables').update({ status: 'pendente' }).eq('id', training.deliverable_id);
   }
+  invalidateStorageCache(['trainings', 'deliverables']);
 }
 
 // --- Contracts ---
-export async function getContracts() {
-  const { data, error } = await supabase.from('contracts').select('*');
-  if (error) { console.error('Error fetching contracts:', error); return []; }
-  return data.map(mapContract);
+export async function getContracts(options = {}) {
+  return fetchWithSWR('contracts', async () => {
+    const { data, error } = await supabase.from('contracts').select('*');
+    if (error) { logSafeError('getContracts', error); return []; }
+    return (data || []).map(mapContract);
+  }, options);
 }
 
 export async function getContractsByCompany(companyId) {
+  const cached = readCacheEntry('contracts');
+  if (cached && Array.isArray(cached.data)) {
+    if (Date.now() - cached.timestamp >= FRESH_TTL_MS) {
+      getContracts({ forceRefresh: true }).catch(() => {});
+    }
+    return cached.data.filter(c => c.companyId === companyId);
+  }
   const { data, error } = await supabase.from('contracts').select('*').eq('company_id', companyId);
-  if (error) { console.error('Error fetching contracts by company:', error); return []; }
-  return data.map(mapContract);
+  if (error) { logSafeError('getContractsByCompany', error); return []; }
+  return (data || []).map(mapContract);
 }
 
 export async function addContract(contract) {
@@ -832,10 +1099,11 @@ export async function addContract(contract) {
     file_path: contract.filePath
   }]).select().single();
   if (error) {
-    console.error('Error adding contract:', error);
-    alert(`Erro ao adicionar contrato: ${error.message}`);
+    logSafeError('addContract', error);
+    alert(sanitizeErrorMessage(error, 'Não foi possível adicionar o contrato.'));
     return null;
   }
+  invalidateStorageCache(['contracts']);
   return mapContract(data);
 }
 
@@ -845,7 +1113,8 @@ export async function updateContract(contractId, updates) {
   if (updates.filePath !== undefined) snakeUpdates.file_path = updates.filePath;
 
   const { data, error } = await supabase.from('contracts').update(snakeUpdates).eq('id', contractId).select().single();
-  if (error) { console.error('Error updating contract:', error); return null; }
+  if (error) { logSafeError('updateContract', error); return null; }
+  invalidateStorageCache(['contracts']);
   return mapContract(data);
 }
 
@@ -855,24 +1124,44 @@ function isS2240Row(row) {
   return t.includes('2240');
 }
 
-export async function getDeliverables() {
-  const { data, error } = await supabase.from('deliverables').select('*').order('due_date', { ascending: true });
-  if (error) { console.error('Error fetching deliverables:', error); return []; }
-  return data.filter(row => !isS2240Row(row)).map(mapDeliverable);
+export async function getDeliverables(options = {}) {
+  return fetchWithSWR('deliverables', async () => {
+    const { data, error } = await supabase.from('deliverables').select('*').order('due_date', { ascending: true });
+    if (error) { logSafeError('getDeliverables', error); return []; }
+    return (data || []).filter(row => !isS2240Row(row)).map(mapDeliverable);
+  }, options);
 }
 
 export async function getDeliverablesByCompany(companyId) {
+  const cachedDeliv = readCacheEntry('deliverables');
+  const cachedComp = readCacheEntry('companies');
+  const cachedGrp = readCacheEntry('groups');
+  const cachedCtr = readCacheEntry('contracts');
+
+  if (cachedDeliv && cachedComp && cachedGrp) {
+    if (Date.now() - cachedDeliv.timestamp >= FRESH_TTL_MS) {
+      getDeliverables({ forceRefresh: true }).catch(() => {});
+    }
+    const allSummary = buildDeliverablesSummary(
+      cachedDeliv.data,
+      cachedComp.data,
+      cachedGrp.data,
+      cachedCtr?.data || []
+    );
+    return allSummary.filter(d => d.companyId === companyId);
+  }
+
   const [{ data, error }, company, groups] = await Promise.all([
     supabase.from('deliverables').select('*').eq('company_id', companyId),
     getCompanyById(companyId),
     getGroups(),
   ]);
-  if (error) { console.error('Error fetching deliverables by company:', error); return []; }
+  if (error) { logSafeError('getDeliverablesByCompany', error); return []; }
   const siblings = company?.groupId ? await getCompaniesByGroup(company.groupId) : (company ? [company] : []);
   const resolvedList = resolveCompaniesWithHeritage(siblings.length > 0 ? siblings : (company ? [company] : []), groups);
   const resolved = resolvedList.find(c => c.id === companyId) || (company ? resolveCompaniesWithHeritage([company], groups)[0] : null);
 
-  return data
+  return (data || [])
     .filter(row => !isS2240Row(row))
     .map(mapDeliverable)
     .map(d => ({
@@ -886,9 +1175,13 @@ export async function getDeliverablesByCompany(companyId) {
 }
 
 export async function getDeliverablesByContract(contractId) {
+  const cached = readCacheEntry('deliverables');
+  if (cached && Array.isArray(cached.data)) {
+    return cached.data.filter(d => d.contractId === contractId);
+  }
   const { data, error } = await supabase.from('deliverables').select('*').eq('contract_id', contractId);
-  if (error) { console.error('Error fetching deliverables by contract:', error); return []; }
-  return data.filter(row => !isS2240Row(row)).map(mapDeliverable);
+  if (error) { logSafeError('getDeliverablesByContract', error); return []; }
+  return (data || []).filter(row => !isS2240Row(row)).map(mapDeliverable);
 }
 
 export async function addDeliverable(deliverable) {
@@ -947,9 +1240,10 @@ export async function addDeliverable(deliverable) {
         upRes = await supabase.from('deliverables').update(updatePayload).eq('id', existing.id).select().single();
       }
       if (upRes.error) {
-        console.error('Error updating existing deliverable for company:', upRes.error);
+        logSafeError('addDeliverable.updateExisting', upRes.error);
         return null;
       }
+      invalidateStorageCache(['deliverables']);
       return mapDeliverable(upRes.data);
     }
   }
@@ -976,7 +1270,8 @@ export async function addDeliverable(deliverable) {
     delete insertPayload.data_emissao;
     insRes = await supabase.from('deliverables').insert([insertPayload]).select().single();
   }
-  if (insRes.error) { console.error('Error adding deliverable:', insRes.error); return null; }
+  if (insRes.error) { logSafeError('addDeliverable', insRes.error); return null; }
+  invalidateStorageCache(['deliverables']);
   return mapDeliverable(insRes.data);
 }
 
@@ -1025,9 +1320,7 @@ export async function updateDeliverable(deliverableId, updates) {
     data = fbRes.data;
     error = fbRes.error;
   }
-  if (error) { console.error('Error updating deliverable:', error); return null; }
-
-
+  if (error) { logSafeError('updateDeliverable', error); return null; }
 
   // Sincronizar com treinamentos (se for um treinamento)
   if (updates.status) {
@@ -1043,6 +1336,7 @@ export async function updateDeliverable(deliverableId, updates) {
     }
   }
 
+  invalidateStorageCache(['deliverables', 'trainings']);
   return mapDeliverable(data);
 }
 
@@ -1053,9 +1347,10 @@ export async function deleteDeliverable(deliverableId) {
     .eq('id', deliverableId);
 
   if (error) {
-    console.error('Error deleting deliverable:', error);
-    throw error;
+    logSafeError('deleteDeliverable', error);
+    throw createSafeError(sanitizeErrorMessage(error, 'Não foi possível excluir o entregável.'));
   }
+  invalidateStorageCache(['deliverables']);
   return true;
 }
 
@@ -1067,36 +1362,22 @@ export async function deleteDeliverables(deliverableIds) {
     .in('id', deliverableIds);
 
   if (error) {
-    console.error('Error bulk deleting deliverables:', error);
-    throw error;
+    logSafeError('deleteDeliverables', error);
+    throw createSafeError(sanitizeErrorMessage(error, 'Não foi possível excluir os entregáveis selecionados.'));
   }
+  invalidateStorageCache(['deliverables']);
   return true;
 }
 
-export async function getAllDeliverablesSummary() {
+export async function getAllDeliverablesSummary(options = {}) {
   const [deliverables, companies, groups, contracts] = await Promise.all([
-    getDeliverables(),
-    getCompanies(),
-    getGroups(),
-    getContracts(),
+    getDeliverables(options),
+    getCompanies(options),
+    getGroups(options),
+    getContracts(options),
   ]);
 
-  const resolvedCompanies = resolveCompaniesWithHeritage(companies, groups);
-  const companiesById = new Map(resolvedCompanies.map(c => [c.id, c]));
-  const contractsById = new Map(contracts.map(c => [c.id, c]));
-
-  return deliverables.map(d => {
-    const comp = companiesById.get(d.companyId);
-    return {
-      ...d,
-      companyName: comp?.name || 'N/A',
-      groupId: comp?.groupId || null,
-      groupName: comp?.groupName || 'Sem Grupo',
-      supervisor: comp?.effSupervisor || 'Não definido',
-      tecnicoResponsavel: comp?.effTecnico || 'Não definido',
-      contractNumber: contractsById.get(d.contractId)?.contractNumber || 'N/A',
-    };
-  });
+  return buildDeliverablesSummary(deliverables, companies, groups, contracts);
 }
 
 const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
@@ -1108,18 +1389,18 @@ const ALLOWED_UPLOAD_EXTENSIONS = new Set([
 // --- Storage (Arquivos) ---
 export async function uploadDocument(file, folderPath, options = {}) {
   if (!file) {
-    throw new Error('Nenhum arquivo selecionado para envio.');
+    throw createSafeError('Nenhum arquivo selecionado para envio.');
   }
 
   if (typeof file.size === 'number' && file.size > MAX_UPLOAD_SIZE_BYTES) {
-    throw new Error('O arquivo excede o tamanho máximo permitido de 25 MB.');
+    throw createSafeError('O arquivo excede o tamanho máximo permitido de 25 MB.');
   }
 
   const originalParts = String(file.name || '').split('.');
   const rawOriginalExt = originalParts.length > 1 ? originalParts.pop() : '';
   const safeOriginalExt = rawOriginalExt.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!safeOriginalExt || !ALLOWED_UPLOAD_EXTENSIONS.has(safeOriginalExt)) {
-    throw new Error(`Tipo de arquivo não permitido (.${safeOriginalExt || 'desconhecido'}).`);
+    throw createSafeError(`Tipo de arquivo não permitido (.${safeOriginalExt || 'desconhecido'}).`);
   }
 
   let fileToUpload = file;
@@ -1129,14 +1410,14 @@ export async function uploadDocument(file, folderPath, options = {}) {
   }
 
   if (typeof fileToUpload.size === 'number' && fileToUpload.size > MAX_UPLOAD_SIZE_BYTES) {
-    throw new Error('O arquivo comprimido ainda excede o tamanho máximo permitido de 25 MB.');
+    throw createSafeError('O arquivo comprimido ainda excede o tamanho máximo permitido de 25 MB.');
   }
 
   const nameParts = String(fileToUpload.name || '').split('.');
   const rawExt = nameParts.length > 1 ? nameParts.pop() : '';
   const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!safeExt || !ALLOWED_UPLOAD_EXTENSIONS.has(safeExt)) {
-    throw new Error(`Tipo de arquivo não permitido (.${safeExt || 'desconhecido'}).`);
+    throw createSafeError(`Tipo de arquivo não permitido (.${safeExt || 'desconhecido'}).`);
   }
 
   const safeFolder = String(folderPath || 'misc')
@@ -1190,24 +1471,26 @@ export function getDocumentUrl(filePath) {
 }
 
 // --- Inventory ---
-export async function getInventory() {
-  const { data, error } = await supabase.from('inventory').select('*').order('name', { ascending: true });
-  if (error) { console.error('Error fetching inventory:', error); return []; }
-  
-  return data.map(item => {
-    let sector = 'Clínica';
-    let cleanCategory = item.category || '';
+export async function getInventory(options = {}) {
+  return fetchWithSWR('inventory', async () => {
+    const { data, error } = await supabase.from('inventory').select('*').order('name', { ascending: true });
+    if (error) { logSafeError('getInventory', error); return []; }
     
-    if (cleanCategory.startsWith('[SST]')) {
-      sector = 'SST';
-      cleanCategory = cleanCategory.replace('[SST]', '').trim();
-    } else if (cleanCategory.startsWith('[Clínica]')) {
-      sector = 'Clínica';
-      cleanCategory = cleanCategory.replace('[Clínica]', '').trim();
-    }
-    
-    return { ...item, sector, category: cleanCategory };
-  });
+    return (data || []).map(item => {
+      let sector = 'Clínica';
+      let cleanCategory = item.category || '';
+      
+      if (cleanCategory.startsWith('[SST]')) {
+        sector = 'SST';
+        cleanCategory = cleanCategory.replace('[SST]', '').trim();
+      } else if (cleanCategory.startsWith('[Clínica]')) {
+        sector = 'Clínica';
+        cleanCategory = cleanCategory.replace('[Clínica]', '').trim();
+      }
+      
+      return { ...item, sector, category: cleanCategory };
+    });
+  }, options);
 }
 
 export async function addInventoryItem(item) {
@@ -1219,7 +1502,8 @@ export async function addInventoryItem(item) {
     payload.category = `[Clínica] ${payload.category || ''}`.trim();
   }
   const { data, error } = await supabase.from('inventory').insert([payload]).select().single();
-  if (error) { console.error('Error adding inventory item:', error); return null; }
+  if (error) { logSafeError('addInventoryItem', error); return null; }
+  invalidateStorageCache(['inventory']);
   return data;
 }
 
@@ -1230,20 +1514,24 @@ export async function updateInventoryItem(itemId, updates) {
     delete payload.sector;
   }
   const { data, error } = await supabase.from('inventory').update(payload).eq('id', itemId).select().single();
-  if (error) { console.error('Error updating inventory item:', error); return null; }
+  if (error) { logSafeError('updateInventoryItem', error); return null; }
+  invalidateStorageCache(['inventory']);
   return data;
 }
 
 export async function deleteInventoryItem(itemId) {
   const { error } = await supabase.from('inventory').delete().eq('id', itemId);
-  if (error) console.error('Error deleting inventory item:', error);
+  if (error) logSafeError('deleteInventoryItem', error);
+  invalidateStorageCache(['inventory']);
 }
 
 // --- Profiles / Users ---
-export async function getProfiles() {
-  const { data, error } = await supabase.from('profiles').select('id, name, role').order('name', { ascending: true });
-  if (error) { console.error('Error fetching profiles:', error); return []; }
-  return data;
+export async function getProfiles(options = {}) {
+  return fetchWithSWR('profiles', async () => {
+    const { data, error } = await supabase.from('profiles').select('id, name, role').order('name', { ascending: true });
+    if (error) { logSafeError('getProfiles', error); return []; }
+    return data || [];
+  }, options);
 }
 
 // --- Custom Trainings (Certificates) ---

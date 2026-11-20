@@ -7,7 +7,8 @@ import { Link } from 'react-router-dom';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  getContracts, getDeliverables, getTrainings, getCompanies, getGroups, getProfiles
+  getContracts, getDeliverables, getTrainings, getCompanies, getGroups, getProfiles,
+  getCachedSnapshot, subscribeToStorageCache, resolveCompaniesWithHeritage
 } from '../services/storageService';
 import {
   isDelivered,
@@ -69,13 +70,14 @@ function isCompanyAssignedTo(company, personName, personId) {
 const Dashboard = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  const [contracts, setContracts] = useState([]);
-  const [deliverables, setDeliverables] = useState([]);
-  const [trainings, setTrainings] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialSnap = useMemo(() => getCachedSnapshot(), []);
+  const [contracts, setContracts] = useState(() => initialSnap.contracts);
+  const [deliverables, setDeliverables] = useState(() => initialSnap.deliverables);
+  const [trainings, setTrainings] = useState(() => initialSnap.trainings);
+  const [companies, setCompanies] = useState(() => initialSnap.companies);
+  const [groups, setGroups] = useState(() => initialSnap.groups);
+  const [profiles, setProfiles] = useState(() => initialSnap.profiles);
+  const [loading, setLoading] = useState(() => !initialSnap.hasCoreCache);
 
   // Tabs de visualização:
   // #1 SUPERVISOR OU TÉCNICO RESPONSÁVEL | #2 VISÃO GERAL
@@ -83,6 +85,7 @@ const Dashboard = () => {
   const [filterResp, setFilterResp] = useState(null); // null = aguarda detecção do usuário logado
 
   useEffect(() => {
+    let active = true;
     async function loadData() {
       const [c, d, t, comp, g, profs] = await Promise.all([
         getContracts(),
@@ -92,6 +95,7 @@ const Dashboard = () => {
         getGroups(),
         getProfiles()
       ]);
+      if (!active) return;
       setContracts(c || []);
       setDeliverables(d || []);
       setTrainings(t || []);
@@ -101,43 +105,32 @@ const Dashboard = () => {
       setLoading(false);
     }
     loadData();
+
+    const unsubscribe = subscribeToStorageCache((key, data) => {
+      if (!active || !Array.isArray(data)) return;
+      if (key === 'contracts') setContracts(data);
+      else if (key === 'deliverables') setDeliverables(data);
+      else if (key === 'trainings') setTrainings(data);
+      else if (key === 'companies') setCompanies(data);
+      else if (key === 'groups') setGroups(data);
+      else if (key === 'profiles') setProfiles(data);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
-  const groupsMap = useMemo(() => {
-    const map = {};
-    groups.forEach(g => { map[g.id] = g; });
-    return map;
-  }, [groups]);
+  const companiesWithHeritage = useMemo(
+    () => resolveCompaniesWithHeritage(companies, groups),
+    [companies, groups]
+  );
 
-  const companiesWithHeritage = useMemo(() => {
-    // Para cada grupo, resolve o Supervisor, Técnico Responsável e Visitas Técnicas
-    // considerando o grupo ou qualquer empresa pertencente ao grupo
-    const groupResolvedTeam = {};
-    groups.forEach(g => {
-      const compsInG = companies.filter(c => c.groupId === g.id);
-      const sup = g.supervisor || compsInG.find(c => c.supervisor)?.supervisor || compsInG.find(c => c.supportResponsible)?.supportResponsible || '';
-      const tec = g.tecnicoResponsavel || compsInG.find(c => c.tecnicoResponsavel)?.tecnicoResponsavel || compsInG.find(c => c.responsible)?.responsible || '';
-      const vis = (g.visitasTecnicas && g.visitasTecnicas !== 'N/A')
-        ? g.visitasTecnicas
-        : (compsInG.find(c => c.visitasTecnicas && c.visitasTecnicas !== 'N/A')?.visitasTecnicas || 'N/A');
-      groupResolvedTeam[g.id] = { sup, tec, vis };
-    });
-
-    return companies.map(c => {
-      const g = groupsMap[c.groupId];
-      const gResolved = c.groupId ? groupResolvedTeam[c.groupId] : null;
-      const effSupervisor = gResolved?.sup || g?.supervisor || c.supervisor || c.supportResponsible || '';
-      const effTecnico = gResolved?.tec || g?.tecnicoResponsavel || c.tecnicoResponsavel || c.responsible || '';
-      const effVisitas = (gResolved?.vis && gResolved.vis !== 'N/A') ? gResolved.vis : ((g?.visitasTecnicas && g.visitasTecnicas !== 'N/A') ? g.visitasTecnicas : (c.visitasTecnicas || 'N/A'));
-      return {
-        ...c,
-        groupName: g?.name || 'Sem Grupo',
-        effSupervisor: effSupervisor || 'Não definido',
-        effTecnico: effTecnico || 'Não definido',
-        effVisitas: effVisitas || 'N/A',
-      };
-    });
-  }, [companies, groups, groupsMap]);
+  const companiesById = useMemo(
+    () => new Map(companiesWithHeritage.map(c => [c.id, c])),
+    [companiesWithHeritage]
+  );
 
   // Prazos: A Vencer em 30 dias (vermelho) e 60 dias (amarelo)
   const today = useMemo(() => {
@@ -151,27 +144,96 @@ const Dashboard = () => {
 
   const isDelivered = (d) => ['entregue', 'feito', 'concluido'].includes(d.status);
 
+  // Pré-indexação única O(N) de entregáveis e treinamentos por empresa (evita 85.000+ recálculos de data por render)
+  const { annotatedDeliverables, deliverablesByCompanyId, trainingsByCompanyId } = useMemo(() => {
+    const delivByComp = new Map();
+    const annotated = deliverables.map((d) => {
+      const pcaPprAet = isPcaPprAet(d);
+      const isActive = d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !pcaPprAet;
+      const isDeliv = ['entregue', 'feito', 'concluido'].includes(d.status);
+      const isExp = isActive ? isItemExpired(d, today) : false;
+      const isExp30 = isActive && !isExp ? isItemExpiring30(d, today, in30Days) : false;
+      const isExp60 = isActive && !isExp && !isExp30 ? isItemExpiring60(d, today, in30Days, in60Days) : false;
+      const isDeliveredValid = isActive && isDeliv && !isExp && !isExp30 && !isExp60;
+      const isRegular = isActive && !isDeliv && !isExp && !isExp30 && !isExp60;
+      const isPend = isPendingDeliverable(d);
+      const effVal = isActive ? getEffectiveValidityDate(d) : null;
+      const sortDate = effVal
+        ? effVal.toISOString().split('T')[0]
+        : (!isDeliv ? (d.dueDate || '9999-12-31') : '9999-12-31');
+      const companyName = companiesById.get(d.companyId)?.name || 'Empresa';
+
+      const item = {
+        ...d,
+        companyName,
+        _isPcaPprAet: pcaPprAet,
+        _isActive: isActive,
+        _isDeliv: isDeliv,
+        _isExpired: isExp,
+        _isExp30: isExp30,
+        _isExp60: isExp60,
+        _isDeliveredValid: isDeliveredValid,
+        _isRegular: isRegular,
+        _isPend: isPend,
+        _sortDate: sortDate,
+      };
+
+      if (d.companyId) {
+        let list = delivByComp.get(d.companyId);
+        if (!list) {
+          list = [];
+          delivByComp.set(d.companyId, list);
+        }
+        list.push(item);
+      }
+      return item;
+    });
+
+    const trnByComp = new Map();
+    trainings.forEach((t) => {
+      if (!t.companyId) return;
+      let list = trnByComp.get(t.companyId);
+      if (!list) {
+        list = [];
+        trnByComp.set(t.companyId, list);
+      }
+      list.push(t);
+    });
+
+    return {
+      annotatedDeliverables: annotated,
+      deliverablesByCompanyId: delivByComp,
+      trainingsByCompanyId: trnByComp,
+    };
+  }, [deliverables, trainings, companiesById, today, in30Days, in60Days]);
+
   // Análise Global de Entregáveis
   const deliverablesAnalysis = useMemo(() => {
-    const activeDeliverables = deliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
-    const expired = activeDeliverables.filter(d => isItemExpired(d, today));
-    const expiring30 = activeDeliverables.filter(d => isItemExpiring30(d, today, in30Days));
-    const expiring60 = activeDeliverables.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
-    const delivered = activeDeliverables.filter(d => 
-      isDelivered(d) && 
-      !isItemExpired(d, today) && 
-      !isItemExpiring30(d, today, in30Days) && 
-      !isItemExpiring60(d, today, in30Days, in60Days)
-    );
-    const regular = activeDeliverables.filter(d => 
-      !isDelivered(d) && 
-      !isItemExpired(d, today) && 
-      !isItemExpiring30(d, today, in30Days) && 
-      !isItemExpiring60(d, today, in30Days, in60Days)
-    );
-    const pending = activeDeliverables.filter(d => !isDelivered(d));
+    const activeDeliverables = [];
+    const expired = [];
+    const expiring30 = [];
+    const expiring60 = [];
+    const delivered = [];
+    const regular = [];
+    const pending = [];
+
+    for (let i = 0; i < annotatedDeliverables.length; i++) {
+      const d = annotatedDeliverables[i];
+      if (!d._isActive) continue;
+      activeDeliverables.push(d);
+      if (d._isExpired) expired.push(d);
+      else if (d._isExp30) expiring30.push(d);
+      else if (d._isExp60) expiring60.push(d);
+      else if (d._isDeliveredValid) delivered.push(d);
+      else if (d._isRegular) regular.push(d);
+      if (!d._isDeliv) pending.push(d);
+    }
 
     const total = activeDeliverables.length || 1;
+    const pctDelivered = Math.round((delivered.length / total) * 100);
+    const pctExpired = Math.round((expired.length / total) * 100);
+    const pct30 = Math.round((expiring30.length / total) * 100);
+    const pct60 = Math.round((expiring60.length / total) * 100);
     return {
       total: activeDeliverables.length,
       delivered,
@@ -180,13 +242,13 @@ const Dashboard = () => {
       expiring30,
       expiring60,
       regular,
-      pctDelivered: Math.round((delivered.length / total) * 100),
-      pctExpired: Math.round((expired.length / total) * 100),
-      pct30: Math.round((expiring30.length / total) * 100),
-      pct60: Math.round((expiring60.length / total) * 100),
-      pctRegular: Math.max(0, 100 - Math.round((delivered.length / total) * 100) - Math.round((expired.length / total) * 100) - Math.round((expiring30.length / total) * 100) - Math.round((expiring60.length / total) * 100)),
+      pctDelivered,
+      pctExpired,
+      pct30,
+      pct60,
+      pctRegular: Math.max(0, 100 - pctDelivered - pctExpired - pct30 - pct60),
     };
-  }, [deliverables, today, in30Days, in60Days]);
+  }, [annotatedDeliverables]);
 
   // Identificação do Usuário Logado
   const loggedUserName = userProfile?.name || user?.user_metadata?.full_name || '';
@@ -256,33 +318,42 @@ const Dashboard = () => {
       const relatedCompanies = companiesWithHeritage.filter(c =>
         isCompanyAssignedTo(c, name, isSamePerson(name, loggedUserName) ? loggedUserId : undefined)
       );
-      const companyIds = new Set(relatedCompanies.map(c => c.id));
-      const respDeliverables = deliverables.filter(d => companyIds.has(d.companyId));
-      const activeRespDeliv = respDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
-      const expired = activeRespDeliv.filter(d => isItemExpired(d, today));
-      const exp30 = activeRespDeliv.filter(d => isItemExpiring30(d, today, in30Days));
-      const exp60 = activeRespDeliv.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
-      const deliveredDeliverables = activeRespDeliv.filter(d => 
-        isDelivered(d) && 
-        !isItemExpired(d, today) && 
-        !isItemExpiring30(d, today, in30Days) && 
-        !isItemExpiring60(d, today, in30Days, in60Days)
-      );
-      const pendingDeliverables = activeRespDeliv.filter(d => !isDelivered(d));
+
+      let totalDeliverables = 0;
+      let deliveredCount = 0;
+      let pendingDeliverablesCount = 0;
+      let expiredCount = 0;
+      let exp30Count = 0;
+      let exp60Count = 0;
+
+      for (let i = 0; i < relatedCompanies.length; i++) {
+        const compDelivs = deliverablesByCompanyId.get(relatedCompanies[i].id);
+        if (!compDelivs) continue;
+        for (let j = 0; j < compDelivs.length; j++) {
+          const d = compDelivs[j];
+          if (!d._isActive) continue;
+          totalDeliverables++;
+          if (d._isExpired) expiredCount++;
+          else if (d._isExp30) exp30Count++;
+          else if (d._isExp60) exp60Count++;
+          if (d._isDeliveredValid) deliveredCount++;
+          if (!d._isDeliv) pendingDeliverablesCount++;
+        }
+      }
 
       return {
         name,
         companies: relatedCompanies,
         totalCompanies: relatedCompanies.length,
-        totalDeliverables: activeRespDeliv.length,
-        deliveredCount: deliveredDeliverables.length,
-        pendingDeliverablesCount: pendingDeliverables.length,
-        expiredCount: expired.length,
-        exp30Count: exp30.length,
-        exp60Count: exp60.length,
+        totalDeliverables,
+        deliveredCount,
+        pendingDeliverablesCount,
+        expiredCount,
+        exp30Count,
+        exp60Count,
       };
     }).filter(r => r.totalCompanies > 0);
-  }, [responsiblesList, companiesWithHeritage, deliverables, today, in30Days, in60Days, loggedUserName, loggedUserId]);
+  }, [responsiblesList, companiesWithHeritage, deliverablesByCompanyId, loggedUserName, loggedUserId]);
 
   // Dados exclusivos para a pessoa selecionada (ou usuário logado)
   const selectedPersonData = useMemo(() => {
@@ -299,25 +370,35 @@ const Dashboard = () => {
       isCompanyTecnico(c, activePerson, isSamePerson(activePerson, loggedUserName) ? loggedUserId : undefined)
     );
 
-    const companyIds = new Set(personCompanies.map(c => c.id));
-    const personDeliverables = deliverables.filter(d => companyIds.has(d.companyId));
-    const activePersonDeliv = personDeliverables.filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d));
-    const expired = activePersonDeliv.filter(d => isItemExpired(d, today));
-    const exp30 = activePersonDeliv.filter(d => isItemExpiring30(d, today, in30Days));
-    const exp60 = activePersonDeliv.filter(d => isItemExpiring60(d, today, in30Days, in60Days));
-    const delivered = activePersonDeliv.filter(d => 
-      isDelivered(d) && 
-      !isItemExpired(d, today) && 
-      !isItemExpiring30(d, today, in30Days) && 
-      !isItemExpiring60(d, today, in30Days, in60Days)
-    );
-    const regular = activePersonDeliv.filter(d => 
-      !isDelivered(d) && 
-      !isItemExpired(d, today) && 
-      !isItemExpiring30(d, today, in30Days) && 
-      !isItemExpiring60(d, today, in30Days, in60Days)
-    );
-    const pending = activePersonDeliv.filter(d => !isDelivered(d));
+    const personDeliverables = [];
+    const personTrainings = [];
+    for (let i = 0; i < personCompanies.length; i++) {
+      const cid = personCompanies[i].id;
+      const compDelivs = deliverablesByCompanyId.get(cid);
+      if (compDelivs) personDeliverables.push(...compDelivs);
+      const compTrainings = trainingsByCompanyId.get(cid);
+      if (compTrainings) personTrainings.push(...compTrainings);
+    }
+
+    const activePersonDeliv = [];
+    const expired = [];
+    const exp30 = [];
+    const exp60 = [];
+    const delivered = [];
+    const regular = [];
+    const pending = [];
+
+    for (let i = 0; i < personDeliverables.length; i++) {
+      const d = personDeliverables[i];
+      if (!d._isActive) continue;
+      activePersonDeliv.push(d);
+      if (d._isExpired) expired.push(d);
+      else if (d._isExp30) exp30.push(d);
+      else if (d._isExp60) exp60.push(d);
+      if (d._isDeliveredValid) delivered.push(d);
+      if (d._isRegular) regular.push(d);
+      if (!d._isDeliv) pending.push(d);
+    }
 
     const total = activePersonDeliv.length || 1;
     const pctDelivered = Math.round((delivered.length / total) * 100);
@@ -326,24 +407,18 @@ const Dashboard = () => {
     const pct60 = Math.round((exp60.length / total) * 100);
     const pctRegular = Math.max(0, 100 - pctDelivered - pctExpired - pct30 - pct60);
 
-    const getCompName = (id) => personCompanies.find(c => c.id === id)?.name || 'Empresa';
+    const getCompName = (id) => companiesById.get(id)?.name || 'Empresa';
 
     // Priorizar vencidos e com prazo crítico na lista de ação
     const upcomingDeliverables = [...expired, ...exp30, ...exp60, ...regular]
       .sort((a, b) => {
-        const expA = isItemExpired(a, today);
-        const expB = isItemExpired(b, today);
-        if (expA && !expB) return -1;
-        if (!expA && expB) return 1;
-        const critA = isItemExpiring30(a, today, in30Days) || isItemExpiring60(a, today, in30Days, in60Days);
-        const critB = isItemExpiring30(b, today, in30Days) || isItemExpiring60(b, today, in30Days, in60Days);
+        if (a._isExpired && !b._isExpired) return -1;
+        if (!a._isExpired && b._isExpired) return 1;
+        const critA = a._isExp30 || a._isExp60;
+        const critB = b._isExp30 || b._isExp60;
         if (critA && !critB) return -1;
         if (!critA && critB) return 1;
-        const effA = getEffectiveValidityDate(a);
-        const effB = getEffectiveValidityDate(b);
-        const dateA = effA ? effA.toISOString().split('T')[0] : (!isDelivered(a) ? (a.dueDate || '9999-12-31') : '9999-12-31');
-        const dateB = effB ? effB.toISOString().split('T')[0] : (!isDelivered(b) ? (b.dueDate || '9999-12-31') : '9999-12-31');
-        return dateA.localeCompare(dateB);
+        return a._sortDate.localeCompare(b._sortDate);
       })
       .slice(0, 6)
       .map(d => ({
@@ -351,7 +426,6 @@ const Dashboard = () => {
         companyName: getCompName(d.companyId),
       }));
 
-    const personTrainings = trainings.filter(t => companyIds.has(t.companyId));
     const sched = personTrainings
       .filter(t => t.date)
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -362,7 +436,7 @@ const Dashboard = () => {
       }));
 
     const pendTrainDeliv = personDeliverables
-      .filter(d => d.type === 'treinamento' && !isDelivered(d) && d.status !== 'cancelado')
+      .filter(d => d.type === 'treinamento' && !d._isDeliv && d.status !== 'cancelado')
       .map(d => ({
         id: d.id,
         title: d.title,
@@ -396,22 +470,23 @@ const Dashboard = () => {
       upcomingDeliverables,
       upcomingTrainings,
     };
-  }, [activePerson, companiesWithHeritage, deliverables, trainings, in30Days, in60Days, loggedUserName, loggedUserId]);
+  }, [activePerson, companiesWithHeritage, companiesById, deliverablesByCompanyId, trainingsByCompanyId, loggedUserName, loggedUserId]);
 
   // Empresas que possuem programas ou entregáveis vencidos (Consolidado)
   const companiesWithExpiredList = useMemo(() => {
     const map = new Map();
-    deliverables.forEach(d => {
-      if (isItemExpired(d, today)) {
+    for (let i = 0; i < annotatedDeliverables.length; i++) {
+      const d = annotatedDeliverables[i];
+      if (d._isExpired) {
         if (!map.has(d.companyId)) {
           map.set(d.companyId, []);
         }
         map.get(d.companyId).push(d);
       }
-    });
+    }
 
     return Array.from(map.entries()).map(([compId, items]) => {
-      const comp = companiesWithHeritage.find(c => c.id === compId);
+      const comp = companiesById.get(compId);
       const programs = items.filter(it => it.type === 'programa');
       return {
         companyId: compId,
@@ -422,14 +497,60 @@ const Dashboard = () => {
       };
     }).filter(entry => entry.company)
       .sort((a, b) => (b.hasExpiredPrograms - a.hasExpiredPrograms) || (b.expiredItems.length - a.expiredItems.length));
-  }, [deliverables, companiesWithHeritage, today]);
+  }, [annotatedDeliverables, companiesById]);
+
+  const getCompanyName = (companyId) => companiesById.get(companyId)?.name || 'N/A';
+
+  const globalUpcomingDeliverables = useMemo(() => {
+    return annotatedDeliverables
+      .filter(d => d._isActive && (d._isExpired || d._isExp30 || d._isExp60 || !d._isDeliv))
+      .sort((a, b) => {
+        if (a._isExpired && !b._isExpired) return -1;
+        if (!a._isExpired && b._isExpired) return 1;
+        const critA = a._isExp30 || a._isExp60;
+        const critB = b._isExp30 || b._isExp60;
+        if (critA && !critB) return -1;
+        if (!critA && critB) return 1;
+        return a._sortDate.localeCompare(b._sortDate);
+      })
+      .slice(0, 6)
+      .map(d => ({
+        ...d,
+        companyName: companiesById.get(d.companyId)?.name || 'N/A',
+      }));
+  }, [annotatedDeliverables, companiesById]);
+
+  const globalUpcomingTrainings = useMemo(() => {
+    const sched = trainings
+      .filter(t => t.date)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(t => ({
+        ...t,
+        companyName: companiesById.get(t.companyId)?.name || 'N/A',
+        isDeliverable: false
+      }));
+
+    const pendTrainDeliv = annotatedDeliverables
+      .filter(d => d.type === 'treinamento' && !d._isDeliv && d.status !== 'cancelado')
+      .map(d => ({
+        id: d.id,
+        title: d.title,
+        companyName: companiesById.get(d.companyId)?.name || 'N/A',
+        date: d.dueDate || '',
+        time: 'Pendente de Agendamento',
+        status: 'pendente',
+        isDeliverable: true
+      }));
+
+    return [...sched, ...pendTrainDeliv].slice(0, 5);
+  }, [trainings, annotatedDeliverables, companiesById]);
 
   if (loading || authLoading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Carregando dados do painel...</div>;
   }
 
   const activeContracts = contracts.filter(c => c.status === 'ativo').length;
-  const pendingDeliverables = deliverables.filter(d => isPendingDeliverable(d)).length;
+  const pendingDeliverables = annotatedDeliverables.filter(d => isPendingDeliverable(d)).length;
   const completedTrainings = trainings.filter(t => t.status === 'concluido').length;
   const attentionItems = trainings.filter(t => t.status === 'nao_feito' || t.status === 'adiado').length;
 
@@ -441,59 +562,6 @@ const Dashboard = () => {
     { title: 'Treinamentos Concluídos', value: String(completedTrainings), icon: <Users size={16} color="var(--secondary)" />, trend: `de ${trainings.length} agendados` },
     { title: 'Atenção Requerida', value: String(attentionItems), icon: <AlertTriangle size={16} color="var(--danger)" />, trend: 'Adiados / Não feitos' },
   ];
-
-  const getCompanyName = (companyId) => companies.find(c => c.id === companyId)?.name || 'N/A';
-
-  const globalUpcomingDeliverables = deliverables
-    .filter(d => d.status !== 'cancelado' && d.status !== 'nao_se_aplica' && !isPcaPprAet(d) && (
-      isItemExpired(d, today) ||
-      isItemExpiring30(d, today, in30Days) ||
-      isItemExpiring60(d, today, in30Days, in60Days) ||
-      !isDelivered(d)
-    ))
-    .sort((a, b) => {
-      const expA = isItemExpired(a, today);
-      const expB = isItemExpired(b, today);
-      if (expA && !expB) return -1;
-      if (!expA && expB) return 1;
-      const critA = isItemExpiring30(a, today, in30Days) || isItemExpiring60(a, today, in30Days, in60Days);
-      const critB = isItemExpiring30(b, today, in30Days) || isItemExpiring60(b, today, in30Days, in60Days);
-      if (critA && !critB) return -1;
-      if (!critA && critB) return 1;
-      const effA = getEffectiveValidityDate(a);
-      const effB = getEffectiveValidityDate(b);
-      const dateA = effA ? effA.toISOString().split('T')[0] : (!isDelivered(a) ? (a.dueDate || '9999-12-31') : '9999-12-31');
-      const dateB = effB ? effB.toISOString().split('T')[0] : (!isDelivered(b) ? (b.dueDate || '9999-12-31') : '9999-12-31');
-      return dateA.localeCompare(dateB);
-    })
-    .slice(0, 6)
-    .map(d => ({
-      ...d,
-      companyName: getCompanyName(d.companyId),
-    }));
-
-  const globalUpcomingTrainingsScheduled = trainings
-    .filter(t => t.date)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map(t => ({
-      ...t,
-      companyName: getCompanyName(t.companyId),
-      isDeliverable: false
-    }));
-
-  const globalPendingTrainingDeliverables = deliverables
-    .filter(d => d.type === 'treinamento' && !isDelivered(d) && d.status !== 'cancelado')
-    .map(d => ({
-      id: d.id,
-      title: d.title,
-      companyName: getCompanyName(d.companyId),
-      date: d.dueDate || '',
-      time: 'Pendente de Agendamento',
-      status: 'pendente',
-      isDeliverable: true
-    }));
-
-  const globalUpcomingTrainings = [...globalUpcomingTrainingsScheduled, ...globalPendingTrainingDeliverables].slice(0, 5);
 
   const statusIcons = {
     concluido: <CheckCircle color="var(--secondary)" size={14} />,

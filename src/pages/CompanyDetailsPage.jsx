@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText,
@@ -8,7 +8,7 @@ import {
 import {
   getCompanyById, getGroups, getTrainingsByCompany,
   getDeliverablesByCompany, uploadDocument, getDocumentUrl, addDeliverable,
-  updateCompany, updateDeliverable
+  updateCompany, updateDeliverable, getCachedSnapshot, subscribeToStorageCache
 } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -49,19 +49,21 @@ const CompanyDetailsPage = () => {
   const paramTab = searchParams.get('tab');
   const activeTab = VALID_TAB_IDS.has(paramTab) ? paramTab : 'overview';
   
-  const [company, setCompany] = useState(null);
-  const [group, setGroup] = useState(null);
-  const [trainings, setTrainings] = useState([]);
-  const [deliverables, setDeliverables] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialSnap = useMemo(() => getCachedSnapshot(companyId), [companyId]);
+  const [company, setCompany] = useState(() => initialSnap.company || null);
+  const [group, setGroup] = useState(() => initialSnap.companyGroup || null);
+  const [trainings, setTrainings] = useState(() => initialSnap.companyTrainings || []);
+  const [deliverables, setDeliverables] = useState(() => initialSnap.companyDeliverables || []);
+  const [loading, setLoading] = useState(() => !initialSnap.hasCompanyDetailsCache);
   const [showDeliverableModal, setShowDeliverableModal] = useState(false);
   const [deliverableModalMode, setDeliverableModalMode] = useState('single');
   const [editingDeliverable, setEditingDeliverable] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [chatSummary, setChatSummary] = useState({ totalCount: 0, unreadCount: 0, tableMissing: false });
 
-  const loadData = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
+  const loadData = useCallback(async (showLoading = true) => {
+    const snap = getCachedSnapshot(companyId);
+    if (showLoading && !snap.hasCompanyDetailsCache) setLoading(true);
     const [comp, allGroups, trn, deliv] = await Promise.all([
       getCompanyById(companyId),
       getGroups(),
@@ -73,12 +75,29 @@ const CompanyDetailsPage = () => {
     setGroup(allGroups.find(g => g.id === comp?.groupId));
     setTrainings(trn);
     setDeliverables(deliv);
-    if (showLoading) setLoading(false);
-  };
+    setLoading(false);
+  }, [companyId]);
 
   useEffect(() => {
+    const snap = getCachedSnapshot(companyId);
+    if (snap.hasCompanyDetailsCache) {
+      setCompany(snap.company);
+      setGroup(snap.companyGroup);
+      setTrainings(snap.companyTrainings || []);
+      setDeliverables(snap.companyDeliverables || []);
+      setLoading(false);
+    }
     loadData(true);
-  }, [companyId]);
+
+    const unsub = subscribeToStorageCache(() => {
+      const nextSnap = getCachedSnapshot(companyId);
+      if (nextSnap.company) setCompany(nextSnap.company);
+      if (nextSnap.companyGroup) setGroup(nextSnap.companyGroup);
+      if (nextSnap.companyTrainings) setTrainings(nextSnap.companyTrainings);
+      if (nextSnap.companyDeliverables) setDeliverables(nextSnap.companyDeliverables);
+    });
+    return () => unsub();
+  }, [companyId, loadData]);
 
   useEffect(() => {
     let active = true;
@@ -139,13 +158,15 @@ const CompanyDetailsPage = () => {
 
   const handleAddDeliverable = async (dataOrArray) => {
     const items = Array.isArray(dataOrArray) ? dataOrArray : [dataOrArray];
-    for (const item of items) {
-      let fileName = null;
-      if (item.file) {
-        fileName = await uploadDocument(item.file, `deliverables/${companyId}`);
-      }
-      await addDeliverable({ ...item, fileName, companyId });
-    }
+    await Promise.all(
+      items.map(async (item) => {
+        let fileName = null;
+        if (item.file) {
+          fileName = await uploadDocument(item.file, `deliverables/${companyId}`);
+        }
+        return addDeliverable({ ...item, fileName, companyId });
+      })
+    );
     await loadData(false);
     setShowDeliverableModal(false);
   };
